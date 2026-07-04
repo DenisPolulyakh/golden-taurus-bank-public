@@ -1,0 +1,114 @@
+# Compiled files
+target/
+*.class
+
+# IDE files
+.idea/
+*.iml
+*.iws
+*.ipr
+.settings/
+.project
+.classpath
+.springBeans
+.sts4-cache
+
+# IntelliJ specific
+out/
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/usage.statistics.xml
+.idea/**/dictionaries
+.idea/**/shelf
+.idea/**/contentModel.xml
+.idea/**/dataSources/
+.idea/**/dataSources.ids
+.idea/**/dataSources.local.xml
+.idea/**/sqlDataSources.xml
+.idea/**/dynamic.xml
+.idea/**/uiDesigner.xml
+.idea/**/dbnavigator.xml
+.idea/**/gradle.xml
+.idea/**/libraries
+.idea/**/misc.xml
+.idea/**/modules.xml
+.idea/**/runConfigurations/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Eclipse
+*.project
+*.classpath
+.metadata/
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.loadpath
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+logs/
+*.log
+*.log.gz
+
+# Application specific
+application-local.yml
+application-dev.yml
+application-prod.yml
+
+# Docker
+*.pid
+docker-compose.override.yml
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.properties.backup
+
+# Frontend (React - добавите позже)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+build/
+dist/
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Backend generated
+*.h2.db
+*.lock
+HELP.md
+
+# Sensitive data
+*.p12
+*.jks
+*.key
+*.pem
+secrets.yml
+
+# Backup files
+*.backup
+
+# Environment files
+.env
+*.env
+
+# Application specific
+application-*.yml
+!application-example.yml
+
+# Local config
+config.local.yml

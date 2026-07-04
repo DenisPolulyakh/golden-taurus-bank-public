@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: golden_taurus_db
+    environment:
+      POSTGRES_DB: golden_taurus_db
+      POSTGRES_USER: taurus
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5485:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U goldentaurus"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

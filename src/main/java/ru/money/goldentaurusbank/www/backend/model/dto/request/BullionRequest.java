@@ -1,0 +1,25 @@
+package ru.money.goldentaurusbank.www.backend.model.dto.request;
+
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
+
+import java.math.BigDecimal;
+
+@Data
+public class BullionRequest {
+
+    @NotNull(message = "ID категории обязательно")
+    private Long categoryId;
+
+    @NotNull(message = "ID хранилища обязательно")
+    private Long vaultId;
+
+    @NotNull(message = "Сумма обязательна")
+    @PositiveOrZero(message = "Сумма не может быть отрицательной")
+    private BigDecimal amount;
+
+    @Size(max = 500, message = "Описание не должно превышать 500 символов")
+    private String description;
+}

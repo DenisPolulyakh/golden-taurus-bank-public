@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5485/golden_taurus_db
+    username: taurus
+    password: YOUR_DB_PASSWORD_HERE
+  
+  mail:
+    username: YOUR_EMAIL@yandex.ru
+    password: YOUR_EMAIL_PASSWORD_HERE
+
+app:
+  jwt:
+    secret: YOUR_JWT_SECRET_HERE

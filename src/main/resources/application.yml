@@ -1,0 +1,58 @@
+spring:
+  mail:
+    host: ${MAIL_HOST:smtp.yandex.ru}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    protocol: ${MAIL_PROTOCOL:smtps}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_STARTTLS_ENABLE:true}
+          ssl:
+            enable: ${MAIL_SSL_ENABLE:true}
+          socketFactory:
+            class: ${MAIL_SOCKET_FACTORY:javax.net.ssl.SSLSocketFactory}
+
+  application:
+    name: ${SPRING_APPLICATION_NAME:GoldenTaurusBank}
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5485/golden_taurus_db}
+    username: ${DB_USERNAME:taurus}
+    password: ${DB_PASSWORD:}
+    driver-class-name: ${DB_DRIVER:org.postgresql.Driver}
+
+  liquibase:
+    enabled: ${LIQUIBASE_ENABLED:true}
+    change-log: ${LIQUIBASE_CHANGE_LOG:classpath:db/changelog/master.yaml}
+    liquibase-schema: ${LIQUIBASE_SCHEMA:public}
+    default-schema: ${DB_SCHEMA:taurus}
+
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+    show-sql: ${JPA_SHOW_SQL:true}
+    properties:
+      hibernate:
+        default_schema: ${DB_SCHEMA:taurus}
+        dialect: ${JPA_DIALECT:org.hibernate.dialect.PostgreSQLDialect}
+
+server:
+  port: ${SERVER_PORT:8080}
+  address: ${SERVER_ADDRESS:0.0.0.0}
+
+app:
+  frontend:
+    url: ${FRONTEND_URL:http://localhost:3000}
+  jwt:
+    secret: ${JWT_SECRET:}
+    access-expiration: ${JWT_ACCESS_EXPIRATION:900000}
+    refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+
+logging:
+  level:
+    liquibase: ${LOG_LEVEL_LIQUIBASE:DEBUG}
+    org.hibernate.SQL: ${LOG_LEVEL_SQL:DEBUG}
