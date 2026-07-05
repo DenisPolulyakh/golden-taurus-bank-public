@@ -430,6 +430,15 @@ public class TransactionService {
 
         List<MonthlyDataDto> monthlyData = getMonthlyStatistics(userId, fromDate, toDate);
 
+
+        BigDecimal startBalance = getBalanceBeforeYear(userId, year);
+        BigDecimal cumulative = startBalance;
+
+        for (MonthlyDataDto month : monthlyData) {
+            cumulative = cumulative.add(month.getNetChange());
+            month.setSavings(cumulative);
+        }
+
         Object[] totalStats = transactionLogRepository.getTotalStatistics(userId, fromDate, toDate);
 
         BigDecimal totalIncome = BigDecimal.ZERO;
@@ -651,5 +660,34 @@ public class TransactionService {
                 .totalAmount(cumulativeTotal)
                 .dailyData(dailyData)
                 .build();
+
+    }
+
+
+    @Transactional(readOnly = true)
+    public BigDecimal getBalanceBeforeYear(Long userId, int year) {
+        LocalDateTime startOfYear = LocalDate.of(year, 1, 1).atStartOfDay();
+        LocalDateTime endOfPreviousYear = startOfYear.minusNanos(1);
+
+        Object[][] stats = transactionLogRepository.getTotalStatistics(
+                userId,
+                LocalDate.of(1970, 1, 1).atStartOfDay(),
+                endOfPreviousYear
+        );
+
+        if (stats != null && stats.length > 0) {
+            // Безопасное преобразование через Number
+            BigDecimal totalIncome = stats[0][0] != null && stats[0][0] instanceof Number
+                    ? BigDecimal.valueOf(((Number) stats[0][0]).doubleValue())
+                    : BigDecimal.ZERO;
+
+            BigDecimal totalExpense = stats[0][1] != null && stats[0][1] instanceof Number
+                    ? BigDecimal.valueOf(((Number) stats[0][1]).doubleValue())
+                    : BigDecimal.ZERO;
+
+            return totalIncome.subtract(totalExpense);
+        }
+
+        return BigDecimal.ZERO;
     }
 }

@@ -65,11 +65,9 @@ const SavingsChart = ({ refreshKey }) => {
                 params: { year: selectedYear }
             });
 
-            const total = response.data.totalIncome || 0;
-            setTotalSavings(total);
-
             let monthlyData = response.data.monthlyData || [];
 
+            // Если данных нет - создаем пустые месяцы
             if (monthlyData.length === 0) {
                 for (let i = 0; i < 12; i++) {
                     monthlyData.push({
@@ -78,28 +76,30 @@ const SavingsChart = ({ refreshKey }) => {
                         income: 0,
                         expense: 0,
                         netChange: 0,
+                        savings: 0, // Добавляем savings
                         transactionCount: 0
                     });
                 }
             }
 
-            let cumulativeTotal = 0;
-            const transformedData = monthlyData.map((item) => {
-                const [year, month] = item.month.split('-');
-                const monthlyChange = (item.income || 0) - (item.expense || 0);
-                cumulativeTotal += monthlyChange;
+            // Берем итоговые накопления из последнего месяца
+            const lastMonth = monthlyData[monthlyData.length - 1];
+            const total = lastMonth?.savings || 0;
+            setTotalSavings(total);
 
-                const monthNum = parseInt(month);
-                // Для годового режима определяем, наступил ли месяц
+            // Трансформируем данные - savings уже приходит с бэкенда
+            const transformedData = monthlyData.map((item) => {
+                const monthNum = parseInt(item.month.split('-')[1]);
                 const isFuture = selectedYear === currentYear && monthNum > currentMonth;
                 const isCurrentMonth = selectedYear === currentYear && monthNum === currentMonth;
 
                 return {
                     ...item,
-                    monthLabel: `${monthNames[parseInt(month) - 1]} ${year}`,
-                    savings: Math.round(cumulativeTotal * 100) / 100,
-                    monthNumber: parseInt(month),
-                    barColor: cumulativeTotal >= 0 ? '#667eea' : '#e53e3e',
+                    monthLabel: `${monthNames[monthNum - 1]} ${selectedYear}`,
+                    monthNumber: monthNum,
+                    // savings берем из ответа бэкенда
+                    savings: item.savings || 0,
+                    barColor: (item.savings || 0) >= 0 ? '#667eea' : '#e53e3e',
                     barOpacity: isFuture ? 0.35 : (isCurrentMonth ? 0.7 : 1)
                 };
             });

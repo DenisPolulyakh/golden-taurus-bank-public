@@ -78,7 +78,7 @@ public interface TransactionLogRepository extends JpaRepository<TransactionLog, 
             AND created_at >= :fromDate
             AND created_at <= :toDate
         """, nativeQuery = true)
-    Object[] getTotalStatistics(
+    Object[][] getTotalStatistics(
             @Param("userId") Long userId,
             @Param("fromDate") LocalDateTime fromDate,
             @Param("toDate") LocalDateTime toDate

@@ -13,10 +13,11 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MonthlyDataDto {
-    private String month;          // "2024-01"
-    private String monthLabel;     // "Янв 2024"
-    private BigDecimal income;     // пополнения
-    private BigDecimal expense;    // списания
-    private BigDecimal netChange;  // изменение (income - expense)
-    private Long transactionCount; // количество транзакций
+    private String month;
+    private String monthLabel;
+    private BigDecimal income;
+    private BigDecimal expense;
+    private BigDecimal netChange;
+    private BigDecimal savings;
+    private Long transactionCount;
 }

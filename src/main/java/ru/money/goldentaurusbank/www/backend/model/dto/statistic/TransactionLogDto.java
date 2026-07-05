@@ -24,8 +24,8 @@ public class TransactionLogDto {
     private String status;
     private String errorMessage;
     private LocalDateTime createdAt;
-    private Boolean canRollback;     // можно ли откатить
-    private Boolean canRedo;         // можно ли повторить
-    private String rollbackStatus;   // ROLLED_BACK / REDONE / null
+    private Boolean canRollback;
+    private Boolean canRedo;
+    private String rollbackStatus;
     private Long parentTransactionId;
 }
