@@ -54,7 +54,7 @@ function Register({ onRegister }) {
         setLoading(true);
 
         try {
-            await api.post('/auth/register', formData);
+            await api.post('/auth/register', formData, { _skipErrorToast: true });
             setSuccess('Регистрация успешна! Проверьте почту для подтверждения.');
             setTimeout(() => {
                 navigate('/login');

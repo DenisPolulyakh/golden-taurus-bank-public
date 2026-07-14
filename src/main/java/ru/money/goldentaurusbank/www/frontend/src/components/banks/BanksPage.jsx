@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import api from '../../api/axios';
 import BankModal from './BankModal';
 import './Banks.css';
@@ -96,7 +97,6 @@ function BanksPage() {
                 setBanks(prev => prev.filter(bank => bank.id !== id));
             } catch (err) {
                 console.error('Ошибка удаления банка:', err);
-                alert('Не удалось удалить банк');
             }
         }
     };
@@ -105,7 +105,8 @@ function BanksPage() {
     const handleExport = async () => {
         try {
             const response = await api.get('/banks/export', {
-                responseType: 'blob'
+                responseType: 'blob',
+                _skipErrorToast: true
             });
 
             // Создаем ссылку для скачивания
@@ -119,7 +120,7 @@ function BanksPage() {
             window.URL.revokeObjectURL(url);
         } catch (err) {
             console.error('Ошибка экспорта:', err);
-            alert('Не удалось экспортировать банки');
+            toast.error('Не удалось экспортировать банки');
         }
     };
 
@@ -135,7 +136,7 @@ function BanksPage() {
         // Проверка расширения
         const fileExt = file.name.split('.').pop().toLowerCase();
         if (!['xlsx', 'xls'].includes(fileExt)) {
-            alert('Пожалуйста, выберите файл с расширением .xlsx или .xls');
+            toast.error('Пожалуйста, выберите файл с расширением .xlsx или .xls');
             return;
         }
 
@@ -155,21 +156,22 @@ function BanksPage() {
             const result = response.data.data;
             setImportResult(result);
 
-            // Показываем сообщение о результате
-            let message = `✅ Импорт завершен!\nДобавлено: ${result.added}\nПропущено (дубликаты): ${result.skipped}`;
+            // Показываем результат импорта
+            let description = `Добавлено: ${result.added}, пропущено (дубликаты): ${result.skipped}`;
             if (result.errors.length > 0) {
-                message += `\n\nОшибки (${result.errors.length}):\n${result.errors.slice(0, 5).join('\n')}`;
+                description += `\nОшибки (${result.errors.length}): ${result.errors.slice(0, 5).join('; ')}`;
                 if (result.errors.length > 5) {
-                    message += `\n...и еще ${result.errors.length - 5} ошибок`;
+                    description += ` ...и еще ${result.errors.length - 5}`;
                 }
+                toast.warning('Импорт завершён с ошибками', { description });
+            } else {
+                toast.success('Импорт завершён', { description });
             }
-            alert(message);
 
             // Обновляем список банков
             await fetchBanks();
         } catch (err) {
             console.error('Ошибка импорта:', err);
-            alert('Ошибка при импорте файла: ' + (err.response?.data?.message || err.message));
         } finally {
             setImporting(false);
             // Очищаем input, чтобы можно было загрузить тот же файл повторно

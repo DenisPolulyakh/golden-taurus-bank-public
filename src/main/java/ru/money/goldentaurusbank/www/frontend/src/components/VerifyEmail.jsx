@@ -27,7 +27,7 @@ function VerifyEmail() {
 
         const verifyEmail = async () => {
             try {
-                const response = await api.get(`/auth/verify?token=${token}`);
+                const response = await api.get(`/auth/verify?token=${token}`, { _skipErrorToast: true });
                 setStatus('success');
                 setMessage(response.data.message || 'Email успешно подтверждён!');
 

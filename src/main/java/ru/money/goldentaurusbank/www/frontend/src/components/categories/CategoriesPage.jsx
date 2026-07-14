@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import api from '../../api/axios';
 import CategoryModal from './CategoryModal';
 import './Categories.css';
@@ -102,7 +103,6 @@ function CategoriesPage() {
                 setCategories(prev => prev.filter(cat => cat.id !== id));
             } catch (err) {
                 console.error('Ошибка удаления категории:', err);
-                alert('Не удалось удалить категорию');
             }
         }
     };
@@ -111,7 +111,8 @@ function CategoriesPage() {
     const handleExport = async () => {
         try {
             const response = await api.get('/categories/export', {
-                responseType: 'blob'
+                responseType: 'blob',
+                _skipErrorToast: true  // тело ответа — blob, message не прочитать, показываем свой тост
             });
 
             const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -124,7 +125,7 @@ function CategoriesPage() {
             window.URL.revokeObjectURL(url);
         } catch (err) {
             console.error('Ошибка экспорта:', err);
-            alert('Не удалось экспортировать категории');
+            toast.error('Не удалось экспортировать категории');
         }
     };
 
@@ -139,7 +140,7 @@ function CategoriesPage() {
 
         const fileExt = file.name.split('.').pop().toLowerCase();
         if (!['xlsx', 'xls'].includes(fileExt)) {
-            alert('Пожалуйста, выберите файл с расширением .xlsx или .xls');
+            toast.error('Пожалуйста, выберите файл с расширением .xlsx или .xls');
             return;
         }
 
@@ -157,19 +158,21 @@ function CategoriesPage() {
 
             const result = response.data.data;
 
-            let message = `✅ Импорт завершен!\nДобавлено: ${result.added}\nПропущено (дубликаты): ${result.skipped}`;
+            let description = `Добавлено: ${result.added}, пропущено (дубликаты): ${result.skipped}`;
             if (result.errors && result.errors.length > 0) {
-                message += `\n\nОшибки (${result.errors.length}):\n${result.errors.slice(0, 5).join('\n')}`;
+                description += `\nОшибки (${result.errors.length}): ${result.errors.slice(0, 5).join('; ')}`;
                 if (result.errors.length > 5) {
-                    message += `\n...и еще ${result.errors.length - 5} ошибок`;
+                    description += ` ...и еще ${result.errors.length - 5}`;
                 }
+                toast.warning('Импорт завершён с ошибками', { description });
+            } else {
+                toast.success('Импорт завершён', { description });
             }
-            alert(message);
 
             await fetchCategories();
         } catch (err) {
             console.error('Ошибка импорта:', err);
-            alert('Ошибка при импорте файла: ' + (err.response?.data?.message || err.message));
+            toast.error('Ошибка при импорте файла: ' + (err.response?.data?.message || err.message));
         } finally {
             setImporting(false);
             if (fileInputRef.current) {

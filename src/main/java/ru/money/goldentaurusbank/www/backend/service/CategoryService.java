@@ -2,7 +2,9 @@ package ru.money.goldentaurusbank.www.backend.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -12,6 +14,7 @@ import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.CategoryRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.CategoryImportResult;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.CategoryResponse;
+import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
 import ru.money.goldentaurusbank.www.backend.repository.CategoryRepository;
 
 import java.io.ByteArrayOutputStream;
@@ -22,9 +25,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import ru.money.goldentaurusbank.www.backend.repository.UserRepository;
 
 import static ru.money.goldentaurusbank.www.backend.model.dto.enums.ResponseCodes.*;
 
@@ -36,7 +36,7 @@ public class CategoryService {
 
     private final CategoryRepository categoryRepository;
     private final ColorConstants colorConstants;
-
+    private final BullionRepository bullionRepository;
 
     public List<String> getAvailableColors(User user) {
         List<String> usedColors = categoryRepository.findUsedColorsByUser(user);
@@ -120,6 +120,11 @@ public class CategoryService {
                     CATEGORY_NOT_FOUND.getMessage()
             );
         }
+        if (bullionRepository.existsByCategoryIdAndUserId(categoryId, user.getId())) {
+            throw new ApplicationException(
+                    CATEGORY_BULLION_LINK.getCode(), CATEGORY_BULLION_LINK.getMessage());
+        }
+
         categoryRepository.deleteByIdAndUser(categoryId, user);
     }
 

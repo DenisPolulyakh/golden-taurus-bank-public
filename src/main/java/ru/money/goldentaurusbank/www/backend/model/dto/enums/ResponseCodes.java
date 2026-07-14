@@ -43,6 +43,7 @@ public enum ResponseCodes {
     VAULT_NOT_SET(4009, "Хранилище для переноса не задано", HttpStatus.BAD_REQUEST),
     INVALID_COLOR(4010,"Недопустимый цвет. Выберите цвет из предложенных", HttpStatus.BAD_REQUEST),
     COLOR_ALREADY_USE(4011,"Этот цвет уже используется в другой категории", HttpStatus.BAD_REQUEST),
+    CATEGORY_BULLION_LINK(4012, "Категория привязана к слитку, сначала удалите слиток",HttpStatus.BAD_REQUEST),
 
 
     // Системные ошибки (5xxx)

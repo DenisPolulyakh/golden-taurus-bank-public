@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { Toaster } from 'sonner';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/dashboard/Dashboard.jsx';
@@ -86,6 +87,13 @@ function App() {
 
     return (
         <BrowserRouter>
+            <Toaster
+                position="top-right"
+                richColors
+                closeButton
+                expand
+                duration={5000}
+            />
             <Routes>
                 <Route path="/login" element={<Login onLogin={handleLogin} />} />
                 <Route path="/register" element={<Register />} />

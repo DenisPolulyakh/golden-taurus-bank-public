@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';  // ← добавлено Link
+import { toast } from 'sonner';
 import api from '../../api/axios';
 import VaultModal from './VaultModal';
 import './Vaults.css';
@@ -144,7 +145,6 @@ function VaultsPage() {
             } catch (err) {
                 console.error('Ошибка удаления хранилища:', err);
                 setVaults(oldVaults);
-                alert('Не удалось удалить хранилище');
             }
         }
     };
@@ -199,7 +199,7 @@ function VaultsPage() {
 
         const fileExt = file.name.split('.').pop().toLowerCase();
         if (!['xlsx', 'xls'].includes(fileExt)) {
-            alert('Пожалуйста, выберите файл с расширением .xlsx или .xls');
+            toast.error('Пожалуйста, выберите файл с расширением .xlsx или .xls');
             return;
         }
 
@@ -217,36 +217,22 @@ function VaultsPage() {
 
             const result = response.data.data;
 
-            let message = '✅ Импорт завершен!\n\n';
-            message += `📦 Хранилищ добавлено: ${result.vaultsAdded || 0}\n`;
-            message += `📁 Категорий добавлено: ${result.categoriesAdded || 0}\n`;
-            message += `💰 Слитков добавлено: ${result.bullionsAdded || 0}\n`;
-
-            if (result.addedVaults && result.addedVaults.length > 0) {
-                message += `\n📦 Добавленные хранилища:\n${result.addedVaults.map(v => `  • ${v}`).join('\n')}`;
-            }
-
-            if (result.addedCategories && result.addedCategories.length > 0) {
-                message += `\n\n📁 Добавленные категории:\n${result.addedCategories.slice(0, 10).map(c => `  • ${c}`).join('\n')}`;
-                if (result.addedCategories.length > 10) {
-                    message += `\n  ...и еще ${result.addedCategories.length - 10} категорий`;
-                }
-            }
+            let description = `Хранилищ: ${result.vaultsAdded || 0}, категорий: ${result.categoriesAdded || 0}, слитков: ${result.bullionsAdded || 0}`;
 
             if (result.errors && result.errors.length > 0) {
-                message += `\n\n⚠️ Ошибки (${result.errors.length}):\n${result.errors.slice(0, 5).map(e => `  • ${e}`).join('\n')}`;
+                description += `\nОшибки (${result.errors.length}): ${result.errors.slice(0, 5).join('; ')}`;
                 if (result.errors.length > 5) {
-                    message += `\n  ...и еще ${result.errors.length - 5} ошибок`;
+                    description += ` ...и еще ${result.errors.length - 5}`;
                 }
+                toast.warning('Импорт завершён с ошибками', { description });
+            } else {
+                toast.success('Импорт завершён', { description });
             }
-
-            alert(message);
 
             // Обновляем список хранилищ
             fetchVaults(searchTerm, sortField, sortOrder, currentPage, pageSize, true);
         } catch (err) {
             console.error('Ошибка импорта:', err);
-            alert('Ошибка при импорте файла: ' + (err.response?.data?.message || err.message));
         } finally {
             setImporting(false);
             if (fileInputRef.current) {

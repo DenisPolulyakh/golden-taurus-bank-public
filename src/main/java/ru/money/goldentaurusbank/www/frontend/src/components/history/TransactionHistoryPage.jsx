@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 import api from '../../api/axios';
 import './TransactionHistoryPage.css';
 
@@ -49,10 +50,10 @@ const TransactionHistoryPage = () => {
         if (!window.confirm('Вы уверены, что хотите откатить эту транзакцию?')) return;
         try {
             await api.post(`/transactions/${id}/rollback`);
+            toast.success('Транзакция откачена');
             fetchTransactions();
         } catch (err) {
             console.error('Rollback failed:', err);
-            alert('Ошибка при откате: ' + (err.response?.data?.message || err.message));
         }
     };
 
