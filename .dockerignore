@@ -1,0 +1,16 @@
+target/
+**/target/
+
+**/node_modules/
+**/dist/
+
+.git/
+.gitignore
+*.iml
+.idea/
+.vscode/
+
+.env
+*.log
+
+docker-compose.yml.backup

@@ -17,7 +17,7 @@ function Login({ onLogin }) {
         setLoading(true);
 
         try {
-            const response = await api.post('/auth/login', { email, password });
+            const response = await api.post('/auth/login', { email, password }, { _skipErrorToast: true });
 
             if (response.data && response.data.code === 0 && response.data.data) {
                 const { token, id, email: userEmail, fullName, role } = response.data.data;

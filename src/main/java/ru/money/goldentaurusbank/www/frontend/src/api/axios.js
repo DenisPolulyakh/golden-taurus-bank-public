@@ -1,15 +1,9 @@
 import axios from 'axios';
+import { toast } from 'sonner';
 
-// Определяем базовый URL автоматически
+// Базовый URL всегда относительный: '/api'.
 const getBaseUrl = () => {
-    // Если запущено на localhost или 127.0.0.1
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return '/api';  // Используем прокси Vite
-    }
-
-    // Если запущено на любом IP адресе (телефон, другой компьютер в сети)
-    // Берем текущий IP и подставляем порт бэкенда
-    return `http://${window.location.hostname}:8080/api`;
+    return '/api';
 };
 
 const api = axios.create({
@@ -126,7 +120,28 @@ api.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// Перехватчик ответов: реактивное обновление токена как страховка
+// Показываем всплывающее окно с ошибкой бэкенда (единая точка для всего приложения).
+// Текст берём из ResponseCodes-сообщения (err.response.data.message).
+const showErrorToast = (error) => {
+    const data = error.response?.data;
+    let message;
+
+    if (data?.message) {
+        // Единый формат ошибок бэка: { code, message, details? }
+        message = data.message;
+    } else if (error.response) {
+        // Ответ есть, но без нашего message (например, 404/500 без тела)
+        message = `Ошибка сервера (${error.response.status})`;
+    } else if (error.request) {
+        // Запрос ушёл, но ответа нет — сеть недоступна / сервер лежит
+        message = 'Сервер недоступен. Проверьте соединение.';
+    } else {
+        message = error.message || 'Неизвестная ошибка';
+    }
+
+    toast.error(message);
+};
+
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
@@ -150,6 +165,11 @@ api.interceptors.response.use(
                 window.location.href = '/login';
                 return Promise.reject(refreshError);
             }
+        }
+
+        // Централизованный тост об ошибке.
+        if (originalRequest && !originalRequest._skipErrorToast && !originalRequest._skipAuthRefresh) {
+            showErrorToast(error);
         }
 
         return Promise.reject(error);

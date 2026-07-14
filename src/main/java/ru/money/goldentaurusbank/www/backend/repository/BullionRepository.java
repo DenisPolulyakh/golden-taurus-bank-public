@@ -35,6 +35,6 @@ public interface BullionRepository extends JpaRepository<Bullion, Long> {
 
     Optional<Bullion> findByVaultAndCategory(Vault vault, Category category);
 
-    boolean existsByVaultAndCategory(Vault vault, Category category);
 
+    boolean existsByCategoryIdAndUserId(Long categoryId, Long userId);
 }
