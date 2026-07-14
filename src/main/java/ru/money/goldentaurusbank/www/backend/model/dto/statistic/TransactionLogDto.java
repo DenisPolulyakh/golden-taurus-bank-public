@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -20,6 +21,7 @@ public class TransactionLogDto {
     private Long toBullionId;
     private BigDecimal amount;
     private String description;
+    private List<DescriptionSegmentDto> descriptionSegments;
     private String userComment;
     private String status;
     private String errorMessage;

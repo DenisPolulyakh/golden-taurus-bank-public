@@ -12,7 +12,7 @@ const SavingsChart = ({ refreshKey }) => {
     const [years, setYears] = useState([]);
     const [selectedYear, setSelectedYear] = useState(null);
     const [selectedMonth, setSelectedMonth] = useState(null);
-    const [viewMode, setViewMode] = useState('year');
+    const [viewMode, setViewMode] = useState('month');
     const [loading, setLoading] = useState(true);
     const [totalSavings, setTotalSavings] = useState(0);
 
@@ -88,10 +88,14 @@ const SavingsChart = ({ refreshKey }) => {
             setTotalSavings(total);
 
             // Трансформируем данные - savings уже приходит с бэкенда
-            const transformedData = monthlyData.map((item) => {
+            const transformedData = monthlyData.map((item, index) => {
                 const monthNum = parseInt(item.month.split('-')[1]);
                 const isFuture = selectedYear === currentYear && monthNum > currentMonth;
                 const isCurrentMonth = selectedYear === currentYear && monthNum === currentMonth;
+
+                // Изменение по сравнению с предыдущим месяцем
+                const prevSavings = index > 0 ? (monthlyData[index - 1].savings || 0) : 0;
+                const change = (item.savings || 0) - prevSavings;
 
                 return {
                     ...item,
@@ -99,6 +103,7 @@ const SavingsChart = ({ refreshKey }) => {
                     monthNumber: monthNum,
                     // savings берем из ответа бэкенда
                     savings: item.savings || 0,
+                    change: change,
                     barColor: (item.savings || 0) >= 0 ? '#667eea' : '#e53e3e',
                     barOpacity: isFuture ? 0.35 : (isCurrentMonth ? 0.7 : 1)
                 };
@@ -132,13 +137,18 @@ const SavingsChart = ({ refreshKey }) => {
             const isCurrentMonth = selectedYear === currentYear && selectedMonth === currentMonth;
 
             if (dailyData.length > 0) {
-                const transformedData = dailyData.map((item) => {
+                const transformedData = dailyData.map((item, index) => {
                     const isFuture = isCurrentMonth && item.day > currentDay;
                     const isToday = isCurrentMonth && item.day === currentDay;
+
+                    // Изменение по сравнению с предыдущим днем
+                    const prevSavings = index > 0 ? (dailyData[index - 1].savings || 0) : 0;
+                    const change = (item.savings || 0) - prevSavings;
 
                     return {
                         ...item,
                         date: `${String(item.day).padStart(2, '0')}.${String(selectedMonth).padStart(2, '0')}`,
+                        change: change,
                         barColor: item.savings >= 0 ? '#667eea' : '#e53e3e',
                         barOpacity: isFuture ? 0.35 : (isToday ? 0.7 : 1)
                     };
@@ -156,6 +166,7 @@ const SavingsChart = ({ refreshKey }) => {
                         date: `${String(day).padStart(2, '0')}.${String(selectedMonth).padStart(2, '0')}`,
                         savings: 0,
                         dailyChange: 0,
+                        change: 0,
                         income: 0,
                         expense: 0,
                         transactionCount: 0,
@@ -211,6 +222,12 @@ const SavingsChart = ({ refreshKey }) => {
     const CustomTooltip = ({ active, payload, label }) => {
         if (active && payload && payload.length) {
             const savings = payload[0]?.value || 0;
+            const change = payload[0]?.payload?.change || 0;
+            const changeLabel = viewMode === 'year'
+                ? 'к прошлому месяцу'
+                : 'к прошлому дню';
+            const changeColor = change > 0 ? '#48bb78' : (change < 0 ? '#e53e3e' : '#718096');
+            const changeSign = change > 0 ? '+' : '';
             return (
                 <div style={{
                     background: 'white',
@@ -225,6 +242,9 @@ const SavingsChart = ({ refreshKey }) => {
                     </p>
                     <p style={{ margin: '4px 0', color: '#667eea', fontWeight: 600, fontSize: '18px' }}>
                         {formatCurrency(savings)}
+                    </p>
+                    <p style={{ margin: '4px 0 0 0', color: changeColor, fontWeight: 500, fontSize: '13px' }}>
+                        {changeSign}{formatCurrency(change)} <span style={{ color: '#a0aec0' }}>{changeLabel}</span>
                     </p>
                 </div>
             );

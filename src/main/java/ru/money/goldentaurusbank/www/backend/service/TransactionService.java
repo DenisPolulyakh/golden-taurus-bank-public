@@ -36,6 +36,7 @@ public class TransactionService {
     private final VaultRepository vaultRepository;
     private final CategoryRepository categoryRepository;
     private final TransactionLogRepository transactionLogRepository;
+    private final ColorConstants colorConstants;
 
     @Transactional
     public Bullion refillBullion(RefillBullionRequest request, User user, Long batchId) {
@@ -69,7 +70,7 @@ public class TransactionService {
                     .toBullionAmountBefore(toBefore)
                     .toBullionAmountAfter(existingBullion.getAmount())
                     .userComment(request.getUserComment())
-                    .description("Пополнение на сумму " + refillAmount + " слитка " + existingBullion.getCategory().getName());
+                    .description("Пополнение на сумму " + refillAmount + " слитка " + describeBullion(existingBullion));
 
             transactionLogRepository.save(logBuilder.build());
             log.info("Refill amount success: bullion={}, amount={}", existingBullion.getId(), refillAmount);
@@ -115,7 +116,7 @@ public class TransactionService {
                     .toBullionAmountBefore(toBefore)
                     .toBullionAmountAfter(bullion.getAmount())
                     .userComment(request.getUserComment())
-                    .description("Снятие суммы " + withDrawAmount + " слитка " + existingBullion.getCategory().getName());
+                    .description("Снятие суммы " + withDrawAmount + " слитка " + describeBullion(existingBullion));
 
             transactionLogRepository.save(logBuilder.build());
             log.info("Withdrawal amount success: bullion={}, amount={}", existingBullion.getId(), bullion.getAmount());
@@ -177,7 +178,7 @@ public class TransactionService {
                     .fromBullionAmountAfter(fromBullion.getAmount())
                     .toBullionAmountBefore(toBefore)
                     .toBullionAmountAfter(toBullion.getAmount())
-                    .description("Перевод суммы " + amount + " из слитка " + fromBullionId + " в " + toBullionId);
+                    .description("Перевод суммы " + amount + " из слитка " + describeBullion(fromBullion) + " в " + describeBullion(toBullion));
 
             transactionLogRepository.save(logBuilder.build());
             log.info("Transfer amount success: from={}, to={}, amount={}", fromBullionId, toBullionId, amount);
@@ -250,9 +251,13 @@ public class TransactionService {
                         .toBullionAmountAfter(newBullion.getAmount());
             }
 
+            String toVaultLabel = (toVault.getBank() != null && toVault.getBank().getName() != null)
+                    ? toVault.getBank().getName() + " | " + toVault.getName()
+                    : toVault.getName();
+
             logBuilder.fromBullionAmountBefore(fromAmount)
                     .fromBullionAmountAfter(BigDecimal.ZERO)
-                    .description("Перемещение слитка " + fromBullionId + " в хранилище " + toVaultId);
+                    .description("Перемещение слитка " + describeBullion(fromBullion) + " в хранилище " + toVaultLabel);
 
             transactionLogRepository.save(logBuilder.build());
             log.info("Transfer bullion success: bullionId={}, toVaultId={}", fromBullionId, toVaultId);
@@ -412,6 +417,81 @@ public class TransactionService {
         return System.currentTimeMillis();
     }
 
+    /**
+     * Человекочитаемое описание слитка в формате:
+     * «Категория (Цвет) | Банк | Хранилище».
+     * Цвет берётся у категории (единственная сущность с цветом),
+     * банк опускается, если у хранилища его нет.
+     */
+    private String describeBullion(Bullion bullion) {
+        if (bullion == null) {
+            return "—";
+        }
+
+        StringBuilder sb = new StringBuilder();
+
+        Category category = bullion.getCategory();
+        if (category != null) {
+            sb.append(category.getName());
+            String colorName = colorConstants.getColorName(category.getColor());
+            if (colorName != null) {
+                sb.append(" (").append(colorName).append(")");
+            }
+        } else {
+            sb.append("слиток #").append(bullion.getId());
+        }
+
+        Vault vault = bullion.getVault();
+        if (vault != null) {
+            if (vault.getBank() != null && vault.getBank().getName() != null) {
+                sb.append(" | ").append(vault.getBank().getName());
+            }
+            sb.append(" | ").append(vault.getName());
+        }
+
+        return sb.toString();
+    }
+
+    // Фиксированные цвета текста для банка и хранилища (у них нет собственного
+    // цвета в модели). Название слитка красится реальным цветом его категории.
+    private static final String BANK_COLOR = "#FFA502";  // оранжевый
+    private static final String VAULT_COLOR = "#FFD93D"; // жёлтый
+
+    /**
+     * То же, что {@link #describeBullion(Bullion)}, но в виде цветных сегментов:
+     * название слитка — цветом категории, банк — оранжевым, хранилище — жёлтым.
+     */
+    private List<DescriptionSegmentDto> describeBullionSegments(Bullion bullion) {
+        List<DescriptionSegmentDto> segments = new ArrayList<>();
+        if (bullion == null) {
+            segments.add(segment("—", null));
+            return segments;
+        }
+
+        Category category = bullion.getCategory();
+        if (category != null) {
+            segments.add(segment(category.getName(), category.getColor()));
+        } else {
+            segments.add(segment("слиток #" + bullion.getId(), null));
+        }
+
+        Vault vault = bullion.getVault();
+        if (vault != null) {
+            if (vault.getBank() != null && vault.getBank().getName() != null) {
+                segments.add(segment(" | ", null));
+                segments.add(segment(vault.getBank().getName(), BANK_COLOR));
+            }
+            segments.add(segment(" | ", null));
+            segments.add(segment(vault.getName(), VAULT_COLOR));
+        }
+
+        return segments;
+    }
+
+    private DescriptionSegmentDto segment(String text, String color) {
+        return DescriptionSegmentDto.builder().text(text).color(color).build();
+    }
+
     public List<TransactionLog> getBullionHistory(Long bullionId) {
         return transactionLogRepository.findByFromBullionIdOrderByCreatedAtDesc(bullionId);
     }
@@ -430,23 +510,32 @@ public class TransactionService {
 
         List<MonthlyDataDto> monthlyData = getMonthlyStatistics(userId, fromDate, toDate);
 
+        // Накопления не должны обнуляться в начале года — берём остаток за все
+        // предыдущие годы как стартовый баланс и ведём нарастающий итог.
+        BigDecimal startBalance = year != null
+                ? getBalanceBeforeYear(userId, year)
+                : BigDecimal.ZERO;
 
-        BigDecimal startBalance = getBalanceBeforeYear(userId, year);
-        BigDecimal cumulative = startBalance;
-
-        for (MonthlyDataDto month : monthlyData) {
-            cumulative = cumulative.add(month.getNetChange());
-            month.setSavings(cumulative);
+        if (year != null) {
+            // Разворачиваем в полные 12 месяцев, чтобы месяцы без транзакций
+            // сохраняли накопления предыдущего месяца, а не проваливались в ноль.
+            monthlyData = buildFullYearMonths(monthlyData, year, startBalance);
+        } else {
+            BigDecimal cumulative = startBalance;
+            for (MonthlyDataDto month : monthlyData) {
+                cumulative = cumulative.add(month.getNetChange());
+                month.setSavings(cumulative);
+            }
         }
 
-        Object[] totalStats = transactionLogRepository.getTotalStatistics(userId, fromDate, toDate);
+        List<Object[]> totalStats = transactionLogRepository.getTotalStatistics(userId, fromDate, toDate);
 
         BigDecimal totalIncome = BigDecimal.ZERO;
         BigDecimal totalExpense = BigDecimal.ZERO;
         Long totalTransactions = 0L;
 
-        if (totalStats != null && totalStats.length > 0) {
-            Object[] row = (Object[]) totalStats[0];
+        if (totalStats != null && !totalStats.isEmpty()) {
+            Object[] row = totalStats.get(0);
             totalIncome = row[0] != null ? new BigDecimal(row[0].toString()) : BigDecimal.ZERO;
             totalExpense = row[1] != null ? new BigDecimal(row[1].toString()) : BigDecimal.ZERO;
             totalTransactions = row[2] != null ? ((Number) row[2]).longValue() : 0L;
@@ -511,6 +600,54 @@ public class TransactionService {
         }
 
         return monthlyData;
+    }
+
+    /**
+     * Разворачивает статистику в полный список из 12 месяцев года.
+     * Месяцы без транзакций получают нулевое изменение, но нарастающий итог
+     * (savings) переносится с предыдущего месяца — накопления не теряются.
+     *
+     * @param sparseData   месяцы, где реально были транзакции (могут идти с пропусками)
+     * @param year         год, за который строим статистику
+     * @param startBalance накопления на начало года (остаток за прошлые годы)
+     */
+    private List<MonthlyDataDto> buildFullYearMonths(
+            List<MonthlyDataDto> sparseData, int year, BigDecimal startBalance) {
+
+        Map<String, MonthlyDataDto> byMonth = new HashMap<>();
+        for (MonthlyDataDto dto : sparseData) {
+            byMonth.put(dto.getMonth(), dto);
+        }
+
+        List<MonthlyDataDto> result = new ArrayList<>(12);
+        BigDecimal cumulative = startBalance;
+
+        for (int m = 1; m <= 12; m++) {
+            LocalDate monthDate = LocalDate.of(year, m, 1);
+            String month = monthDate.format(DateTimeFormatter.ofPattern("yyyy-MM"));
+            String monthLabel = monthDate.format(DateTimeFormatter.ofPattern("MMM yyyy"));
+
+            MonthlyDataDto existing = byMonth.get(month);
+
+            BigDecimal income = existing != null ? existing.getIncome() : BigDecimal.ZERO;
+            BigDecimal expense = existing != null ? existing.getExpense() : BigDecimal.ZERO;
+            BigDecimal netChange = income.subtract(expense);
+            Long transactionCount = existing != null ? existing.getTransactionCount() : 0L;
+
+            cumulative = cumulative.add(netChange);
+
+            result.add(MonthlyDataDto.builder()
+                    .month(month)
+                    .monthLabel(monthLabel)
+                    .income(income)
+                    .expense(expense)
+                    .netChange(netChange)
+                    .savings(cumulative)
+                    .transactionCount(transactionCount)
+                    .build());
+        }
+
+        return result;
     }
 
     @Transactional(readOnly = true)
@@ -592,7 +729,8 @@ public class TransactionService {
                 .fromBullionId(log.getFromBullionId())
                 .toBullionId(log.getToBullionId())
                 .amount(log.getAmount())
-                .description(log.getDescription())
+                .description(buildDescription(log))
+                .descriptionSegments(buildDescriptionSegments(log))
                 .userComment(log.getUserComment())
                 .status(log.getStatus())
                 .errorMessage(log.getErrorMessage())
@@ -604,6 +742,99 @@ public class TransactionService {
                 .build();
     }
 
+    /**
+     * Строит описание транзакции с человекочитаемыми названиями слитков
+     * (категория, цвет, банк, хранилище) вместо технических id.
+     * Работает и для старых записей истории, где в description сохранены id.
+     */
+    private String buildDescription(TransactionLog log) {
+        BigDecimal amount = log.getAmount();
+        String operationType = log.getOperationType();
+
+        switch (operationType) {
+            case "REFILL_BULLION" -> {
+                String to = describeBullionById(log.getToBullionId());
+                return "Пополнение на сумму " + amount + " слитка " + to;
+            }
+            case "WITHDRAW_BULLION" -> {
+                String to = describeBullionById(log.getToBullionId());
+                return "Снятие суммы " + amount + " слитка " + to;
+            }
+            case "TRANSFER_AMOUNT" -> {
+                String from = describeBullionById(log.getFromBullionId());
+                String to = describeBullionById(log.getToBullionId());
+                return "Перевод суммы " + amount + " из слитка " + from + " в " + to;
+            }
+            case "TRANSFER_BULLION" -> {
+                // Слиток-источник удаляется после перемещения, поэтому по id его
+                // уже не восстановить — используем описание, сохранённое при записи.
+                return log.getDescription();
+            }
+            default -> {
+                // Откаты и прочие типы — оставляем как есть
+                return log.getDescription();
+            }
+        }
+    }
+
+    /**
+     * Описание слитка по его id. Если слиток уже удалён (например, после
+     * перемещения), возвращает запасной вариант с id.
+     */
+    private String describeBullionById(Long bullionId) {
+        if (bullionId == null) {
+            return "—";
+        }
+        return bullionRepository.findById(bullionId)
+                .map(this::describeBullion)
+                .orElse("слиток #" + bullionId);
+    }
+
+    /**
+     * Цветные сегменты описания транзакции — параллель к {@link #buildDescription}.
+     * Название слитка красится цветом категории, банк — оранжевым, хранилище — жёлтым.
+     * Служебный текст («Пополнение на сумму …») идёт без цвета.
+     */
+    private List<DescriptionSegmentDto> buildDescriptionSegments(TransactionLog log) {
+        BigDecimal amount = log.getAmount();
+        String operationType = log.getOperationType();
+
+        List<DescriptionSegmentDto> segments = new ArrayList<>();
+
+        switch (operationType) {
+            case "REFILL_BULLION" -> {
+                segments.add(segment("Пополнение на сумму " + amount + " слитка ", null));
+                segments.addAll(describeBullionSegmentsById(log.getToBullionId()));
+            }
+            case "WITHDRAW_BULLION" -> {
+                segments.add(segment("Снятие суммы " + amount + " слитка ", null));
+                segments.addAll(describeBullionSegmentsById(log.getToBullionId()));
+            }
+            case "TRANSFER_AMOUNT" -> {
+                segments.add(segment("Перевод суммы " + amount + " из слитка ", null));
+                segments.addAll(describeBullionSegmentsById(log.getFromBullionId()));
+                segments.add(segment(" в ", null));
+                segments.addAll(describeBullionSegmentsById(log.getToBullionId()));
+            }
+            default -> {
+                // TRANSFER_BULLION, откаты и прочее — цветной разбивки нет,
+                // фронт отрисует плоский description.
+                segments.add(segment(buildDescription(log), null));
+            }
+        }
+
+        return segments;
+    }
+
+    private List<DescriptionSegmentDto> describeBullionSegmentsById(Long bullionId) {
+        if (bullionId == null) {
+            return List.of(segment("—", null));
+        }
+        return bullionRepository.findById(bullionId)
+                .map(this::describeBullionSegments)
+                .orElse(List.of(segment("слиток #" + bullionId, null)));
+    }
+
     @Transactional(readOnly = true)
     public DashboardDailyStatisticsDto getDailyStatistics(Long userId, int year, int month) {
         List<Object[]> results = transactionLogRepository.getDailyStatistics(userId, year, month);
@@ -612,7 +843,9 @@ public class TransactionService {
                 .format(DateTimeFormatter.ofPattern("MMMM yyyy"));
 
         List<DashboardDailyStatisticsDto.DailyDataDto> dailyData = new ArrayList<>();
-        BigDecimal cumulativeTotal = BigDecimal.ZERO;
+        // Стартуем не с нуля, а с накоплений на конец предыдущего месяца,
+        // чтобы дневной график продолжал общий нарастающий итог.
+        BigDecimal cumulativeTotal = getBalanceBefore(userId, LocalDate.of(year, month, 1).atStartOfDay());
 
         // Получаем количество дней в месяце
         int daysInMonth = LocalDate.of(year, month, 1).lengthOfMonth();
@@ -667,22 +900,32 @@ public class TransactionService {
     @Transactional(readOnly = true)
     public BigDecimal getBalanceBeforeYear(Long userId, int year) {
         LocalDateTime startOfYear = LocalDate.of(year, 1, 1).atStartOfDay();
-        LocalDateTime endOfPreviousYear = startOfYear.minusNanos(1);
+        return getBalanceBefore(userId, startOfYear);
+    }
 
-        Object[][] stats = transactionLogRepository.getTotalStatistics(
+    /**
+     * Суммарный остаток (доходы − расходы) по всем успешным операциям
+     * строго до указанного момента времени.
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal getBalanceBefore(Long userId, LocalDateTime before) {
+        LocalDateTime upperBound = before.minusNanos(1);
+
+        List<Object[]> stats = transactionLogRepository.getTotalStatistics(
                 userId,
                 LocalDate.of(1970, 1, 1).atStartOfDay(),
-                endOfPreviousYear
+                upperBound
         );
 
-        if (stats != null && stats.length > 0) {
-            // Безопасное преобразование через Number
-            BigDecimal totalIncome = stats[0][0] != null && stats[0][0] instanceof Number
-                    ? BigDecimal.valueOf(((Number) stats[0][0]).doubleValue())
+        if (stats != null && !stats.isEmpty()) {
+            Object[] row = stats.get(0);
+
+            BigDecimal totalIncome = row[0] != null
+                    ? new BigDecimal(row[0].toString())
                     : BigDecimal.ZERO;
 
-            BigDecimal totalExpense = stats[0][1] != null && stats[0][1] instanceof Number
-                    ? BigDecimal.valueOf(((Number) stats[0][1]).doubleValue())
+            BigDecimal totalExpense = row[1] != null
+                    ? new BigDecimal(row[1].toString())
                     : BigDecimal.ZERO;
 
             return totalIncome.subtract(totalExpense);

@@ -84,6 +84,21 @@ const TransactionHistoryPage = () => {
         }).format(amount);
     };
 
+    const renderDescription = (tx) => {
+        const segments = tx.descriptionSegments;
+        if (Array.isArray(segments) && segments.length > 0) {
+            return segments.map((seg, i) => (
+                <span
+                    key={i}
+                    style={seg.color ? { color: seg.color, fontWeight: 600 } : undefined}
+                >
+                    {seg.text}
+                </span>
+            ));
+        }
+        return tx.description || tx.userComment || '-';
+    };
+
     if (loading && page === 0) {
         return <div className="history-loading">Загрузка истории...</div>;
     }
@@ -189,7 +204,7 @@ const TransactionHistoryPage = () => {
                                 <td className={`amount-cell ${tx.operationType === 'REFILL_BULLION' ? 'income' : tx.operationType === 'WITHDRAW_BULLION' ? 'expense' : 'transfer'}`}>
                                     {formatAmount(tx.amount)}
                                 </td>
-                                <td className="description-cell">{tx.description || tx.userComment || '-'}</td>
+                                <td className="description-cell">{renderDescription(tx)}</td>
                                 <td className="actions-cell">
                                     {tx.status === 'SUCCESS' && (
                                         <button
