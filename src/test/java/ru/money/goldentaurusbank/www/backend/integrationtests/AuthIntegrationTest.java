@@ -182,7 +182,43 @@ class AuthIntegrationTest {
 
         User verifiedUser = userRepository.findByEmail("verify@example.com").get();
         assertThat(verifiedUser.isEmailVerified()).isTrue();
-        assertThat(verifiedUser.getVerificationToken()).isNull();
+        // Токен намеренно сохраняется, чтобы повторный переход по ссылке был идемпотентным
+        assertThat(verifiedUser.getVerificationToken()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Повторное подтверждение по той же ссылке - успех (идемпотентность)")
+    void verifyEmailTwiceIsIdempotent() throws Exception {
+        String registerRequest = """
+                {
+                    "email": "verify-twice@example.com",
+                    "password": "123456%",
+                    "fullName": "Verify Twice User"
+                }
+                """;
+        mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(registerRequest));
+
+        User user = userRepository.findByEmail("verify-twice@example.com").get();
+        String token = user.getVerificationToken();
+
+        // Первый переход по ссылке
+        mockMvc.perform(get("/api/auth/verify")
+                        .param("token", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.message").value("Email успешно подтверждён!"));
+
+        // Повторный переход по той же ссылке - тоже успех, без ошибки
+        mockMvc.perform(get("/api/auth/verify")
+                        .param("token", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.message").value("Email успешно подтверждён!"));
+
+        User verifiedUser = userRepository.findByEmail("verify-twice@example.com").get();
+        assertThat(verifiedUser.isEmailVerified()).isTrue();
     }
 
     @Test

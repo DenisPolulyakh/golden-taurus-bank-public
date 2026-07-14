@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
 import './Login.css';
@@ -10,6 +10,7 @@ function VerifyEmail() {
 
     const [status, setStatus] = useState('loading');
     const [message, setMessage] = useState('');
+    const hasVerified = useRef(false);
 
     useEffect(() => {
         if (!token) {
@@ -17,6 +18,12 @@ function VerifyEmail() {
             setMessage('Неверная ссылка подтверждения');
             return;
         }
+
+        // Защита от повторного вызова (React StrictMode вызывает эффект дважды)
+        if (hasVerified.current) {
+            return;
+        }
+        hasVerified.current = true;
 
         const verifyEmail = async () => {
             try {

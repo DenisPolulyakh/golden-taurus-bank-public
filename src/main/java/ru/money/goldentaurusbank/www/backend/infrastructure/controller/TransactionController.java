@@ -42,11 +42,14 @@ public class TransactionController {
      */
     @GetMapping("/dashboard/statistics")
     public ResponseEntity<DashboardStatisticsDto> getDashboardStatistics(
-            @AuthenticationPrincipal UserDetails userDetails,  // Изменено
+            @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam(required = false) Integer year) {
 
         User user = getUserFromUserDetails(userDetails);  // Добавить
         log.info("Get dashboard statistics for user: {}, year: {}", user.getId(), year);
+        if(year == null) {
+            year = LocalDateTime.now().getYear();
+        }
         DashboardStatisticsDto statistics = transactionService.getDashboardStatistics(user.getId(), year);
         return ResponseEntity.ok(statistics);
     }

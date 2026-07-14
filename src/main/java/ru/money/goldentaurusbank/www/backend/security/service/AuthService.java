@@ -66,12 +66,12 @@ public class AuthService {
         User user = userRepository.findByVerificationToken(token)
                 .orElseThrow(() -> new ApplicationException(INVALID_VERIFICATION_TOKEN.getCode(), INVALID_VERIFICATION_TOKEN.getMessage()));
 
+        // Идемпотентность: повторный переход по той же ссылке не считается ошибкой
         if (user.isEmailVerified()) {
-            throw new ApplicationException(EMAIL_ALREADY_VERIFIED.getCode(), EMAIL_ALREADY_VERIFIED.getMessage());
+            return;
         }
 
         user.setEmailVerified(true);
-        user.setVerificationToken(null);
         userRepository.save(user);
     }
 

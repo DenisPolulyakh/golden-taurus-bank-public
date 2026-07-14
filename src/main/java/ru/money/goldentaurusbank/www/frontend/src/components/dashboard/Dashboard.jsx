@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api, { clearAccessToken } from '../../api/axios';
-import StatisticsChart from './StatisticsChart.jsx';
 import SavingsChart from './SavingsChart.jsx';
 import PieChartComponent from './PieChartComponent.jsx';
 import './Dashboard.css';
@@ -14,12 +13,21 @@ function Dashboard({ user, onLogout }) {
     const [countBullions, setCountBullions] = useState(0);
     const [bullionDistribution, setBullionDistribution] = useState([]);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [currentDateTime, setCurrentDateTime] = useState(new Date());
     const navigate = useNavigate();
 
     useEffect(() => {
         fetchUserData();
         fetchDashboardData();
     }, [refreshKey]);
+
+    // Обновляем текущие дату и время каждую секунду
+    useEffect(() => {
+        const timerId = setInterval(() => {
+            setCurrentDateTime(new Date());
+        }, 1000);
+        return () => clearInterval(timerId);
+    }, []);
 
     const fetchUserData = async () => {
         try {
@@ -96,6 +104,21 @@ function Dashboard({ user, onLogout }) {
         return formattedInteger;
     };
 
+    const formatDateTime = (date) => {
+        const dateStr = date.toLocaleDateString('ru-RU', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+        const timeStr = date.toLocaleTimeString('ru-RU', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        return `${dateStr}, ${timeStr}`;
+    };
+
     if (loading) {
         return <div className="dashboard-container">Загрузка...</div>;
     }
@@ -133,6 +156,7 @@ function Dashboard({ user, onLogout }) {
                 <div className="user-info">
                     <h2>Добро пожаловать, {userData?.fullName}! 👋</h2>
                     <p>📧 Email: {userData?.email}</p>
+                    <p className="current-datetime">🕐 {formatDateTime(currentDateTime)}</p>
                 </div>
 
                 <div className="stats-cards">
@@ -152,10 +176,6 @@ function Dashboard({ user, onLogout }) {
 
                 <div className="chart-section">
                     <SavingsChart refreshKey={refreshKey} />
-                </div>
-
-                <div className="chart-section">
-                    <StatisticsChart refreshKey={refreshKey} />
                 </div>
 
                 {hasChartData && (
