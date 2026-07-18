@@ -10,6 +10,7 @@ function Dashboard({ user, onLogout }) {
     const [loading, setLoading] = useState(true);
     const [totalAmount, setTotalAmount] = useState(0);
     const [countVaults, setCountVaults] = useState(0);
+    const [averageRate, setAverageRate] = useState(0);
     const [countBullions, setCountBullions] = useState(0);
     const [bullionDistribution, setBullionDistribution] = useState([]);
     const [refreshKey, setRefreshKey] = useState(0);
@@ -49,6 +50,7 @@ function Dashboard({ user, onLogout }) {
             setTotalAmount(data?.totalAmount || 0);
             setCountVaults(data?.countVaults || 0);
             setCountBullions(data?.countBullions || 0);
+            setAverageRate(data?.averageRate || 0.0);
 
             if (data?.categoryBullionList && data.categoryBullionList.length > 0) {
                 const distribution = data.categoryBullionList
@@ -162,7 +164,7 @@ function Dashboard({ user, onLogout }) {
                 <div className="stats-cards">
                     <div className="stat-card total-card">
                         <div className="stat-label">💰 Общая сумма всех слитков</div>
-                        <div className="stat-value large">{formatAmount(totalAmount)} ₽</div>
+                        <div className="stat-value no-large">{formatAmount(totalAmount)} ₽</div>
                     </div>
                     <div className="stat-card">
                         <div className="stat-label">📊 Количество слитков</div>
@@ -172,10 +174,14 @@ function Dashboard({ user, onLogout }) {
                         <div className="stat-label">🏦 Количество хранилищ</div>
                         <div className="stat-value">{countVaults}</div>
                     </div>
+                    <div className="stat-card">
+                        <span className="stat-name">📈 Средняя ставка:</span>
+                        <div className="stat-value">{averageRate.toFixed(2)}%</div>
+                    </div>
                 </div>
 
                 <div className="chart-section">
-                    <SavingsChart refreshKey={refreshKey} />
+                    <SavingsChart refreshKey={refreshKey}/>
                 </div>
 
                 {hasChartData && (

@@ -443,8 +443,8 @@ function BullionsPage() {
                         <div className="stat-value">{formatAmount(totalAmount)} ₽</div>
                     </div>
                     <div className="stat-card">
-                        <div className="stat-label">Средняя ставка</div>
-                        <div className="stat-value">{averageRate.toFixed(1)}%</div>
+                        <span className="stat-name">📈 Средняя ставка:</span>
+                        <div className="stat-value">{averageRate.toFixed(2)}%</div>
                     </div>
                 </div>
 

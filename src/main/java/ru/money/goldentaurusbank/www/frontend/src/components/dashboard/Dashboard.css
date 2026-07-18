@@ -143,6 +143,10 @@
     font-size: 32px;
 }
 
+.stat-value.no-large {
+    font-size: 29px;
+}
+
 /* Круговая диаграмма */
 .chart-section {
     background: white;
