@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 public class TransferRequest {
@@ -18,6 +20,8 @@ public class TransferRequest {
     @NotNull(message = "Сумма перевода обязательна")
     @Positive(message = "Сумма должна быть больше 0")
     private BigDecimal amount;
+
+    private LocalDate dateOperation;
     
     private String comment;
 }

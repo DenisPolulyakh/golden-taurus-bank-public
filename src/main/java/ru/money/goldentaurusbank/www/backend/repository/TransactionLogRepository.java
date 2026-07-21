@@ -35,7 +35,7 @@ public interface TransactionLogRepository extends JpaRepository<TransactionLog, 
 
     @Query(value = """
         SELECT 
-            DATE_TRUNC('month', created_at) as month,
+            DATE_TRUNC('month', date_operation) as month,
             COALESCE(SUM(CASE 
                 WHEN operation_type = 'REFILL_BULLION' THEN amount 
                 ELSE 0 
@@ -48,10 +48,10 @@ public interface TransactionLogRepository extends JpaRepository<TransactionLog, 
         FROM taurus.transaction_logs
         WHERE user_id = :userId
             AND status = 'SUCCESS'
-            AND created_at >= :fromDate
-            AND created_at <= :toDate
-            AND operation_type IN ('REFILL_BULLION', 'WITHDRAW_BULLION', 'TRANSFER_AMOUNT')
-        GROUP BY DATE_TRUNC('month', created_at)
+            AND date_operation >= :fromDate
+            AND date_operation <= :toDate
+            AND operation_type IN ('REFILL_BULLION', 'WITHDRAW_BULLION')
+        GROUP BY DATE_TRUNC('month', date_operation)
         ORDER BY month ASC
         """, nativeQuery = true)
     List<Object[]> getMonthlyStatistics(
@@ -74,9 +74,9 @@ public interface TransactionLogRepository extends JpaRepository<TransactionLog, 
         FROM taurus.transaction_logs
         WHERE user_id = :userId
             AND status = 'SUCCESS'
-            AND operation_type IN ('REFILL_BULLION', 'WITHDRAW_BULLION', 'TRANSFER_AMOUNT')
-            AND created_at >= :fromDate
-            AND created_at <= :toDate
+            AND operation_type IN ('REFILL_BULLION', 'WITHDRAW_BULLION')
+            AND date_operation >= :fromDate
+            AND date_operation <= :toDate
         """, nativeQuery = true)
     List<Object[]> getTotalStatistics(
             @Param("userId") Long userId,
@@ -88,7 +88,7 @@ public interface TransactionLogRepository extends JpaRepository<TransactionLog, 
         SELECT * FROM taurus.transaction_logs
         WHERE user_id = :userId 
             AND status = 'SUCCESS'
-        ORDER BY created_at DESC
+        ORDER BY date_operation DESC
         LIMIT :limit
         """, nativeQuery = true)
     List<TransactionLog> findLastSuccessfulTransactions(
@@ -99,7 +99,7 @@ public interface TransactionLogRepository extends JpaRepository<TransactionLog, 
     @Query(value = """
         SELECT * FROM taurus.transaction_logs
         WHERE user_id = :userId
-        ORDER BY created_at DESC
+        ORDER BY date_operation DESC
         OFFSET :offset LIMIT :limit
         """, nativeQuery = true)
     List<TransactionLog> findTransactionHistory(
@@ -122,8 +122,8 @@ public interface TransactionLogRepository extends JpaRepository<TransactionLog, 
         WHERE user_id = :userId 
             AND operation_type = 'REFILL_BULLION' 
             AND status = 'SUCCESS'
-            AND created_at >= :fromDate 
-            AND created_at <= :toDate
+            AND date_operation >= :fromDate 
+            AND date_operation <= :toDate
         """, nativeQuery = true)
     BigDecimal getTotalIncome(
             @Param("userId") Long userId,
@@ -137,8 +137,8 @@ public interface TransactionLogRepository extends JpaRepository<TransactionLog, 
         WHERE user_id = :userId 
             AND operation_type = 'WITHDRAW_BULLION' 
             AND status = 'SUCCESS'
-            AND created_at >= :fromDate 
-            AND created_at <= :toDate
+            AND date_operation >= :fromDate 
+            AND date_operation <= :toDate
         """, nativeQuery = true)
     BigDecimal getTotalExpense(
             @Param("userId") Long userId,
@@ -154,8 +154,8 @@ public interface TransactionLogRepository extends JpaRepository<TransactionLog, 
         FROM taurus.transaction_logs
         WHERE user_id = :userId
             AND status = 'SUCCESS'
-            AND created_at >= :fromDate
-            AND created_at <= :toDate
+            AND date_operation >= :fromDate
+            AND date_operation <= :toDate
         GROUP BY operation_type
         ORDER BY total_amount DESC
         """, nativeQuery = true)
@@ -167,26 +167,26 @@ public interface TransactionLogRepository extends JpaRepository<TransactionLog, 
 
 
     @Query(value = """
-        SELECT 
-            EXTRACT(DAY FROM created_at) as day,
-            COALESCE(SUM(CASE 
-                WHEN operation_type = 'REFILL_BULLION' THEN amount 
-                ELSE 0 
-            END), 0) as daily_income,
-            COALESCE(SUM(CASE 
-                WHEN operation_type = 'WITHDRAW_BULLION' THEN amount 
-                ELSE 0 
-            END), 0) as daily_expense,
-            COUNT(*) as transaction_count
-        FROM taurus.transaction_logs
-        WHERE user_id = :userId
-            AND status = 'SUCCESS'
-            AND EXTRACT(YEAR FROM created_at) = :year
-            AND EXTRACT(MONTH FROM created_at) = :month
-            AND operation_type IN ('REFILL_BULLION', 'WITHDRAW_BULLION', 'TRANSFER_AMOUNT')
-        GROUP BY EXTRACT(DAY FROM created_at)
-        ORDER BY day ASC
-        """, nativeQuery = true)
+            SELECT 
+                EXTRACT(DAY FROM date_operation) as day,
+                COALESCE(SUM(CASE 
+                    WHEN operation_type = 'REFILL_BULLION' THEN amount 
+                    ELSE 0 
+                END), 0) as daily_income,
+                COALESCE(SUM(CASE 
+                    WHEN operation_type = 'WITHDRAW_BULLION' THEN amount 
+                    ELSE 0 
+                END), 0) as daily_expense,
+                COUNT(*) as transaction_count
+            FROM taurus.transaction_logs
+            WHERE user_id = :userId
+                AND status = 'SUCCESS'
+                AND EXTRACT(YEAR FROM date_operation) = :year
+                AND EXTRACT(MONTH FROM date_operation) = :month
+                AND operation_type IN ('REFILL_BULLION', 'WITHDRAW_BULLION')
+            GROUP BY EXTRACT(DAY FROM date_operation)
+            ORDER BY day ASC
+            """, nativeQuery = true)
     List<Object[]> getDailyStatistics(
             @Param("userId") Long userId,
             @Param("year") int year,

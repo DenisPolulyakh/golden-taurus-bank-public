@@ -12,6 +12,7 @@ function BullionModal({
                           initialDescription,
                           isEditing,
                           initialCategoryName,
+                          initialDateOperation,
                           allowedChangeAmount = true // 👈 ДОБАВИТЬ ЭТОТ ПРОПС
                       }) {
     const [categories, setCategories] = useState([]);
@@ -21,6 +22,7 @@ function BullionModal({
     const [amount, setAmount] = useState('');
     const [amountDisplay, setAmountDisplay] = useState('');
     const [description, setDescription] = useState('');
+    const [dateOperation, setDateOperation] = useState('');
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
 
@@ -102,10 +104,28 @@ function BullionModal({
                 setAmount('');
             }
 
+            // Устанавливаем начальную дату операции
+            if (isEditing) {
+                // При редактировании используем переданную дату или пустую строку (если дата не задана)
+                setDateOperation(initialDateOperation || '');
+            } else {
+                // При создании новой записи: если дата передана, используем её, иначе сегодня
+                if (initialDateOperation) {
+                    setDateOperation(initialDateOperation);
+                } else {
+                    const today = new Date();
+                    const year = today.getFullYear();
+                    const month = String(today.getMonth() + 1).padStart(2, '0');
+                    const day = String(today.getDate()).padStart(2, '0');
+                    const formattedDate = `${year}-${month}-${day}`;
+                    setDateOperation(formattedDate);
+                }
+            }
+
             setDescription(initialDescription || '');
             setError('');
         }
-    }, [isOpen, initialCategoryId, initialVaultId, initialAmount, initialDescription, isEditing]);
+    }, [isOpen, initialCategoryId, initialVaultId, initialAmount, initialDescription, isEditing, initialDateOperation]);
 
     const fetchCategories = async () => {
         try {
@@ -164,7 +184,8 @@ function BullionModal({
                 isEditing ? initialCategoryId : parseInt(categoryId),
                 isEditing ? parseInt(initialVaultId) : parseInt(vaultId),
                 amountNum,
-                description.trim() || null
+                description.trim() || null,
+                dateOperation ? dateOperation : null
             );
             onClose();
         } catch (err) {
@@ -270,6 +291,17 @@ function BullionModal({
                                     Используйте точку или запятую для копеек
                                 </small>
                             )}
+                        </div>
+
+                        <div className="form-group">
+                            <label>Дата операции *</label>
+                            <input
+                                type="date"
+                                value={dateOperation}
+                                onChange={(e) => setDateOperation(e.target.value)}
+                                max={`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`}
+                                required
+                            />
                         </div>
 
                         <div className="form-group">

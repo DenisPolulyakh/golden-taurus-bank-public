@@ -131,7 +131,8 @@ const SavingsChart = ({ refreshKey }) => {
             });
 
             const dailyData = response.data.dailyData || [];
-            const total = response.data.totalAmount || 0;
+            // Use savings from the last day as total savings for the month
+            const total = dailyData.length > 0 ? dailyData[dailyData.length - 1].savings || 0 : 0;
             setTotalSavings(total);
 
             const isCurrentMonth = selectedYear === currentYear && selectedMonth === currentMonth;

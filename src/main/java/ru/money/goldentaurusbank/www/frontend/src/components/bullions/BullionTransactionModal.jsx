@@ -45,7 +45,8 @@ function BullionTransactionModal({
                                      fromBullionId = null,
                                      fromBullions = [],
                                      onSelectFromBullion = null,
-                                     selectedFromBullionId = null
+                                     selectedFromBullionId = null,
+                                     initialDateOperation = null,
                                  }) {
     const [amount, setAmount] = useState('');
     const [amountDisplay, setAmountDisplay] = useState('');
@@ -58,6 +59,7 @@ function BullionTransactionModal({
     const [toLiquidityVault, setToLiquidityVault] = useState(true);
     const [amountError, setAmountError] = useState('');
     const [isAmountValid, setIsAmountValid] = useState(true);
+    const [dateOperation, setDateOperation] = useState(''); // 👈 ДОБАВИТЬ СОСТОЯНИЕ ДАТЫ
 
     const isDeleteModal = type === 'delete';
     const isTransferModal = type === 'transfer';
@@ -100,8 +102,6 @@ function BullionTransactionModal({
             validateAmount(number);
         } else if (value === '' || value === '.') {
             setAmount('');
-            setIsAmountValid(true);
-            setAmountError('');
         }
     };
 
@@ -135,8 +135,6 @@ function BullionTransactionModal({
         } else if (amountDisplay === '.') {
             setAmountDisplay('');
             setAmount('');
-            setIsAmountValid(true);
-            setAmountError('');
         }
     };
 
@@ -185,15 +183,26 @@ function BullionTransactionModal({
                 } else {
                     setAmountDisplay('');
                     setAmount('');
-                    setIsAmountValid(true);
-                    setAmountError('');
                 }
             } else {
                 setAmountDisplay('');
                 setAmount('');
-                setIsAmountValid(true);
-                setAmountError('');
             }
+
+            // Устанавливаем начальную дату операции
+            if (initialDateOperation) {
+                // Предполагаем, что initialDateOperation является строкой в формате yyyy-MM-dd
+                setDateOperation(initialDateOperation);
+            } else {
+                // Если дата не указана, устанавливаем текущую дату в локальном часовом поясе пользователя
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                const formattedDate = `${year}-${month}-${day}`;
+                setDateOperation(formattedDate);
+            }
+
             setDescription(initialDescription || '');
             setSelectedVaultId(initialVaultId || '');
             setToLiquidityVault(true);
@@ -202,7 +211,7 @@ function BullionTransactionModal({
             setError('');
             setSaving(false);
         }
-    }, [isOpen, initialAmount, initialDescription, initialVaultId]);
+    }, [isOpen, initialAmount, initialDescription, initialVaultId, initialDateOperation]);
 
     useEffect(() => {
         if (selectedFromBullionId && fromBullionOptions.length > 0) {
@@ -304,7 +313,8 @@ function BullionTransactionModal({
                 await onSave(
                     amountNum,
                     selectedTargetOption.value,
-                    description.trim() || null
+                    description.trim() || null,
+                    dateOperation // 👈 ПЕРЕДАЕМ ДАТУ ОПЕРАЦИИ
                 );
                 onClose();
             } catch (err) {
@@ -352,12 +362,13 @@ function BullionTransactionModal({
                 await onSave(
                     toLiquidityVault ? null : selectedVaultId,
                     toLiquidityVault,
-                    description.trim() || null
+                    description.trim() || null,
+                    dateOperation ? dateOperation : null
                 );
             } else if (showAmount) {
-                await onSave(amountNum, description.trim() || null, selectedVaultId);
+                await onSave(amountNum, description.trim() || null, selectedVaultId, dateOperation ? dateOperation : null);
             } else {
-                await onSave(selectedVaultId, description.trim() || null);
+                await onSave(selectedVaultId, description.trim() || null, dateOperation ? dateOperation : null);
             }
             onClose();
         } catch (err) {
@@ -633,6 +644,17 @@ function BullionTransactionModal({
                                 </small>
                             </div>
                         )}
+
+                        <div className="form-group">
+                            <label>Дата операции *</label>
+                            <input
+                                type="date"
+                                value={dateOperation}
+                                onChange={(e) => setDateOperation(e.target.value)}
+                                max={`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`}
+                                required
+                            />
+                        </div>
 
                         {error && <div className="error-message">{error}</div>}
                     </div>

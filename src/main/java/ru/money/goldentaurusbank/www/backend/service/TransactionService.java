@@ -37,6 +37,8 @@ public class TransactionService {
     private final CategoryRepository categoryRepository;
     private final TransactionLogRepository transactionLogRepository;
     private final ColorConstants colorConstants;
+    private static final String BANK_COLOR = "#FFA502";  // оранжевый
+    private static final String VAULT_COLOR = "#FFD93D"; // жёлтый
 
     @Transactional
     public Bullion refillBullion(RefillBullionRequest request, User user, Long batchId) {
@@ -54,6 +56,7 @@ public class TransactionService {
                 .amount(refillAmount)
                 .userId(user.getId())
                 .batchId(batchId)
+                .dateOperation(request.getDateOperation())
                 .status("SUCCESS");
 
         try {
@@ -99,6 +102,7 @@ public class TransactionService {
                 .amount(withDrawAmount)
                 .userId(user.getId())
                 .batchId(batchId)
+                .dateOperation(request.getDateOperation())
                 .status("SUCCESS");
 
         try {
@@ -130,12 +134,12 @@ public class TransactionService {
     }
 
     @Transactional
-    public void transferAmount(Long fromBullionId, Long toBullionId, BigDecimal amount, User user, String comment) {
-        transferAmount(fromBullionId, toBullionId, amount, user, null, comment);
+    public void transferAmount(Long fromBullionId, Long toBullionId, BigDecimal amount, User user, String comment, LocalDate dateOperation) {
+        transferAmount(fromBullionId, toBullionId, amount, user, null, comment, dateOperation);
     }
 
     @Transactional
-    public void transferAmount(Long fromBullionId, Long toBullionId, BigDecimal amount, User user, Long batchId, String comment) {
+    public void transferAmount(Long fromBullionId, Long toBullionId, BigDecimal amount, User user, Long batchId, String comment, LocalDate dateOperation) {
         TransactionLog.TransactionLogBuilder logBuilder = TransactionLog.builder()
                 .operationType(TRANSFER_AMOUNT.name())
                 .fromBullionId(fromBullionId)
@@ -143,6 +147,7 @@ public class TransactionService {
                 .amount(amount)
                 .userId(user.getId())
                 .batchId(batchId)
+                .dateOperation(dateOperation)
                 .status("SUCCESS");
 
         try {
@@ -191,18 +196,19 @@ public class TransactionService {
     }
 
     @Transactional
-    public void transferBullion(Long fromBullionId, Long toVaultId, User user) {
+    public void transferBullion(Long fromBullionId, Long toVaultId, User user, LocalDate dateOperation) {
         transferBullion(fromBullionId, toVaultId, user, null);
     }
 
     @Transactional
-    public void transferBullion(Long fromBullionId, Long toVaultId, User user, Long batchId) {
+    public void transferBullion(Long fromBullionId, Long toVaultId, User user, Long batchId, LocalDate dateOperation) {
         TransactionLog.TransactionLogBuilder logBuilder = TransactionLog.builder()
                 .operationType(TRANSFER_BULLION.name())
                 .fromBullionId(fromBullionId)
                 .toVaultId(toVaultId)
                 .userId(user.getId())
                 .batchId(batchId)
+                .dateOperation(dateOperation)
                 .status("SUCCESS");
 
         try {
@@ -333,6 +339,7 @@ public class TransactionService {
                     .userId(originalLog.getUserId())
                     .batchId(originalLog.getBatchId())
                     .parentTransactionId(originalLog.getId())
+                    .dateOperation(LocalDate.now())
                     .status("SUCCESS")
                     .description("Откат транзакции " + originalLog.getId())
                     .build();
@@ -412,7 +419,6 @@ public class TransactionService {
     }
 
 
-
     public Long createBatchId() {
         return System.currentTimeMillis();
     }
@@ -452,11 +458,6 @@ public class TransactionService {
         return sb.toString();
     }
 
-    // Фиксированные цвета текста для банка и хранилища (у них нет собственного
-    // цвета в модели). Название слитка красится реальным цветом его категории.
-    private static final String BANK_COLOR = "#FFA502";  // оранжевый
-    private static final String VAULT_COLOR = "#FFD93D"; // жёлтый
-
     /**
      * То же, что {@link #describeBullion(Bullion)}, но в виде цветных сегментов:
      * название слитка — цветом категории, банк — оранжевым, хранилище — жёлтым.
@@ -478,10 +479,9 @@ public class TransactionService {
         Vault vault = bullion.getVault();
         if (vault != null) {
             if (vault.getBank() != null && vault.getBank().getName() != null) {
-                segments.add(segment(" | ", null));
                 segments.add(segment(vault.getBank().getName(), BANK_COLOR));
+                segments.add(segment(" | ", null));
             }
-            segments.add(segment(" | ", null));
             segments.add(segment(vault.getName(), VAULT_COLOR));
         }
 
@@ -546,6 +546,9 @@ public class TransactionService {
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
 
+        // Получаем общую сумму всех слитков пользователя
+        BigDecimal totalAmount = bullionRepository.getTotalAmountByUserId(userId);
+
         List<Object[]> opStats = transactionLogRepository.getOperationTypeStatistics(userId, fromDate, toDate);
         List<OperationTypeStatsDto> operationTypeStats = opStats.stream()
                 .map(row -> OperationTypeStatsDto.builder()
@@ -560,6 +563,7 @@ public class TransactionService {
                 .totalIncome(totalIncome)
                 .totalExpense(totalExpense)
                 .netChange(totalIncome.subtract(totalExpense))
+                .totalAmount(totalAmount)
                 .totalTransactions(totalTransactions)
                 .recentTransactions(recentTransactions)
                 .operationTypeStats(operationTypeStats.isEmpty() ? null : operationTypeStats.get(0))
@@ -577,7 +581,14 @@ public class TransactionService {
         List<MonthlyDataDto> monthlyData = new ArrayList<>();
 
         for (Object[] row : results) {
-            java.sql.Timestamp timestamp = (java.sql.Timestamp) row[0];
+            java.sql.Timestamp timestamp;
+            if (row[0] instanceof java.time.Instant) {
+                timestamp = new java.sql.Timestamp(((java.time.Instant) row[0]).toEpochMilli());
+            } else if (row[0] instanceof java.sql.Timestamp) {
+                timestamp = (java.sql.Timestamp) row[0];
+            } else {
+                throw new ApplicationException(5000, "Unexpected type for date_operation column: " + row[0].getClass().getName());
+            }
             LocalDateTime monthDate = timestamp.toLocalDateTime();
 
             BigDecimal income = row[1] != null ? new BigDecimal(row[1].toString()) : BigDecimal.ZERO;
@@ -893,7 +904,6 @@ public class TransactionService {
                 .totalAmount(cumulativeTotal)
                 .dailyData(dailyData)
                 .build();
-
     }
 
 

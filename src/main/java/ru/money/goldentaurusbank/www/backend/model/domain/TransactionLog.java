@@ -1,9 +1,11 @@
 package ru.money.goldentaurusbank.www.backend.model.domain;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -73,6 +75,10 @@ public class TransactionLog {
      * При повторе: parentTransactionId = id операции, которую повторяем
      */
     private Long parentTransactionId;
+
+    @NotNull
+    @Column(name = "date_operation", updatable = false)
+    private LocalDate dateOperation;
     
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

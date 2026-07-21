@@ -46,7 +46,8 @@ function VaultBullionsPage() {
         isOpen: false,
         type: null,
         bullion: null,
-        fromVaultId: null
+        fromVaultId: null,
+        dateOperation: null
     });
 
     const [transferModal, setTransferModal] = useState({
@@ -54,7 +55,8 @@ function VaultBullionsPage() {
         fromBullion: null,
         fromAmount: 0,
         fromBullionId: null,
-        fromCategoryId: null
+        fromCategoryId: null,
+        dateOperation: null
     });
 
     const [transferTargets, setTransferTargets] = useState([]);
@@ -207,7 +209,8 @@ function VaultBullionsPage() {
             isOpen: true,
             type: 'refill',
             bullion: bullion,
-            fromVaultId: parseInt(vaultId)
+            fromVaultId: parseInt(vaultId),
+            dateOperation: null
         });
     };
 
@@ -216,7 +219,8 @@ function VaultBullionsPage() {
             isOpen: true,
             type: 'withdraw',
             bullion: bullion,
-            fromVaultId: parseInt(vaultId)
+            fromVaultId: parseInt(vaultId),
+            dateOperation: null
         });
     };
 
@@ -225,17 +229,26 @@ function VaultBullionsPage() {
             isOpen: true,
             type: 'delete',
             bullion: bullion,
-            fromVaultId: parseInt(vaultId)
+            fromVaultId: parseInt(vaultId),
+            dateOperation: null
         });
     };
 
     const handleOpenTransfer = (bullion) => {
+        // Set today's date as default for the transfer modal
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const formattedDate = `${year}-${month}-${day}`;
+
         setTransferModal({
             isOpen: true,
             fromBullion: bullion,
             fromAmount: bullion.amount,
             fromBullionId: bullion.id,
-            fromCategoryId: bullion.categoryId
+            fromCategoryId: bullion.categoryId,
+            dateOperation: formattedDate
         });
     };
 
@@ -247,14 +260,15 @@ function VaultBullionsPage() {
         }));
     };
 
-    const handleRefill = async (amount, userComment) => {
+    const handleRefill = async (amount, userComment, selectedVaultId, dateOperation) => {
         setActionLoading(true);
         try {
             await api.post('/bullions/refill', {
                 categoryId: transactionModal.bullion.categoryId,
                 vaultId: parseInt(vaultId),
                 amount: amount,
-                userComment: userComment
+                userComment: userComment,
+                dateOperation: dateOperation ? dateOperation : null
             });
             closeTransactionModal();
             await refreshData();
@@ -266,14 +280,15 @@ function VaultBullionsPage() {
         }
     };
 
-    const handleWithdraw = async (amount, userComment) => {
+    const handleWithdraw = async (amount, userComment, selectedVaultId, dateOperation) => {
         setActionLoading(true);
         try {
             await api.post('/bullions/withdraw', {
                 categoryId: transactionModal.bullion.categoryId,
                 vaultId: parseInt(vaultId),
                 amount: amount,
-                userComment: userComment
+                userComment: userComment,
+                dateOperation: dateOperation ? dateOperation : null
             });
             closeTransactionModal();
             await refreshData();
@@ -285,7 +300,7 @@ function VaultBullionsPage() {
         }
     };
 
-    const handleDeleteWithTransfer = async (targetVaultId, toLiquidityVault, description) => {
+    const handleDeleteWithTransfer = async (targetVaultId, toLiquidityVault, description, dateOperation) => {
         setActionLoading(true);
         try {
             await api.delete(`/bullions/${transactionModal.bullion.id}/transfer`, {
@@ -293,7 +308,8 @@ function VaultBullionsPage() {
                     fromVaultId: transactionModal.fromVaultId,
                     toVaultId: targetVaultId,
                     toLiquidityVault: toLiquidityVault,
-                    description: description
+                    description: description,
+                    dateOperation: dateOperation ? dateOperation : null
                 }
             });
             closeTransactionModal();
@@ -306,13 +322,14 @@ function VaultBullionsPage() {
         }
     };
 
-    const handleTransfer = async (amount, toBullionId, comment) => {
+    const handleTransfer = async (amount, toBullionId, comment, dateOperation) => {
         try {
             await api.post('/transactions/transfer', {
                 fromBullionId: transferModal.fromBullionId,
                 toBullionId: toBullionId,
                 amount: amount,
-                comment: comment
+                comment: comment,
+                dateOperation: dateOperation ? dateOperation : null
             });
             closeTransferModal();
             await refreshData();
@@ -326,14 +343,15 @@ function VaultBullionsPage() {
         await Promise.all([fetchVaultSummary(), fetchVault(), fetchAllVaults(), fetchAllBullions()]);
     }, [fetchVaultSummary, fetchVault, fetchAllVaults, fetchAllBullions]);
 
-    const handleSaveBullion = async (categoryId, vaultIdParam, amount, description) => {
+    const handleSaveBullion = async (categoryId, vaultIdParam, amount, description, dateOperation) => {
         setActionLoading(true);
         try {
             await api.post('/bullions', {
                 categoryId,
                 vaultId: vaultIdParam,
                 amount,
-                description
+                description,
+                dateOperation: dateOperation ? dateOperation : null
             });
             closeModal();
             await refreshData();
@@ -345,14 +363,15 @@ function VaultBullionsPage() {
         }
     };
 
-    const handleUpdateBullion = async (bullionId, categoryId, vaultIdParam, amount, description) => {
+    const handleUpdateBullion = async (bullionId, categoryId, vaultIdParam, amount, description, dateOperation) => {
         setActionLoading(true);
         try {
             await api.put(`/bullions/${bullionId}`, {
                 categoryId,
                 vaultId: vaultIdParam,
                 amount,
-                description
+                description,
+                dateOperation: dateOperation ? dateOperation : null
             });
             closeModal();
             await refreshData();
@@ -381,7 +400,8 @@ function VaultBullionsPage() {
             isOpen: false,
             type: null,
             bullion: null,
-            fromVaultId: null
+            fromVaultId: null,
+            dateOperation: null
         });
     };
 
@@ -391,7 +411,8 @@ function VaultBullionsPage() {
             fromBullion: null,
             fromAmount: 0,
             fromBullionId: null,
-            fromCategoryId: null
+            fromCategoryId: null,
+            dateOperation: null
         });
     };
 
@@ -575,15 +596,17 @@ function VaultBullionsPage() {
                     isOpen={modalOpen}
                     onClose={closeModal}
                     onSave={editingBullion
-                        ? (categoryId, vaultIdParam, amount, description) =>
-                            handleUpdateBullion(editingBullion.id, categoryId, vaultIdParam, amount, description)
-                        : handleSaveBullion
+                        ? (categoryId, vaultIdParam, amount, description, dateOperation) =>
+                            handleUpdateBullion(editingBullion.id, categoryId, vaultIdParam, amount, description, dateOperation)
+                        : (categoryId, vaultIdParam, amount, description, dateOperation) =>
+                            handleSaveBullion(categoryId, vaultIdParam, amount, description, dateOperation)
                     }
                     initialCategoryId={editingBullion?.categoryId}
                     initialCategoryName={editingBullion?.categoryName}
                     initialVaultId={parseInt(vaultId)}
                     initialAmount={editingBullion?.amount}
                     initialDescription={editingBullion?.description}
+                    initialDateOperation={editingBullion?.dateOperation}
                     isEditing={!!editingBullion}
                     allowedChangeAmount={allowedChangeAmount}
                 />
@@ -610,6 +633,7 @@ function VaultBullionsPage() {
                         descriptionLabel={currentTransaction.descriptionLabel}
                         vaultSelectorLabel={currentTransaction.vaultSelectorLabel}
                         type={currentTransaction.type || null}
+                        initialDateOperation={transactionModal.dateOperation}
                     />
                 )}
 
@@ -633,6 +657,7 @@ function VaultBullionsPage() {
                         fromBullions={getFromBullions()}
                         onSelectFromBullion={handleSelectFromBullion}
                         selectedFromBullionId={transferModal.fromBullionId}
+                        initialDateOperation={transferModal.dateOperation}
                     />
                 )}
             </div>

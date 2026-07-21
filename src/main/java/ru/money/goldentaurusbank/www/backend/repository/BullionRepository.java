@@ -37,4 +37,6 @@ public interface BullionRepository extends JpaRepository<Bullion, Long> {
 
 
     boolean existsByCategoryIdAndUserId(Long categoryId, Long userId);
+    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user.id = :userId")
+    BigDecimal getTotalAmountByUserId(@Param("userId") Long userId);
 }

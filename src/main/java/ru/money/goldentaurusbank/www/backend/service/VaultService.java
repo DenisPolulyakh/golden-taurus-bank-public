@@ -24,6 +24,8 @@ import ru.money.goldentaurusbank.www.backend.repository.BankRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -152,7 +154,7 @@ public class VaultService {
             Vault liquidityReserve = getLiquidityReserve(user);
             Long batchId = transactionService.createBatchId();
             for (Bullion bullion : bullions) {
-                transactionService.transferBullion(bullion.getId(), liquidityReserve.getId(), user, batchId);
+                transactionService.transferBullion(bullion.getId(), liquidityReserve.getId(), user, batchId, LocalDate.now());
             }
             log.info("To Reserve Vault move {} bullion", bullions.size());
         }
