@@ -134,12 +134,12 @@ public class TransactionService {
     }
 
     @Transactional
-    public void transferAmount(Long fromBullionId, Long toBullionId, BigDecimal amount, User user, String comment, LocalDate dateOperation) {
+    public void transferAmount(Long fromBullionId, Long toBullionId, BigDecimal amount, User user, String comment, LocalDateTime dateOperation) {
         transferAmount(fromBullionId, toBullionId, amount, user, null, comment, dateOperation);
     }
 
     @Transactional
-    public void transferAmount(Long fromBullionId, Long toBullionId, BigDecimal amount, User user, Long batchId, String comment, LocalDate dateOperation) {
+    public void transferAmount(Long fromBullionId, Long toBullionId, BigDecimal amount, User user, Long batchId, String comment, LocalDateTime dateOperation) {
         TransactionLog.TransactionLogBuilder logBuilder = TransactionLog.builder()
                 .operationType(TRANSFER_AMOUNT.name())
                 .fromBullionId(fromBullionId)
@@ -201,7 +201,7 @@ public class TransactionService {
     }
 
     @Transactional
-    public void transferBullion(Long fromBullionId, Long toVaultId, User user, Long batchId, LocalDate dateOperation) {
+    public void transferBullion(Long fromBullionId, Long toVaultId, User user, Long batchId, LocalDateTime dateOperation) {
         TransactionLog.TransactionLogBuilder logBuilder = TransactionLog.builder()
                 .operationType(TRANSFER_BULLION.name())
                 .fromBullionId(fromBullionId)
@@ -339,7 +339,7 @@ public class TransactionService {
                     .userId(originalLog.getUserId())
                     .batchId(originalLog.getBatchId())
                     .parentTransactionId(originalLog.getId())
-                    .dateOperation(LocalDate.now())
+                    .dateOperation(LocalDateTime.now())
                     .status("SUCCESS")
                     .description("Откат транзакции " + originalLog.getId())
                     .build();
@@ -472,8 +472,10 @@ public class TransactionService {
         Category category = bullion.getCategory();
         if (category != null) {
             segments.add(segment(category.getName(), category.getColor()));
+            segments.add(segment(" | ", null));
         } else {
             segments.add(segment("слиток #" + bullion.getId(), null));
+            segments.add(segment(" | ", null));
         }
 
         Vault vault = bullion.getVault();
@@ -746,6 +748,7 @@ public class TransactionService {
                 .status(log.getStatus())
                 .errorMessage(log.getErrorMessage())
                 .createdAt(log.getCreatedAt())
+                .dateOperation(log.getDateOperation())
                 .canRollback(canRollback)
                 .canRedo(canRedo)
                 .rollbackStatus(rollbackStatus)

@@ -189,18 +189,49 @@ function BullionTransactionModal({
                 setAmount('');
             }
 
-            // Устанавливаем начальную дату операции
+            // Устанавливаем начальную дату и время операции
             if (initialDateOperation) {
-                // Предполагаем, что initialDateOperation является строкой в формате yyyy-MM-dd
-                setDateOperation(initialDateOperation);
+                // Check if it's a date-only string (yyyy-MM-dd)
+                if (/^\d{4}-\d{2}-\d{2}$/.test(initialDateOperation)) {
+                    // Parse as date-only and set time to 00:00 in local time
+                    const [year, month, day] = initialDateOperation.split('-').map(Number);
+                    const localDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+                    const yearLocal = localDate.getFullYear();
+                    const monthLocal = String(localDate.getMonth() + 1).padStart(2, '0');
+                    const dayLocal = String(localDate.getDate()).padStart(2, '0');
+                    const hoursLocal = String(localDate.getHours()).padStart(2, '0');
+                    const minutesLocal = String(localDate.getMinutes()).padStart(2, '0');
+                    setDateOperation(`${yearLocal}-${monthLocal}-${dayLocal}T${hoursLocal}:${minutesLocal}`);
+                } else {
+                    // Try to parse as a date string (with time) or ISO string
+                    const date = new Date(initialDateOperation);
+                    if (!isNaN(date.getTime())) {
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        const hours = String(date.getHours()).padStart(2, '0');
+                        const minutes = String(date.getMinutes()).padStart(2, '0');
+                        setDateOperation(`${year}-${month}-${day}T${hours}:${minutes}`);
+                    } else {
+                        // If invalid, fallback to current datetime
+                        const now = new Date();
+                        const year = now.getFullYear();
+                        const month = String(now.getMonth() + 1).padStart(2, '0');
+                        const day = String(now.getDate()).padStart(2, '0');
+                        const hours = String(now.getHours()).padStart(2, '0');
+                        const minutes = String(now.getMinutes()).padStart(2, '0');
+                        setDateOperation(`${year}-${month}-${day}T${hours}:${minutes}`);
+                    }
+                }
             } else {
-                // Если дата не указана, устанавливаем текущую дату в локальном часовом поясе пользователя
-                const today = new Date();
-                const year = today.getFullYear();
-                const month = String(today.getMonth() + 1).padStart(2, '0');
-                const day = String(today.getDate()).padStart(2, '0');
-                const formattedDate = `${year}-${month}-${day}`;
-                setDateOperation(formattedDate);
+                // Если дата не указана, устанавливаем текущую дату и время в локальном часовом поясе пользователя
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                setDateOperation(`${year}-${month}-${day}T${hours}:${minutes}`);
             }
 
             setDescription(initialDescription || '');
@@ -646,12 +677,12 @@ function BullionTransactionModal({
                         )}
 
                         <div className="form-group">
-                            <label>Дата операции *</label>
+                            <label>Дата и время операции *</label>
                             <input
-                                type="date"
+                                type="datetime-local"
                                 value={dateOperation}
                                 onChange={(e) => setDateOperation(e.target.value)}
-                                max={`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`}
+                                max={`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}T${String(new Date().getHours()).padStart(2,'0')}:${String(new Date().getMinutes()).padStart(2,'0')}`}
                                 required
                             />
                         </div>

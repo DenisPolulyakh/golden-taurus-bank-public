@@ -21,7 +21,7 @@ public class TransferRequest {
     @Positive(message = "Сумма должна быть больше 0")
     private BigDecimal amount;
 
-    private LocalDate dateOperation;
+    private LocalDateTime dateOperation;
     
     private String comment;
 }

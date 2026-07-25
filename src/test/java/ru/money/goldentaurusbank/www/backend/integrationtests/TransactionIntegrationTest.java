@@ -206,7 +206,7 @@ class TransactionIntegrationTest {
                     "categoryId": %d,
                     "vaultId": %d,
                     "amount": 100000,
-                    "dateOperation": "2026-07-20"
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId1, vaultId1);
         MvcResult bullionResult1 = mockMvc.perform(post("/api/bullions")
@@ -222,7 +222,7 @@ class TransactionIntegrationTest {
                     "categoryId": %d,
                     "vaultId": %d,
                     "amount": 50000,
-                    "dateOperation": "2026-07-20"
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId2, vaultId2);
         MvcResult bullionResult2 = mockMvc.perform(post("/api/bullions")
@@ -436,7 +436,7 @@ class TransactionIntegrationTest {
                     "vaultId": %d,
                     "amount": %d,
                     "batchId": %d,
-                    "dateOperation": "2026-07-20"
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId1, vaultId1, amount, batchId);
 
@@ -456,7 +456,7 @@ class TransactionIntegrationTest {
                     "vaultId": %d,
                     "amount": %d,
                     "batchId": %d,
-                    "dateOperation": "2026-07-20"
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId1, vaultId1, amount, batchId);
 

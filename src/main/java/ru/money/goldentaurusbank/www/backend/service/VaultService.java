@@ -154,7 +154,7 @@ public class VaultService {
             Vault liquidityReserve = getLiquidityReserve(user);
             Long batchId = transactionService.createBatchId();
             for (Bullion bullion : bullions) {
-                transactionService.transferBullion(bullion.getId(), liquidityReserve.getId(), user, batchId, LocalDate.now());
+                transactionService.transferBullion(bullion.getId(), liquidityReserve.getId(), user, batchId, LocalDateTime.now());
             }
             log.info("To Reserve Vault move {} bullion", bullions.size());
         }

@@ -25,5 +25,5 @@ public class WithdrawBullionRequest {
     @Size(max = 500, message = "Описание не должно превышать 500 символов")
     private String userComment;
 
-    private LocalDate dateOperation;
+    private LocalDateTime dateOperation;
 }

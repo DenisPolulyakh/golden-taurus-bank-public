@@ -30,7 +30,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       SERVER_ADDRESS: 0.0.0.0
-      SERVER_PORT: 8080
+      SERVER_PORT: 8081
       # Почта (необязательно — оставьте пустым, если не нужна)
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
@@ -42,7 +42,7 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
-    # Порт 8080 наружу не публикуем — доступ только через nginx
+    # Порт 8081 наружу не публикуем — доступ только через nginx
 
   nginx:
     build: ./src/main/java/ru/money/goldentaurusbank/www/frontend

@@ -27,6 +27,7 @@ import ru.money.goldentaurusbank.www.backend.util.math.FinancialCalculator;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -169,7 +170,7 @@ public class BullionService {
             request.setAmount(bullion.getAmount());
             request.setCategoryId(bullion.getCategory().getId());
             request.setVaultId(bullion.getVault().getId());
-            request.setDateOperation(LocalDate.now());
+            request.setDateOperation(LocalDateTime.now());
             request.setUserComment("Удаление слитка");
             transactionService.withdrawBullion(request, user, null);
             // After withdrawal, bullion amount should be zero; flush to ensure state

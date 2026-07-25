@@ -78,7 +78,7 @@ public class TransactionLog {
 
     @NotNull
     @Column(name = "date_operation", updatable = false)
-    private LocalDate dateOperation;
+    private LocalDateTime dateOperation;
     
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

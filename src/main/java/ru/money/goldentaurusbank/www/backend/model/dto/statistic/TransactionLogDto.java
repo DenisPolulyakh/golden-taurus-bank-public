@@ -26,6 +26,7 @@ public class TransactionLogDto {
     private String status;
     private String errorMessage;
     private LocalDateTime createdAt;
+    private LocalDateTime dateOperation;
     private Boolean canRollback;
     private Boolean canRedo;
     private String rollbackStatus;
