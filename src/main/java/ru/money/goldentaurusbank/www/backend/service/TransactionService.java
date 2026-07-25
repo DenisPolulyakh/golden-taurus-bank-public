@@ -2,11 +2,13 @@ package ru.money.goldentaurusbank.www.backend.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.money.goldentaurusbank.www.backend.infrastructure.exception.ApplicationException;
 import ru.money.goldentaurusbank.www.backend.model.domain.*;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.OperationType;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.RefillBullionRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.WithdrawBullionRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.*;
@@ -19,6 +21,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -668,15 +671,19 @@ public class TransactionService {
             Long userId,
             String operationType,
             String status,
-            LocalDateTime fromDate,
-            LocalDateTime toDate,
+            LocalDate fromDate,
+            LocalDate toDate,
             Pageable pageable) {
 
         int offset = (int) pageable.getOffset();
         int limit = pageable.getPageSize();
-
-        List<TransactionLog> logs = transactionLogRepository.findTransactionHistory(userId, offset, limit);
-        long total = transactionLogRepository.countTransactionHistory(userId);
+        LocalDateTime from = fromDate == null ? null : fromDate.atStartOfDay();
+        LocalDateTime to = toDate == null ? null : toDate.atTime(LocalTime.MAX);
+        String opType = StringUtils.isBlank(operationType) ? null : OperationType.valueOf(operationType).name();
+        List<TransactionLog> logs = transactionLogRepository.findTransactionHistory(
+                userId, offset, limit, from, to, opType, status);
+        long total = transactionLogRepository.countTransactionHistory(
+                userId, from, to, opType, status);
 
         List<TransactionLogDto> content = logs.stream()
                 .map(this::convertToDto)

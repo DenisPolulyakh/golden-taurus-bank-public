@@ -96,24 +96,23 @@ public interface TransactionLogRepository extends JpaRepository<TransactionLog, 
             @Param("limit") int limit
     );
 
-    @Query(value = """
-        SELECT * FROM taurus.transaction_logs
-        WHERE user_id = :userId
-        ORDER BY date_operation DESC
-        OFFSET :offset LIMIT :limit
-        """, nativeQuery = true)
-    List<TransactionLog> findTransactionHistory(
-            @Param("userId") Long userId,
-            @Param("offset") int offset,
-            @Param("limit") int limit
-    );
+
+    
 
     @Query(value = """
         SELECT COUNT(*) FROM taurus.transaction_logs
         WHERE user_id = :userId
+            AND date_operation >= COALESCE(:dateFrom, date_operation)
+            AND date_operation <= COALESCE(:toDate, date_operation)
+            AND operation_type = COALESCE(:operationType, operation_type)
+            AND status = COALESCE(:status, status)
         """, nativeQuery = true)
     long countTransactionHistory(
-            @Param("userId") Long userId
+            @Param("userId") Long userId,
+            @Param("dateFrom") LocalDateTime dateFrom,
+            @Param("toDate") LocalDateTime toDate,
+            @Param("operationType") String operationType,
+            @Param("status") String status
     );
 
     @Query(value = """
@@ -191,5 +190,25 @@ public interface TransactionLogRepository extends JpaRepository<TransactionLog, 
             @Param("userId") Long userId,
             @Param("year") int year,
             @Param("month") int month
+    );
+
+    @Query(value = """
+        SELECT * FROM taurus.transaction_logs
+        WHERE user_id = :userId
+            AND date_operation >= COALESCE(:dateFrom, date_operation)
+            AND date_operation <= COALESCE(:toDate, date_operation)
+            AND operation_type = COALESCE(:operationType, operation_type)
+            AND status = COALESCE(:status, status)
+        ORDER BY date_operation DESC
+        OFFSET :offset LIMIT :limit
+        """, nativeQuery = true)
+    List<TransactionLog> findTransactionHistory(
+            @Param("userId") Long userId,
+            @Param("offset") int offset,
+            @Param("limit") int limit,
+            @Param("dateFrom") LocalDateTime dateFrom,
+            @Param("toDate") LocalDateTime toDate,
+            @Param("operationType") String operationType,
+            @Param("status") String status
     );
 }
