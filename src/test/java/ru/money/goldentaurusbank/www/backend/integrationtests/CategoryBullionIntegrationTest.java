@@ -214,7 +214,8 @@ class CategoryBullionIntegrationTest {
                     "categoryId": %d,
                     "vaultId": %d,
                     "amount": 100000,
-                    "description": "На чёрный день"
+                    "description": "На чёрный день",
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId1, vaultId1);
 
@@ -235,7 +236,8 @@ class CategoryBullionIntegrationTest {
                 {
                     "categoryId": %d,
                     "vaultId": %d,
-                    "amount": 100000
+                    "amount": 100000,
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId1, vaultId1);
 
@@ -249,7 +251,8 @@ class CategoryBullionIntegrationTest {
                 {
                     "categoryId": %d,
                     "vaultId": %d,
-                    "amount": 50000
+                    "amount": 50000,
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId1, vaultId1);
 
@@ -259,6 +262,7 @@ class CategoryBullionIntegrationTest {
                         .content(request2))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.message").value("Слиток успешно добавлен"))
                 .andExpect(jsonPath("$.data.amount").value(150000));
     }
 
@@ -266,12 +270,13 @@ class CategoryBullionIntegrationTest {
     @DisplayName("Получение группированных слитков - успешно")
     void getGroupedBullionsSuccess() throws Exception {
         String createBullion1 = """
-            {
-                "categoryId": %d,
-                "vaultId": %d,
-                "amount": 100000
-            }
-            """.formatted(categoryId1, vaultId1);
+                {
+                    "categoryId": %d,
+                    "vaultId": %d,
+                    "amount": 100000,
+                    "dateOperation": "2026-07-20T12:00:00"
+                }
+                """.formatted(categoryId1, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -279,12 +284,13 @@ class CategoryBullionIntegrationTest {
                 .andExpect(status().isOk());
 
         String createBullion2 = """
-            {
-                "categoryId": %d,
-                "vaultId": %d,
-                "amount": 50000
-            }
-            """.formatted(categoryId1, vaultId2);
+                {
+                    "categoryId": %d,
+                    "vaultId": %d,
+                    "amount": 50000,
+                    "dateOperation": "2026-07-20T12:00:00"
+                }
+                """.formatted(categoryId1, vaultId2);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -292,12 +298,13 @@ class CategoryBullionIntegrationTest {
                 .andExpect(status().isOk());
 
         String createBullion3 = """
-            {
-                "categoryId": %d,
-                "vaultId": %d,
-                "amount": 75000
-            }
-            """.formatted(categoryId2, vaultId1);
+                {
+                    "categoryId": %d,
+                    "vaultId": %d,
+                    "amount": 75000,
+                    "dateOperation": "2026-07-20T12:00:00"
+                }
+                """.formatted(categoryId2, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -317,7 +324,6 @@ class CategoryBullionIntegrationTest {
                 .andExpect(jsonPath("$.data.categoryBullionList").isArray())
                 .andExpect(jsonPath("$.data.categoryBullionList.length()").value(2))
                 .andReturn();
-
 
 
         String responseBody = result.getResponse().getContentAsString();
@@ -383,7 +389,6 @@ class CategoryBullionIntegrationTest {
         assertThat(vaultInGroup2.getAmount()).isEqualByComparingTo(new BigDecimal("75000"));
 
 
-
     }
 
     @Test
@@ -394,7 +399,8 @@ class CategoryBullionIntegrationTest {
                     "categoryId": %d,
                     "vaultId": %d,
                     "amount": 100000,
-                    "description": "Описание 1"
+                    "description": "Описание 1",
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId1, vaultId1);
         mockMvc.perform(post("/api/bullions")
@@ -408,7 +414,8 @@ class CategoryBullionIntegrationTest {
                     "categoryId": %d,
                     "vaultId": %d,
                     "amount": 75000,
-                    "description": "Описание 2"
+                    "description": "Описание 2",
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId2, vaultId1);
         mockMvc.perform(post("/api/bullions")
@@ -459,7 +466,8 @@ class CategoryBullionIntegrationTest {
                 {
                     "categoryId": %d,
                     "vaultId": %d,
-                    "amount": 100000
+                    "amount": 100000,
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId1, vaultId1);
         mockMvc.perform(post("/api/bullions")
@@ -472,7 +480,8 @@ class CategoryBullionIntegrationTest {
                 {
                     "categoryId": %d,
                     "vaultId": %d,
-                    "amount": 50000
+                    "amount": 50000,
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId2, vaultId1);
         mockMvc.perform(post("/api/bullions")
@@ -495,7 +504,8 @@ class CategoryBullionIntegrationTest {
                 {
                     "categoryId": %d,
                     "vaultId": %d,
-                    "amount": 100000
+                    "amount": 100000,
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId1, vaultId1);
         mockMvc.perform(post("/api/bullions")
@@ -508,7 +518,8 @@ class CategoryBullionIntegrationTest {
                 {
                     "categoryId": %d,
                     "vaultId": %d,
-                    "amount": 50000
+                    "amount": 50000,
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId2, vaultId1);
         mockMvc.perform(post("/api/bullions")
@@ -533,7 +544,8 @@ class CategoryBullionIntegrationTest {
                     "categoryId": %d,
                     "vaultId": %d,
                     "amount": 100000,
-                    "description": "Старое описание"
+                    "description": "Старое описание",
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId1, vaultId1);
 
@@ -551,7 +563,8 @@ class CategoryBullionIntegrationTest {
                     "categoryId": %d,
                     "vaultId": %d,
                     "amount": 150000,
-                    "description": "Новое описание"
+                    "description": "Новое описание",
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId1, vaultId1);
 
@@ -572,7 +585,8 @@ class CategoryBullionIntegrationTest {
                 {
                     "categoryId": %d,
                     "vaultId": %d,
-                    "amount": 100000
+                    "amount": 100000,
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId1, vaultId1);
 
@@ -615,12 +629,13 @@ class CategoryBullionIntegrationTest {
     @DisplayName("Получение группированных слитков - несколько категорий в одном хранилище")
     void getGroupedBullionsMultipleCategoriesOneVault() throws Exception {
         String createBullion1 = """
-            {
-                "categoryId": %d,
-                "vaultId": %d,
-                "amount": 100000
-            }
-            """.formatted(categoryId1, vaultId1);
+                {
+                    "categoryId": %d,
+                    "vaultId": %d,
+                    "amount": 100000,
+                    "dateOperation": "2026-07-20T12:00:00"
+                }
+                """.formatted(categoryId1, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -628,12 +643,13 @@ class CategoryBullionIntegrationTest {
                 .andExpect(status().isOk());
 
         String createBullion2 = """
-            {
-                "categoryId": %d,
-                "vaultId": %d,
-                "amount": 75000
-            }
-            """.formatted(categoryId2, vaultId1);
+                {
+                    "categoryId": %d,
+                    "vaultId": %d,
+                    "amount": 75000,
+                    "dateOperation": "2026-07-20T12:00:00"
+                }
+                """.formatted(categoryId2, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -705,7 +721,6 @@ class CategoryBullionIntegrationTest {
                 .andExpect(jsonPath("$.data.name").value("Сбербанк"))
                 .andExpect(jsonPath("$.data.totalAmount").value(0))
                 .andExpect(jsonPath("$.data.categoriesCount").value(0));
-
     }
 
     @Test
@@ -715,7 +730,8 @@ class CategoryBullionIntegrationTest {
                 {
                     "categoryId": %d,
                     "vaultId": %d,
-                    "amount": 100000
+                    "amount": 100000,
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId1, vaultId1);
         mockMvc.perform(post("/api/bullions")
@@ -728,7 +744,8 @@ class CategoryBullionIntegrationTest {
                 {
                     "categoryId": %d,
                     "vaultId": %d,
-                    "amount": 50000
+                    "amount": 50000,
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId1, vaultId1);
         mockMvc.perform(post("/api/bullions")
@@ -758,7 +775,8 @@ class CategoryBullionIntegrationTest {
                 {
                     "categoryId": %d,
                     "vaultId": %d,
-                    "amount": 100000
+                    "amount": 100000,
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId1, vaultId1);
         mockMvc.perform(post("/api/bullions")
@@ -771,7 +789,8 @@ class CategoryBullionIntegrationTest {
                 {
                     "categoryId": %d,
                     "vaultId": %d,
-                    "amount": 75000
+                    "amount": 75000,
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId2, vaultId1);
         mockMvc.perform(post("/api/bullions")

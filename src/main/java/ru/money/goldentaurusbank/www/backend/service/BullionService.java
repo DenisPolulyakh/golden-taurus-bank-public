@@ -27,6 +27,7 @@ import ru.money.goldentaurusbank.www.backend.util.math.FinancialCalculator;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -130,7 +131,6 @@ public class BullionService {
             bullion.setAmount(request.getAmount());
         }
 
-
         bullion.setDescription(request.getDescription());
 
         if (request.getCategoryId() != null && !bullion.getCategory().getId().equals(request.getCategoryId())) {
@@ -158,12 +158,25 @@ public class BullionService {
 
     @Transactional
     public void deleteBullion(User user, Long bullionId) {
-        if (!bullionRepository.existsByIdAndUser(bullionId, user)) {
-            throw new ApplicationException(
-                    BULLION_NOT_FOUND.getCode(),
-                    BULLION_NOT_FOUND.getMessage()
-            );
+        Bullion bullion = bullionRepository.findByIdAndUser(bullionId, user)
+                .orElseThrow(() -> new ApplicationException(
+                        BULLION_NOT_FOUND.getCode(),
+                        BULLION_NOT_FOUND.getMessage()
+                ));
+
+        // If bullion has nonzero amount, treat its deletion as a withdrawal of the full amount
+        if (bullion.getAmount().compareTo(BigDecimal.ZERO) != 0) {
+            WithdrawBullionRequest request = new WithdrawBullionRequest();
+            request.setAmount(bullion.getAmount());
+            request.setCategoryId(bullion.getCategory().getId());
+            request.setVaultId(bullion.getVault().getId());
+            request.setDateOperation(LocalDateTime.now());
+            request.setUserComment("Удаление слитка");
+            transactionService.withdrawBullion(request, user, null);
+            // After withdrawal, bullion amount should be zero; flush to ensure state
+            bullionRepository.flush();
         }
+
         bullionRepository.deleteByIdAndUser(bullionId, user);
     }
 
@@ -293,10 +306,10 @@ public class BullionService {
                 ));
         if (request.isToLiquidityVault()) {
             Vault liquidityVault = vaultService.getLiquidityReserve(user);
-            transactionService.transferBullion(bullion.getId(), liquidityVault.getId(), user);
+            transactionService.transferBullion(bullion.getId(), liquidityVault.getId(), user,request.getDateOperation());
             log.info("Bullion {} transfer to liquidity reverse id = {}", bullion.getCategory().getName(), liquidityVault.getId());
         } else {
-            transactionService.transferBullion(bullion.getId(), request.getToVaultId(), user);
+            transactionService.transferBullion(bullion.getId(), request.getToVaultId(), user, request.getDateOperation());
             log.info("Bullion {} transfer to vault id = {}", bullion.getCategory().getName(), request.getToVaultId());
         }
         bullionRepository.deleteByIdAndUser(bullionId, user);

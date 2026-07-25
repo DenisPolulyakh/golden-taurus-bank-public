@@ -44,7 +44,8 @@ function BullionsPage() {
         amount: null,
         bullionId: null,
         description: null,
-        fromVaultId: null
+        fromVaultId: null,
+        dateOperation: null // 👈 ДОБАВИТЬ ПОЛЕ ДАТЫ
     });
 
     const navigate = useNavigate();
@@ -126,7 +127,8 @@ function BullionsPage() {
             amount: null,
             bullionId: null,
             description: null,
-            fromVaultId: null
+            fromVaultId: null,
+            dateOperation: null // будет установлено в модальном окне
         });
     };
 
@@ -141,7 +143,8 @@ function BullionsPage() {
             amount: null,
             bullionId: null,
             description: null,
-            fromVaultId: null
+            fromVaultId: null,
+            dateOperation: null
         });
     };
 
@@ -156,17 +159,19 @@ function BullionsPage() {
             amount: null,
             bullionId: bullionId,
             description: null,
-            fromVaultId: vaultId
+            fromVaultId: vaultId,
+            dateOperation: null
         });
     };
 
-    const handleRefill = async (amount, description, vaultId) => {
+    const handleRefill = async (amount, description, vaultId, dateOperation) => {
         try {
             await api.post('/bullions/refill', {
                 categoryId: transactionModal.categoryId,
                 vaultId: vaultId,
                 amount: amount,
-                description: description
+                description: description,
+                dateOperation: dateOperation
             });
             await fetchGroupedBullions();
         } catch (err) {
@@ -175,13 +180,14 @@ function BullionsPage() {
         }
     };
 
-    const handleWithdraw = async (amount, description, vaultId) => {
+    const handleWithdraw = async (amount, description, vaultId, dateOperation) => {
         try {
             await api.post('/bullions/withdraw', {
                 categoryId: transactionModal.categoryId,
                 vaultId: vaultId,
                 amount: amount,
-                description: description
+                description: description,
+                dateOperation: dateOperation
             });
             await fetchGroupedBullions();
         } catch (err) {
@@ -190,7 +196,7 @@ function BullionsPage() {
         }
     };
 
-    const handleDeleteWithTransfer = async (targetVaultId, toLiquidityVault, description) => {
+    const handleDeleteWithTransfer = async (targetVaultId, toLiquidityVault, description, dateOperation) => {
         try {
             await api.post('/bullions/delete-with-transfer', {
                 bullionId: transactionModal.bullionId,
@@ -198,7 +204,8 @@ function BullionsPage() {
                 toVaultId: targetVaultId,
                 toLiquidityVault: toLiquidityVault,
                 categoryId: transactionModal.categoryId,
-                description: description
+                description: description,
+                dateOperation: dateOperation
             });
             await fetchGroupedBullions();
         } catch (err) {
@@ -207,15 +214,15 @@ function BullionsPage() {
         }
     };
 
-    const handleSaveBullion = async (categoryId, vaultId, amount, description) => {
+    const handleSaveBullion = async (categoryId, vaultId, amount, description, dateOperation) => {
         try {
             if (editingBullion) {
                 await api.put(`/bullions/${editingBullion.id}`, {
-                    categoryId, vaultId, amount, description
+                    categoryId, vaultId, amount, description, dateOperation
                 });
             } else {
                 await api.post('/bullions', {
-                    categoryId, vaultId, amount, description
+                    categoryId, vaultId, amount, description, dateOperation
                 });
             }
             setModalOpen(false);
@@ -247,7 +254,8 @@ function BullionsPage() {
             amount: null,
             bullionId: null,
             description: null,
-            fromVaultId: null
+            fromVaultId: null,
+            dateOperation: null
         });
     };
 
@@ -355,13 +363,14 @@ function BullionsPage() {
         });
     };
 
-    const handleTransfer = async (amount, toBullionId, comment) => {
+    const handleTransfer = async (amount, toBullionId, comment, dateOperation) => {
         try {
             await api.post('/transactions/transfer', {
                 fromBullionId: transferModal.fromBullionId,
                 toBullionId: toBullionId,
                 amount: amount,
-                comment: comment
+                comment: comment,
+                dateOperation: dateOperation
             });
             await fetchGroupedBullions();
         } catch (err) {
@@ -580,6 +589,7 @@ function BullionsPage() {
                     initialVaultId={editingBullion?.vaultId}
                     initialAmount={editingBullion?.amount}
                     initialDescription={editingBullion?.description}
+                    initialDateOperation={editingBullion?.dateOperation}
                     isEditing={!!editingBullion}
                 />
 
@@ -605,6 +615,19 @@ function BullionsPage() {
                         descriptionLabel={currentTransaction.descriptionLabel}
                         vaultSelectorLabel={currentTransaction.vaultSelectorLabel}
                         type={currentTransaction.type || null}
+                        maxTransferAmount={currentTransaction.type === 'transfer' ? 0 : 0} // не используется для refill/withdraw/delete
+                        transferTargets={currentTransaction.type === 'transfer' ? getTransferTargets() : []}
+                        fromBullionId={currentTransaction.type === 'transfer' ? null : null}
+                        fromBullions={currentTransaction.type === 'transfer' ? getFromBullions() : []}
+                        onSelectFromBullion={currentTransaction.type === 'transfer' ? (bullionId, amount) => {
+                            setTransferModal(prev => ({
+                                ...prev,
+                                fromBullionId: bullionId,
+                                fromAmount: amount
+                            }));
+                        } : null}
+                        selectedFromBullionId={currentTransaction.type === 'transfer' ? transferModal.fromBullionId : null}
+                        initialDateOperation={transactionModal.dateOperation} // 👈 ПЕРЕДАЕМ ДАТУ
                     />
                 )}
 
@@ -634,6 +657,7 @@ function BullionsPage() {
                             }));
                         }}
                         selectedFromBullionId={transferModal.fromBullionId}
+                        initialDateOperation={null} // Для transfer модалки будем устанавливать дату внутри (сегодня)
                     />
                 )}
             </div>

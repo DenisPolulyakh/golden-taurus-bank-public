@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 public class WithdrawBullionRequest {
@@ -22,4 +24,6 @@ public class WithdrawBullionRequest {
 
     @Size(max = 500, message = "Описание не должно превышать 500 символов")
     private String userComment;
+
+    private LocalDateTime dateOperation;
 }

@@ -205,7 +205,8 @@ class TransactionIntegrationTest {
                 {
                     "categoryId": %d,
                     "vaultId": %d,
-                    "amount": 100000
+                    "amount": 100000,
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId1, vaultId1);
         MvcResult bullionResult1 = mockMvc.perform(post("/api/bullions")
@@ -220,7 +221,8 @@ class TransactionIntegrationTest {
                 {
                     "categoryId": %d,
                     "vaultId": %d,
-                    "amount": 50000
+                    "amount": 50000,
+                    "dateOperation": "2026-07-20T12:00:00"
                 }
                 """.formatted(categoryId2, vaultId2);
         MvcResult bullionResult2 = mockMvc.perform(post("/api/bullions")
@@ -266,7 +268,6 @@ class TransactionIntegrationTest {
     }
 
 
-
     // ==================== ТЕСТЫ ИСТОРИИ ====================
 
     @Test
@@ -299,7 +300,7 @@ class TransactionIntegrationTest {
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(5))
-                .andExpect(jsonPath("$.content[0].operationType").value("WITHDRAW_BULLION"));
+                .andExpect(jsonPath("$.content[0].operationType").value("REFILL_BULLION"));
     }
 
     @Test
@@ -430,13 +431,14 @@ class TransactionIntegrationTest {
         Long batchId = System.currentTimeMillis();
 
         String request = """
-            {
-                "categoryId": %d,
-                "vaultId": %d,
-                "amount": %d,
-                "batchId": %d
-            }
-            """.formatted(categoryId1, vaultId1, amount, batchId);
+                {
+                    "categoryId": %d,
+                    "vaultId": %d,
+                    "amount": %d,
+                    "batchId": %d,
+                    "dateOperation": "2026-07-20T12:00:00"
+                }
+                """.formatted(categoryId1, vaultId1, amount, batchId);
 
         mockMvc.perform(post("/api/bullions/refill")
                         .header("Authorization", "Bearer " + accessToken)
@@ -449,13 +451,14 @@ class TransactionIntegrationTest {
         Long batchId = System.currentTimeMillis();
 
         String request = """
-            {
-                "categoryId": %d,
-                "vaultId": %d,
-                "amount": %d,
-                "batchId": %d
-            }
-            """.formatted(categoryId1, vaultId1, amount, batchId);
+                {
+                    "categoryId": %d,
+                    "vaultId": %d,
+                    "amount": %d,
+                    "batchId": %d,
+                    "dateOperation": "2026-07-20T12:00:00"
+                }
+                """.formatted(categoryId1, vaultId1, amount, batchId);
 
         mockMvc.perform(post("/api/bullions/withdraw")
                         .header("Authorization", "Bearer " + accessToken)

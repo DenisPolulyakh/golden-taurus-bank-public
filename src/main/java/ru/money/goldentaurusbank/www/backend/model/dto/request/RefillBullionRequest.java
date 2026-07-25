@@ -6,9 +6,10 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Data
-public class RefillBullionRequest implements ChangeBullionRequest{
+public class RefillBullionRequest implements ChangeBullionRequest {
 
     @NotNull(message = "ID категории обязательно")
     private Long categoryId;
@@ -22,4 +23,7 @@ public class RefillBullionRequest implements ChangeBullionRequest{
 
     @Size(max = 500, message = "Описание не должно превышать 500 символов")
     private String userComment;
+
+
+    private LocalDateTime dateOperation;
 }

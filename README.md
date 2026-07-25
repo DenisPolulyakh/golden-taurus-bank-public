@@ -8,7 +8,7 @@
 
 ```
 браузер → :80 nginx ──(статика React)
-                     └─(/api/**)→ app:8080 (Spring Boot) → postgres:5432
+                     └─(/api/**)→ app:8081 (Spring Boot) → postgres:5432
 ```
 
 nginx раздаёт собранный фронтенд и проксирует `/api` на бэкенд. Фронт и API на одном
@@ -121,4 +121,4 @@ docker compose up -d --build
 - Бэкенд: `./mvnw spring-boot:run` (нужен запущенный Postgres — можно
   `docker compose up -d postgres`).
 - Фронтенд: в каталоге `src/main/java/ru/money/goldentaurusbank/www/frontend`
-  выполнить `npm install && npm run dev` (Vite проксирует `/api` на `localhost:8080`).
+  выполнить `npm install && npm run dev` (Vite проксирует `/api` на `localhost:8081`).

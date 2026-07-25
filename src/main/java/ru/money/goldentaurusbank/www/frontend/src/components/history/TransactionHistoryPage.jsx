@@ -69,10 +69,13 @@ const TransactionHistoryPage = () => {
 
     const formatDate = (date) => {
         if (!date) return '-';
-        return new Date(date).toLocaleDateString('ru-RU', {
-            day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit'
-        });
+        const d = new Date(date);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        const hour = String(d.getHours()).padStart(2, '0');
+        const minute = String(d.getMinutes()).padStart(2, '0');
+        return `${day}.${month}.${year} ${hour}:${minute}`;
     };
 
     const formatAmount = (amount) => {
@@ -196,7 +199,7 @@ const TransactionHistoryPage = () => {
 
                         return (
                             <tr key={tx.id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
-                                <td>{formatDate(tx.createdAt)}</td>
+                                <td>{formatDate(tx.dateOperation)}</td>
                                 <td>
                     <span className={`type-badge type-${tx.operationType.toLowerCase()}`}>
                       {getOperationTypeLabel(tx.operationType)}

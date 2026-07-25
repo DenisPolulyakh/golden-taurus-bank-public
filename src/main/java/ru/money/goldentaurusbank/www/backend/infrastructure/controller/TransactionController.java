@@ -139,7 +139,8 @@ public class TransactionController {
                 request.getToBullionId(),
                 request.getAmount(),
                 user,
-                request.getComment()
+                request.getComment(),
+                request.getDateOperation()
         );
 
         return ResponseEntity.ok(new SuccessResponse<>(
