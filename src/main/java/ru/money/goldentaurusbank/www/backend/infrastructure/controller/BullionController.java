@@ -35,10 +35,10 @@ public class BullionController {
     public ResponseEntity<SuccessResponse<BullionResponse>> createBullion(
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody BullionRequest request) {
-        
+
         User user = getUserFromUserDetails(userDetails);
         BullionResponse response = bullionService.createBullion(user, request);
-        
+
         return ResponseEntity.ok(new SuccessResponse<>(
                 SUCCESS.getCode(),
                 "Слиток успешно добавлен",
@@ -78,13 +78,31 @@ public class BullionController {
         ));
     }
 
+    @PostMapping("/transfer")
+    public ResponseEntity<SuccessResponse<Void>> transferAmount(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody TransferRequest request) {
+
+        User user = getUserFromUserDetails(userDetails);
+        bullionService.transferAmountBullion(
+                user, request
+        );
+
+        return ResponseEntity.ok(new SuccessResponse<>(
+                0,
+                "Перевод выполнен успешно",
+                null
+        ));
+    }
+
+
     @GetMapping
     public ResponseEntity<SuccessResponse<List<BullionResponse>>> getAllBullions(
             @AuthenticationPrincipal UserDetails userDetails) {
-        
+
         User user = getUserFromUserDetails(userDetails);
         List<BullionResponse> bullions = bullionService.getAllBullions(user);
-        
+
         return ResponseEntity.ok(new SuccessResponse<>(bullions));
     }
 
@@ -92,10 +110,10 @@ public class BullionController {
     public ResponseEntity<SuccessResponse<BullionResponse>> getBullionById(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long bullionId) {
-        
+
         User user = getUserFromUserDetails(userDetails);
         BullionResponse bullion = bullionService.getBullionById(user, bullionId);
-        
+
         return ResponseEntity.ok(new SuccessResponse<>(bullion));
     }
 
@@ -104,10 +122,10 @@ public class BullionController {
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long bullionId,
             @Valid @RequestBody BullionRequest request) {
-        
+
         User user = getUserFromUserDetails(userDetails);
         BullionResponse response = bullionService.updateBullion(user, bullionId, request);
-        
+
         return ResponseEntity.ok(new SuccessResponse<>(
                 SUCCESS.getCode(),
                 "Слиток успешно обновлён",
@@ -119,20 +137,20 @@ public class BullionController {
     public ResponseEntity<SuccessResponse<Void>> deleteBullion(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long bullionId) {
-        
+
         User user = getUserFromUserDetails(userDetails);
         bullionService.deleteBullion(user, bullionId);
-        
+
         return ResponseEntity.ok(new SuccessResponse<>("Слиток успешно удалён"));
     }
 
     @GetMapping("/total")
     public ResponseEntity<SuccessResponse<BigDecimal>> getTotalAmount(
             @AuthenticationPrincipal UserDetails userDetails) {
-        
+
         User user = getUserFromUserDetails(userDetails);
         BigDecimal total = bullionService.getTotalAmount(user);
-        
+
         return ResponseEntity.ok(new SuccessResponse<>(total));
     }
 
@@ -140,20 +158,19 @@ public class BullionController {
     public ResponseEntity<SuccessResponse<BigDecimal>> getTotalAmountByCategory(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long categoryId) {
-        
+
         User user = getUserFromUserDetails(userDetails);
-        
+
         Category category = categoryRepository.findByIdAndUser(categoryId, user)
                 .orElseThrow(() -> new ApplicationException(
                         CATEGORY_NOT_FOUND.getCode(),
                         CATEGORY_NOT_FOUND.getMessage()
                 ));
-        
+
         BigDecimal total = bullionService.getTotalAmountByCategory(user, category);
-        
+
         return ResponseEntity.ok(new SuccessResponse<>(total));
     }
-
 
 
     @DeleteMapping("/{bullionId}/transfer")
@@ -173,7 +190,6 @@ public class BullionController {
     }
 
 
-
     @GetMapping("/grouped")
     public ResponseEntity<SuccessResponse<GroupedBullionResponse>> getGroupedBullions(
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -183,15 +199,6 @@ public class BullionController {
 
         return ResponseEntity.ok(new SuccessResponse<>(grouped));
     }
-
-
-
-
-
-
-
-
-
 
 
     private User getUserFromUserDetails(UserDetails userDetails) {

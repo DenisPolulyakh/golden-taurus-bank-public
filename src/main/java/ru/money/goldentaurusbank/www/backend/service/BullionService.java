@@ -11,10 +11,7 @@ import ru.money.goldentaurusbank.www.backend.model.domain.Category;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.domain.Vault;
 import ru.money.goldentaurusbank.www.backend.model.dto.enums.AccountType;
-import ru.money.goldentaurusbank.www.backend.model.dto.request.BullionRequest;
-import ru.money.goldentaurusbank.www.backend.model.dto.request.DeleteBullionWithTransferRequest;
-import ru.money.goldentaurusbank.www.backend.model.dto.request.RefillBullionRequest;
-import ru.money.goldentaurusbank.www.backend.model.dto.request.WithdrawBullionRequest;
+import ru.money.goldentaurusbank.www.backend.model.dto.request.*;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.GroupedBullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.mapper.BullionMapper;
@@ -66,6 +63,15 @@ public class BullionService {
     public BullionResponse withDrawBullion(User user, WithdrawBullionRequest request) {
         Bullion withdrawBullion = transactionService.withdrawBullion(request, user, null);
         return bullionMapper.toResponse(withdrawBullion);
+    }
+
+
+    @Transactional
+    public BullionResponse transferAmountBullion(User user, TransferRequest request) {
+        Bullion withdrawBullion = transactionService.transferAmount(request, user);
+        log.info("Сумма перенесена из слитка {} в слиток {}", request.getFromBullionId(), request.getToBullionId());
+        return bullionMapper.toResponse(withdrawBullion);
+
     }
 
     @Transactional

@@ -365,7 +365,7 @@ function BullionsPage() {
 
     const handleTransfer = async (amount, toBullionId, comment, dateOperation) => {
         try {
-            await api.post('/transactions/transfer', {
+            await api.post('/bullions/transfer', {
                 fromBullionId: transferModal.fromBullionId,
                 toBullionId: toBullionId,
                 amount: amount,
@@ -388,7 +388,7 @@ function BullionsPage() {
                 // Проверяем allowedTransfer - если false, то не показываем
                 if (vault.id !== transferModal.fromBullionId && vault.allowedTransfer !== false) {
                     targets.push({
-                        id: vault.id,
+                        id: vault.bullionId,
                         categoryName: category.categoryName,
                         vaultName: vault.name,
                         amount: vault.amount,
@@ -410,7 +410,7 @@ function BullionsPage() {
                     // Исключаем срочные хранилища
                     if (vault.allowedTransfer !== false) {
                         targets.push({
-                            id: vault.id,
+                            id: vault.bullionId,
                             categoryName: category.categoryName,
                             vaultName: vault.name,
                             amount: vault.amount,

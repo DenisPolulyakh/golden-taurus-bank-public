@@ -129,27 +129,7 @@ public class TransactionController {
     }
 
 
-    @PostMapping("/transfer")
-    public ResponseEntity<SuccessResponse<Void>> transferAmount(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @Valid @RequestBody TransferRequest request) {
 
-        User user = getUserFromUserDetails(userDetails);
-        transactionService.transferAmount(
-                request.getFromBullionId(),
-                request.getToBullionId(),
-                request.getAmount(),
-                user,
-                request.getComment(),
-                request.getDateOperation()
-        );
-
-        return ResponseEntity.ok(new SuccessResponse<>(
-                0,
-                "Перевод выполнен успешно",
-                null
-        ));
-    }
 
     @GetMapping("/dashboard/daily-statistics")
     public ResponseEntity<DashboardDailyStatisticsDto> getDailyStatistics(

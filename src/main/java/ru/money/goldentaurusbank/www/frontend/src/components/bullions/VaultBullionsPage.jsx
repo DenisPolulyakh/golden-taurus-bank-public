@@ -235,20 +235,13 @@ function VaultBullionsPage() {
     };
 
     const handleOpenTransfer = (bullion) => {
-        // Set today's date as default for the transfer modal
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        const formattedDate = `${year}-${month}-${day}`;
-
         setTransferModal({
             isOpen: true,
             fromBullion: bullion,
             fromAmount: bullion.amount,
             fromBullionId: bullion.id,
             fromCategoryId: bullion.categoryId,
-            dateOperation: formattedDate
+            dateOperation: null
         });
     };
 
@@ -324,7 +317,7 @@ function VaultBullionsPage() {
 
     const handleTransfer = async (amount, toBullionId, comment, dateOperation) => {
         try {
-            await api.post('/transactions/transfer', {
+            await api.post('/bullions/transfer', {
                 fromBullionId: transferModal.fromBullionId,
                 toBullionId: toBullionId,
                 amount: amount,
