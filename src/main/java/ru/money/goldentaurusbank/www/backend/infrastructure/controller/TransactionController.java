@@ -23,6 +23,7 @@ import ru.money.goldentaurusbank.www.backend.model.dto.statistic.TransactionLogD
 import ru.money.goldentaurusbank.www.backend.repository.UserRepository;
 import ru.money.goldentaurusbank.www.backend.service.TransactionService;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -62,8 +63,8 @@ public class TransactionController {
             @AuthenticationPrincipal UserDetails userDetails,  // Изменено
             @RequestParam(required = false) String operationType,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 
         User user = getUserFromUserDetails(userDetails);  // Добавить
@@ -128,27 +129,7 @@ public class TransactionController {
     }
 
 
-    @PostMapping("/transfer")
-    public ResponseEntity<SuccessResponse<Void>> transferAmount(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @Valid @RequestBody TransferRequest request) {
 
-        User user = getUserFromUserDetails(userDetails);
-        transactionService.transferAmount(
-                request.getFromBullionId(),
-                request.getToBullionId(),
-                request.getAmount(),
-                user,
-                request.getComment(),
-                request.getDateOperation()
-        );
-
-        return ResponseEntity.ok(new SuccessResponse<>(
-                0,
-                "Перевод выполнен успешно",
-                null
-        ));
-    }
 
     @GetMapping("/dashboard/daily-statistics")
     public ResponseEntity<DashboardDailyStatisticsDto> getDailyStatistics(

@@ -2,23 +2,28 @@ package ru.money.goldentaurusbank.www.backend.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.money.goldentaurusbank.www.backend.infrastructure.exception.ApplicationException;
 import ru.money.goldentaurusbank.www.backend.model.domain.*;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.OperationType;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.RefillBullionRequest;
+import ru.money.goldentaurusbank.www.backend.model.dto.request.TransferRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.WithdrawBullionRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.*;
 import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
 import ru.money.goldentaurusbank.www.backend.repository.CategoryRepository;
 import ru.money.goldentaurusbank.www.backend.repository.TransactionLogRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
+import ru.money.goldentaurusbank.www.backend.util.JsonSerialization;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -40,103 +45,53 @@ public class TransactionService {
     private static final String BANK_COLOR = "#FFA502";  // оранжевый
     private static final String VAULT_COLOR = "#FFD93D"; // жёлтый
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Bullion refillBullion(RefillBullionRequest request, User user, Long batchId) {
-        BigDecimal refillAmount = request.getAmount();
-        if (BigDecimal.ZERO.compareTo(refillAmount) == 0) {
-            throw new ApplicationException(CHANGE_AMOUNT_ZERO.getCode(), CHANGE_AMOUNT_ZERO.getMessage());
-        }
-        Bullion existingBullion = bullionRepository.findByUserAndCategoryIdAndVaultId(
-                user, request.getCategoryId(), request.getVaultId()).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
-
-        TransactionLog.TransactionLogBuilder logBuilder = TransactionLog.builder()
-                .operationType(REFILL_BULLION.name())
-                .fromBullionId(null)
-                .toBullionId(existingBullion.getId())
-                .amount(refillAmount)
-                .userId(user.getId())
-                .batchId(batchId)
-                .dateOperation(request.getDateOperation())
-                .status("SUCCESS");
-
-        try {
-            if (refillAmount.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new ApplicationException(INSUFFICIENT_FUNDS.getCode(), "Сумма пополнения должна быть больше 0");
-            }
-
-            BigDecimal toBefore = existingBullion.getAmount();
-            existingBullion.setAmount(toBefore.add(refillAmount).setScale(2, RoundingMode.HALF_UP));
-            bullionRepository.save(existingBullion);
-
-            logBuilder.fromBullionAmountBefore(null)
-                    .fromBullionAmountAfter(null)
-                    .toBullionAmountBefore(toBefore)
-                    .toBullionAmountAfter(existingBullion.getAmount())
-                    .userComment(request.getUserComment())
-                    .description("Пополнение на сумму " + refillAmount + " слитка " + describeBullion(existingBullion));
-
-            transactionLogRepository.save(logBuilder.build());
-            log.info("Refill amount success: bullion={}, amount={}", existingBullion.getId(), refillAmount);
-            return existingBullion;
-
-        } catch (ApplicationException e) {
-            logBuilder.status(FAILED.name()).errorMessage(e.getMessage());
-            transactionLogRepository.save(logBuilder.build());
-            throw e;
-        }
+        return refillAmountBullion(request, user, batchId);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Bullion withdrawBullion(WithdrawBullionRequest request, User user, Long batchId) {
-        BigDecimal withDrawAmount = request.getAmount();
-        if (BigDecimal.ZERO.compareTo(withDrawAmount) == 0) {
+        return withdrawAmountBullion(request, user, batchId);
+    }
+
+
+    @Transactional
+    public Bullion transferAmount(TransferRequest request, User user) {
+        log.info("[transferAmount] перевод денег: {}", JsonSerialization.toJson(request));
+        BigDecimal transferAmount = request.getAmount();
+        if (BigDecimal.ZERO.compareTo(transferAmount) == 0) {
             throw new ApplicationException(CHANGE_AMOUNT_ZERO.getCode(), CHANGE_AMOUNT_ZERO.getMessage());
         }
-        Bullion existingBullion = bullionRepository.findByUserAndCategoryIdAndVaultId(
-                user, request.getCategoryId(), request.getVaultId()).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
+        Bullion existingFromBullion = bullionRepository.findByIdAndUser(request.getFromBullionId(), user).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
 
-        TransactionLog.TransactionLogBuilder logBuilder = TransactionLog.builder()
-                .operationType(WITHDRAW_BULLION.name())
-                .fromBullionId(null)
-                .toBullionId(existingBullion.getId())
-                .amount(withDrawAmount)
-                .userId(user.getId())
-                .batchId(batchId)
-                .dateOperation(request.getDateOperation())
-                .status("SUCCESS");
+        Bullion existingToBullion = bullionRepository.findByIdAndUser(request.getToBullionId(), user).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
 
-        try {
-            if (withDrawAmount.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new ApplicationException(INSUFFICIENT_FUNDS.getCode(), "Сумма снятия должна отличаться от 0");
-            }
-            Bullion bullion = bullionRepository.findByIdAndUser(existingBullion.getId(), user).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
-
-            BigDecimal toBefore = bullion.getAmount();
-            bullion.setAmount(bullion.getAmount().subtract(withDrawAmount).setScale(2, RoundingMode.HALF_UP));
-            bullionRepository.save(bullion);
-
-            logBuilder.fromBullionAmountBefore(null)
-                    .fromBullionAmountAfter(null)
-                    .toBullionAmountBefore(toBefore)
-                    .toBullionAmountAfter(bullion.getAmount())
-                    .userComment(request.getUserComment())
-                    .description("Снятие суммы " + withDrawAmount + " слитка " + describeBullion(existingBullion));
-
-            transactionLogRepository.save(logBuilder.build());
-            log.info("Withdrawal amount success: bullion={}, amount={}", existingBullion.getId(), bullion.getAmount());
-            return existingBullion;
-
-        } catch (ApplicationException e) {
-            logBuilder.status(FAILED.name()).errorMessage(e.getMessage());
-            transactionLogRepository.save(logBuilder.build());
-            throw e;
-        }
+        WithdrawBullionRequest withdrawRequest = new WithdrawBullionRequest();
+        withdrawRequest.setVaultId(existingFromBullion.getVault().getId());
+        withdrawRequest.setCategoryId(existingFromBullion.getCategory().getId());
+        withdrawRequest.setAmount(transferAmount);
+        withdrawRequest.setUserComment(request.getComment());
+        withdrawRequest.setDateOperation(request.getDateOperation());
+        Bullion withdrawBullion = withdrawAmountBullion(withdrawRequest, user, null);
+        log.info("[transferAmount] сумма {} списана со слитка {}",request.getAmount(), withdrawBullion.getCategory().getName());
+        RefillBullionRequest refillRequest = new RefillBullionRequest();
+        refillRequest.setAmount(request.getAmount());
+        refillRequest.setCategoryId(existingToBullion.getCategory().getId());
+        refillRequest.setVaultId(existingToBullion.getVault().getId());
+        refillRequest.setUserComment(request.getComment());
+        refillRequest.setDateOperation(request.getDateOperation());
+        Bullion refillBullion = refillAmountBullion(refillRequest, user, null);
+        log.info("[transferAmount] сумма {} внесена в слиток {}", request.getAmount(),  refillBullion.getCategory().getName());
+        return withdrawBullion;
     }
 
     @Transactional
     public void transferAmount(Long fromBullionId, Long toBullionId, BigDecimal amount, User user, String comment, LocalDateTime dateOperation) {
         transferAmount(fromBullionId, toBullionId, amount, user, null, comment, dateOperation);
     }
+
+
 
     @Transactional
     public void transferAmount(Long fromBullionId, Long toBullionId, BigDecimal amount, User user, Long batchId, String comment, LocalDateTime dateOperation) {
@@ -192,6 +147,98 @@ public class TransactionService {
             logBuilder.status("FAILED").errorMessage(e.getMessage());
             transactionLogRepository.save(logBuilder.build());
             throw e;
+        }
+    }
+
+
+    private Bullion refillAmountBullion(RefillBullionRequest request, User user, Long batchId) {
+        BigDecimal refillAmount = request.getAmount();
+        if (BigDecimal.ZERO.compareTo(refillAmount) == 0) {
+            throw new ApplicationException(CHANGE_AMOUNT_ZERO.getCode(), CHANGE_AMOUNT_ZERO.getMessage());
+        }
+        Bullion existingBullion = bullionRepository.findByUserAndCategoryIdAndVaultId(
+                user, request.getCategoryId(), request.getVaultId()).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
+
+        TransactionLog.TransactionLogBuilder logBuilder = TransactionLog.builder()
+                .operationType(REFILL_BULLION.name())
+                .fromBullionId(null)
+                .toBullionId(existingBullion.getId())
+                .amount(refillAmount)
+                .userId(user.getId())
+                .batchId(batchId)
+                .dateOperation(request.getDateOperation())
+                .status("SUCCESS");
+
+        try {
+            if (refillAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ApplicationException(INSUFFICIENT_FUNDS.getCode(), "Сумма пополнения должна быть больше 0");
+            }
+
+            BigDecimal toBefore = existingBullion.getAmount();
+            existingBullion.setAmount(toBefore.add(refillAmount).setScale(2, RoundingMode.HALF_UP));
+            bullionRepository.save(existingBullion);
+
+            logBuilder.fromBullionAmountBefore(null)
+                    .fromBullionAmountAfter(null)
+                    .toBullionAmountBefore(toBefore)
+                    .toBullionAmountAfter(existingBullion.getAmount())
+                    .userComment(request.getUserComment())
+                    .description("Пополнение на сумму " + refillAmount + " слитка " + describeBullion(existingBullion));
+
+            transactionLogRepository.save(logBuilder.build());
+            log.info("Refill amount success: bullion={}, amount={}", existingBullion.getId(), refillAmount);
+            return existingBullion;
+
+        } catch (ApplicationException e) {
+            logBuilder.status(FAILED.name()).errorMessage(e.getMessage());
+            transactionLogRepository.save(logBuilder.build());
+            throw new ApplicationException(INTERNAL_ERROR.getCode(), INTERNAL_ERROR.getMessage());
+        }
+    }
+
+    private Bullion withdrawAmountBullion(WithdrawBullionRequest request, User user, Long batchId) {
+        BigDecimal withDrawAmount = request.getAmount();
+        if (BigDecimal.ZERO.compareTo(withDrawAmount) == 0) {
+            throw new ApplicationException(CHANGE_AMOUNT_ZERO.getCode(), CHANGE_AMOUNT_ZERO.getMessage());
+        }
+        Bullion existingBullion = bullionRepository.findByUserAndCategoryIdAndVaultId(
+                user, request.getCategoryId(), request.getVaultId()).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
+
+        TransactionLog.TransactionLogBuilder logBuilder = TransactionLog.builder()
+                .operationType(WITHDRAW_BULLION.name())
+                .fromBullionId(null)
+                .toBullionId(existingBullion.getId())
+                .amount(withDrawAmount)
+                .userId(user.getId())
+                .batchId(batchId)
+                .dateOperation(request.getDateOperation())
+                .status("SUCCESS");
+
+        try {
+            if (withDrawAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ApplicationException(INSUFFICIENT_FUNDS.getCode(), "Сумма снятия должна отличаться от 0");
+            }
+            Bullion bullion = bullionRepository.findByIdAndUser(existingBullion.getId(), user).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
+
+            BigDecimal toBefore = bullion.getAmount();
+            bullion.setAmount(bullion.getAmount().subtract(withDrawAmount).setScale(2, RoundingMode.HALF_UP));
+            bullionRepository.save(bullion);
+
+            logBuilder.fromBullionAmountBefore(null)
+                    .fromBullionAmountAfter(null)
+                    .toBullionAmountBefore(toBefore)
+                    .toBullionAmountAfter(bullion.getAmount())
+                    .userComment(request.getUserComment())
+                    .description("Снятие суммы " + withDrawAmount + " слитка " + describeBullion(existingBullion));
+
+            transactionLogRepository.save(logBuilder.build());
+            log.info("Withdrawal amount success: bullion={}, amount={}", existingBullion.getId(), bullion.getAmount());
+            return existingBullion;
+
+        } catch (ApplicationException e) {
+            logBuilder.status(FAILED.name()).errorMessage(e.getMessage());
+            transactionLogRepository.save(logBuilder.build());
+            throw new ApplicationException(INTERNAL_ERROR.getCode(), INTERNAL_ERROR.getMessage());
         }
     }
 
@@ -668,15 +715,19 @@ public class TransactionService {
             Long userId,
             String operationType,
             String status,
-            LocalDateTime fromDate,
-            LocalDateTime toDate,
+            LocalDate fromDate,
+            LocalDate toDate,
             Pageable pageable) {
 
         int offset = (int) pageable.getOffset();
         int limit = pageable.getPageSize();
-
-        List<TransactionLog> logs = transactionLogRepository.findTransactionHistory(userId, offset, limit);
-        long total = transactionLogRepository.countTransactionHistory(userId);
+        LocalDateTime from = fromDate == null ? null : fromDate.atStartOfDay();
+        LocalDateTime to = toDate == null ? null : toDate.atTime(LocalTime.MAX);
+        String opType = StringUtils.isBlank(operationType) ? null : OperationType.valueOf(operationType).name();
+        List<TransactionLog> logs = transactionLogRepository.findTransactionHistory(
+                userId, offset, limit, from, to, opType, status);
+        long total = transactionLogRepository.countTransactionHistory(
+                userId, from, to, opType, status);
 
         List<TransactionLogDto> content = logs.stream()
                 .map(this::convertToDto)
