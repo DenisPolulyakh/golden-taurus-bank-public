@@ -12,7 +12,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CategoryImportResult {
+public class BullionNameImportResult {
     private int totalProcessed;
     private int added;
     private int skipped;
@@ -21,8 +21,8 @@ public class CategoryImportResult {
     private List<String> errors = new ArrayList<>();
     
     @Builder.Default
-    private List<String> skippedCategories = new ArrayList<>();
+    private List<String> skippedBullionNames = new ArrayList<>();
     
     @Builder.Default
-    private List<String> addedCategories = new ArrayList<>();
+    private List<String> addedBullionNames = new ArrayList<>();
 }

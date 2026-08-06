@@ -21,8 +21,8 @@ public interface BullionMapper {
     BullionMapper INSTANCE = Mappers.getMapper(BullionMapper.class);
 
 
-    @Mapping(source = "category.id", target = "category.id")
-    @Mapping(source = "category.name", target = "category.name")
+    @Mapping(source = "bullionName.id", target = "bullionName.id")
+    @Mapping(source = "bullionName.title", target = "bullionName.title")
     @Mapping(source = "vault.id", target = "vault.id")
     @Mapping(source = "vault.name", target = "vault.name")
     @Mapping(source = "vault.interestRate", target = "vault.interestRate")

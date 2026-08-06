@@ -81,14 +81,14 @@ public class Vault {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    public Integer getCategoriesCount() {
+    public Integer getBullionNamesCount() {
         if (bullions == null || bullions.isEmpty()) {
             return 0;
         }
         return (int) bullions.stream()
-                .map(Bullion::getCategory)
+                .map(Bullion::getBullionName)
                 .filter(Objects::nonNull)
-                .map(Category::getId)
+                .map(BullionName::getId)
                 .distinct()
                 .count();
     }

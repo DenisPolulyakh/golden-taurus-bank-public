@@ -14,7 +14,7 @@ import ru.money.goldentaurusbank.www.backend.model.dto.request.TransferRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.WithdrawBullionRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.*;
 import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
-import ru.money.goldentaurusbank.www.backend.repository.CategoryRepository;
+import ru.money.goldentaurusbank.www.backend.repository.BullionNameRepository;
 import ru.money.goldentaurusbank.www.backend.repository.TransactionLogRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
 import ru.money.goldentaurusbank.www.backend.util.JsonSerialization;
@@ -39,7 +39,7 @@ public class TransactionService {
 
     private final BullionRepository bullionRepository;
     private final VaultRepository vaultRepository;
-    private final CategoryRepository categoryRepository;
+    private final BullionNameRepository bullionNameRepository;
     private final TransactionLogRepository transactionLogRepository;
     private final ColorConstants colorConstants;
     private static final String BANK_COLOR = "#FFA502";  // оранжевый
@@ -69,20 +69,20 @@ public class TransactionService {
 
         WithdrawBullionRequest withdrawRequest = new WithdrawBullionRequest();
         withdrawRequest.setVaultId(existingFromBullion.getVault().getId());
-        withdrawRequest.setCategoryId(existingFromBullion.getCategory().getId());
+        withdrawRequest.setBullionNameId(existingFromBullion.getBullionName().getId());
         withdrawRequest.setAmount(transferAmount);
         withdrawRequest.setUserComment(request.getComment());
         withdrawRequest.setDateOperation(request.getDateOperation());
         Bullion withdrawBullion = withdrawAmountBullion(withdrawRequest, user, null);
-        log.info("[transferAmount] сумма {} списана со слитка {}",request.getAmount(), withdrawBullion.getCategory().getName());
+        log.info("[transferAmount] сумма {} списана со слитка {}",request.getAmount(), withdrawBullion.getBullionName().getTitle());
         RefillBullionRequest refillRequest = new RefillBullionRequest();
         refillRequest.setAmount(request.getAmount());
-        refillRequest.setCategoryId(existingToBullion.getCategory().getId());
+        refillRequest.setBullionNameId(existingToBullion.getBullionName().getId());
         refillRequest.setVaultId(existingToBullion.getVault().getId());
         refillRequest.setUserComment(request.getComment());
         refillRequest.setDateOperation(request.getDateOperation());
         Bullion refillBullion = refillAmountBullion(refillRequest, user, null);
-        log.info("[transferAmount] сумма {} внесена в слиток {}", request.getAmount(),  refillBullion.getCategory().getName());
+        log.info("[transferAmount] сумма {} внесена в слиток {}", request.getAmount(),  refillBullion.getBullionName().getTitle());
         return withdrawBullion;
     }
 
@@ -156,8 +156,8 @@ public class TransactionService {
         if (BigDecimal.ZERO.compareTo(refillAmount) == 0) {
             throw new ApplicationException(CHANGE_AMOUNT_ZERO.getCode(), CHANGE_AMOUNT_ZERO.getMessage());
         }
-        Bullion existingBullion = bullionRepository.findByUserAndCategoryIdAndVaultId(
-                user, request.getCategoryId(), request.getVaultId()).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
+        Bullion existingBullion = bullionRepository.findByUserAndBullionNameIdAndVaultId(
+                user, request.getBullionNameId(), request.getVaultId()).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
 
         TransactionLog.TransactionLogBuilder logBuilder = TransactionLog.builder()
                 .operationType(REFILL_BULLION.name())
@@ -201,8 +201,8 @@ public class TransactionService {
         if (BigDecimal.ZERO.compareTo(withDrawAmount) == 0) {
             throw new ApplicationException(CHANGE_AMOUNT_ZERO.getCode(), CHANGE_AMOUNT_ZERO.getMessage());
         }
-        Bullion existingBullion = bullionRepository.findByUserAndCategoryIdAndVaultId(
-                user, request.getCategoryId(), request.getVaultId()).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
+        Bullion existingBullion = bullionRepository.findByUserAndBullionNameIdAndVaultId(
+                user, request.getBullionNameId(), request.getVaultId()).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
 
         TransactionLog.TransactionLogBuilder logBuilder = TransactionLog.builder()
                 .operationType(WITHDRAW_BULLION.name())
@@ -272,12 +272,12 @@ public class TransactionService {
             }
 
             logBuilder.fromVaultId(fromVault.getId())
-                    .categoryId(fromBullion.getCategory().getId());
+                    .bullionNameId(fromBullion.getBullionName().getId());
 
             BigDecimal fromAmount = fromBullion.getAmount();
             BigDecimal toBullionAmountBefore = BigDecimal.ZERO;
 
-            var existingBullion = bullionRepository.findByVaultAndCategory(toVault, fromBullion.getCategory());
+            var existingBullion = bullionRepository.findByVaultAndBullionName(toVault, fromBullion.getBullionName());
 
             if (existingBullion.isPresent()) {
                 toBullionAmountBefore = existingBullion.get().getAmount();
@@ -290,7 +290,7 @@ public class TransactionService {
                         .toBullionAmountAfter(existingBullion.get().getAmount());
             } else {
                 Bullion newBullion = Bullion.builder()
-                        .category(fromBullion.getCategory())
+                        .bullionName(fromBullion.getBullionName())
                         .vault(toVault)
                         .amount(fromAmount)
                         .description(fromBullion.getDescription())
@@ -381,7 +381,7 @@ public class TransactionService {
                     .toBullionId(originalLog.getFromBullionId())
                     .fromVaultId(originalLog.getToVaultId())
                     .toVaultId(originalLog.getFromVaultId())
-                    .categoryId(originalLog.getCategoryId())
+                    .bullionNameId(originalLog.getBullionNameId())
                     .amount(originalLog.getAmount())
                     .userId(originalLog.getUserId())
                     .batchId(originalLog.getBatchId())
@@ -436,8 +436,8 @@ public class TransactionService {
             throw new ApplicationException(4000, "Невозможно откатить: слиток уже был изменен");
         }
 
-        Category category = categoryRepository.findById(log.getCategoryId())
-                .orElseThrow(() -> new ApplicationException(4006, "Категория не найдена"));
+        BullionName bullionName = bullionNameRepository.findById(log.getBullionNameId())
+                .orElseThrow(() -> new ApplicationException(4006, "Наименование не найдено"));
 
         Vault fromVault = vaultRepository.findById(log.getFromVaultId())
                 .orElseThrow(() -> new ApplicationException(4006, "Исходное хранилище не найдено"));
@@ -446,7 +446,7 @@ public class TransactionService {
         user.setId(log.getUserId());
 
         Bullion restoredBullion = Bullion.builder()
-                .category(category)
+                .bullionName(bullionName)
                 .vault(fromVault)
                 .amount(log.getFromBullionAmountBefore())
                 .description("Восстановлен при откате транзакции " + log.getId())
@@ -472,8 +472,8 @@ public class TransactionService {
 
     /**
      * Человекочитаемое описание слитка в формате:
-     * «Категория (Цвет) | Банк | Хранилище».
-     * Цвет берётся у категории (единственная сущность с цветом),
+     * «Наименование (Цвет) | Банк | Хранилище».
+     * Цвет берётся у наименования (единственная сущность с цветом),
      * банк опускается, если у хранилища его нет.
      */
     private String describeBullion(Bullion bullion) {
@@ -483,10 +483,10 @@ public class TransactionService {
 
         StringBuilder sb = new StringBuilder();
 
-        Category category = bullion.getCategory();
-        if (category != null) {
-            sb.append(category.getName());
-            String colorName = colorConstants.getColorName(category.getColor());
+        BullionName bullionName = bullion.getBullionName();
+        if (bullionName != null) {
+            sb.append(bullionName.getTitle());
+            String colorName = colorConstants.getColorName(bullionName.getColor());
             if (colorName != null) {
                 sb.append(" (").append(colorName).append(")");
             }
@@ -507,7 +507,7 @@ public class TransactionService {
 
     /**
      * То же, что {@link #describeBullion(Bullion)}, но в виде цветных сегментов:
-     * название слитка — цветом категории, банк — оранжевым, хранилище — жёлтым.
+     * название слитка — цветом наименования, банк — оранжевым, хранилище — жёлтым.
      */
     private List<DescriptionSegmentDto> describeBullionSegments(Bullion bullion) {
         List<DescriptionSegmentDto> segments = new ArrayList<>();
@@ -516,9 +516,9 @@ public class TransactionService {
             return segments;
         }
 
-        Category category = bullion.getCategory();
-        if (category != null) {
-            segments.add(segment(category.getName(), category.getColor()));
+        BullionName bullionName = bullion.getBullionName();
+        if (bullionName != null) {
+            segments.add(segment(bullionName.getTitle(), bullionName.getColor()));
             segments.add(segment(" | ", null));
         } else {
             segments.add(segment("слиток #" + bullion.getId(), null));
@@ -809,7 +809,7 @@ public class TransactionService {
 
     /**
      * Строит описание транзакции с человекочитаемыми названиями слитков
-     * (категория, цвет, банк, хранилище) вместо технических id.
+     * (наименование, цвет, банк, хранилище) вместо технических id.
      * Работает и для старых записей истории, где в description сохранены id.
      */
     private String buildDescription(TransactionLog log) {
@@ -857,7 +857,7 @@ public class TransactionService {
 
     /**
      * Цветные сегменты описания транзакции — параллель к {@link #buildDescription}.
-     * Название слитка красится цветом категории, банк — оранжевым, хранилище — жёлтым.
+     * Название слитка красится цветом наименования, банк — оранжевым, хранилище — жёлтым.
      * Служебный текст («Пополнение на сумму …») идёт без цвета.
      */
     private List<DescriptionSegmentDto> buildDescriptionSegments(TransactionLog log) {

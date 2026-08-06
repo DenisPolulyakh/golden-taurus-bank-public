@@ -7,13 +7,13 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import ru.money.goldentaurusbank.www.backend.infrastructure.exception.ApplicationException;
-import ru.money.goldentaurusbank.www.backend.model.domain.Category;
+import ru.money.goldentaurusbank.www.backend.model.domain.BullionName;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.*;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.GroupedBullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.SuccessResponse;
-import ru.money.goldentaurusbank.www.backend.repository.CategoryRepository;
+import ru.money.goldentaurusbank.www.backend.repository.BullionNameRepository;
 import ru.money.goldentaurusbank.www.backend.repository.UserRepository;
 import ru.money.goldentaurusbank.www.backend.service.BullionService;
 
@@ -29,7 +29,7 @@ public class BullionController {
 
     private final BullionService bullionService;
     private final UserRepository userRepository;
-    private final CategoryRepository categoryRepository;
+    private final BullionNameRepository bullionNameRepository;
 
     @PostMapping
     public ResponseEntity<SuccessResponse<BullionResponse>> createBullion(
@@ -154,20 +154,20 @@ public class BullionController {
         return ResponseEntity.ok(new SuccessResponse<>(total));
     }
 
-    @GetMapping("/category/{categoryId}")
-    public ResponseEntity<SuccessResponse<BigDecimal>> getTotalAmountByCategory(
+    @GetMapping("/bullion-name/{bullionNameId}")
+    public ResponseEntity<SuccessResponse<BigDecimal>> getTotalAmountByBullionName(
             @AuthenticationPrincipal UserDetails userDetails,
-            @PathVariable Long categoryId) {
+            @PathVariable Long bullionNameId) {
 
         User user = getUserFromUserDetails(userDetails);
 
-        Category category = categoryRepository.findByIdAndUser(categoryId, user)
+        BullionName bullionName = bullionNameRepository.findByIdAndUser(bullionNameId, user)
                 .orElseThrow(() -> new ApplicationException(
-                        CATEGORY_NOT_FOUND.getCode(),
-                        CATEGORY_NOT_FOUND.getMessage()
+                        BULLION_NAME_NOT_FOUND.getCode(),
+                        BULLION_NAME_NOT_FOUND.getMessage()
                 ));
 
-        BigDecimal total = bullionService.getTotalAmountByCategory(user, category);
+        BigDecimal total = bullionService.getTotalAmountByBullionName(user, bullionName);
 
         return ResponseEntity.ok(new SuccessResponse<>(total));
     }

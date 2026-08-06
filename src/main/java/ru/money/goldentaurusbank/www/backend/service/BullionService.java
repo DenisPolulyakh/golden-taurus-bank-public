@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.money.goldentaurusbank.www.backend.infrastructure.exception.ApplicationException;
 import ru.money.goldentaurusbank.www.backend.model.domain.Bullion;
-import ru.money.goldentaurusbank.www.backend.model.domain.Category;
+import ru.money.goldentaurusbank.www.backend.model.domain.BullionName;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.domain.Vault;
 import ru.money.goldentaurusbank.www.backend.model.dto.enums.AccountType;
@@ -17,7 +17,7 @@ import ru.money.goldentaurusbank.www.backend.model.dto.response.GroupedBullionRe
 import ru.money.goldentaurusbank.www.backend.model.mapper.BullionMapper;
 import ru.money.goldentaurusbank.www.backend.model.mapper.BullionRequestMapper;
 import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
-import ru.money.goldentaurusbank.www.backend.repository.CategoryRepository;
+import ru.money.goldentaurusbank.www.backend.repository.BullionNameRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
 import ru.money.goldentaurusbank.www.backend.util.math.FinancialCalculator;
 
@@ -44,7 +44,7 @@ public class BullionService {
     private static final Logger log = LoggerFactory.getLogger(BullionService.class);
 
     private final BullionRepository bullionRepository;
-    private final CategoryRepository categoryRepository;
+    private final BullionNameRepository bullionNameRepository;
     private final VaultRepository vaultRepository;
     private final VaultService vaultService;
     private final BullionMapper bullionMapper;
@@ -76,10 +76,10 @@ public class BullionService {
 
     @Transactional
     public BullionResponse createBullion(User user, BullionRequest request) {
-        Category category = categoryRepository.findByIdAndUser(request.getCategoryId(), user)
+        BullionName bullionName = bullionNameRepository.findByIdAndUser(request.getBullionNameId(), user)
                 .orElseThrow(() -> new ApplicationException(
-                        CATEGORY_NOT_FOUND.getCode(),
-                        CATEGORY_NOT_FOUND.getMessage()
+                        BULLION_NAME_NOT_FOUND.getCode(),
+                        BULLION_NAME_NOT_FOUND.getMessage()
                 ));
 
         Vault vault = vaultRepository.findByIdAndUser(request.getVaultId(), user)
@@ -88,8 +88,8 @@ public class BullionService {
                         VAULT_NOT_FOUND.getMessage()
                 ));
 
-        Optional<Bullion> existingBullion = bullionRepository.findByUserAndCategoryIdAndVaultId(
-                user, request.getCategoryId(), request.getVaultId());
+        Optional<Bullion> existingBullion = bullionRepository.findByUserAndBullionNameIdAndVaultId(
+                user, request.getBullionNameId(), request.getVaultId());
 
         if (existingBullion.isPresent()) {
             RefillBullionRequest refillBullionRequest = bullionRequestMapper.toRefillBullionRequest(request, REFILL_EXISTS_BULLION_COMMENT);
@@ -97,7 +97,7 @@ public class BullionService {
         }
 
         Bullion bullion = Bullion.builder()
-                .category(category)
+                .bullionName(bullionName)
                 .vault(vault)
                 .amount(BigDecimal.ZERO)
                 .description(request.getDescription())
@@ -139,13 +139,13 @@ public class BullionService {
 
         bullion.setDescription(request.getDescription());
 
-        if (request.getCategoryId() != null && !bullion.getCategory().getId().equals(request.getCategoryId())) {
-            Category category = categoryRepository.findByIdAndUser(request.getCategoryId(), user)
+        if (request.getBullionNameId() != null && !bullion.getBullionName().getId().equals(request.getBullionNameId())) {
+            BullionName bullionName = bullionNameRepository.findByIdAndUser(request.getBullionNameId(), user)
                     .orElseThrow(() -> new ApplicationException(
-                            CATEGORY_NOT_FOUND.getCode(),
-                            CATEGORY_NOT_FOUND.getMessage()
+                            BULLION_NAME_NOT_FOUND.getCode(),
+                            BULLION_NAME_NOT_FOUND.getMessage()
                     ));
-            bullion.setCategory(category);
+            bullion.setBullionName(bullionName);
         }
 
         if (request.getVaultId() != null && !bullion.getVault().getId().equals(request.getVaultId())) {
@@ -174,7 +174,7 @@ public class BullionService {
         if (bullion.getAmount().compareTo(BigDecimal.ZERO) != 0) {
             WithdrawBullionRequest request = new WithdrawBullionRequest();
             request.setAmount(bullion.getAmount());
-            request.setCategoryId(bullion.getCategory().getId());
+            request.setBullionNameId(bullion.getBullionName().getId());
             request.setVaultId(bullion.getVault().getId());
             request.setDateOperation(LocalDateTime.now());
             request.setUserComment("Удаление слитка");
@@ -190,43 +190,43 @@ public class BullionService {
     public GroupedBullionResponse getGroupedBullions(User user) {
         List<Bullion> bullions = bullionRepository.findByUserOrderByCreatedAtDesc(user);
 
-        Map<Long, List<Bullion>> groupedByCategory = bullions.stream()
-                .collect(Collectors.groupingBy(b -> b.getCategory().getId()));
+        Map<Long, List<Bullion>> groupedByBullionName = bullions.stream()
+                .collect(Collectors.groupingBy(b -> b.getBullionName().getId()));
 
         List<Vault> vaults = vaultRepository.findByUser(user);
 
 
         FinancialCalculator.AverageData averageDataVault = new FinancialCalculator.AverageData(BigDecimal.ZERO, BigDecimal.ZERO);
-        FinancialCalculator.AverageData averageDataCategory = new FinancialCalculator.AverageData(BigDecimal.ZERO, BigDecimal.ZERO);
+        FinancialCalculator.AverageData averageDataBullionName = new FinancialCalculator.AverageData(BigDecimal.ZERO, BigDecimal.ZERO);
 
         averageDataVault = calculateWeightedAverageRateWithDecimal(vaults, v -> v.getBullions().stream()
                 .map(Bullion::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add), Vault::getInterestRate);
 
 
-        List<GroupedBullionResponse.CategoryBullion> bullionsList = new ArrayList<>();
-        for (Map.Entry<Long, List<Bullion>> entry : groupedByCategory.entrySet()) {
-            Long categoryId = entry.getKey();
-            List<Bullion> categoryBullions = entry.getValue();
+        List<GroupedBullionResponse.BullionNameBullion> bullionsList = new ArrayList<>();
+        for (Map.Entry<Long, List<Bullion>> entry : groupedByBullionName.entrySet()) {
+            Long bullionNameId = entry.getKey();
+            List<Bullion> bullionNameBullions = entry.getValue();
 
-            String categoryName = categoryBullions.get(0).getCategory().getName();
-            String categoryColor = categoryBullions.get(0).getCategory().getColor();
-            BigDecimal totalCategoryAmount = categoryBullions.stream()
+            String bullionNameTitle = bullionNameBullions.get(0).getBullionName().getTitle();
+            String bullionNameColor = bullionNameBullions.get(0).getBullionName().getColor();
+            BigDecimal totalBullionNameAmount = bullionNameBullions.stream()
                     .map(Bullion::getAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            averageDataCategory = calculateWeightedAverageRateWithDecimal(categoryBullions, Bullion::getAmount, b -> b.getVault().getInterestRate());
+            averageDataBullionName = calculateWeightedAverageRateWithDecimal(bullionNameBullions, Bullion::getAmount, b -> b.getVault().getInterestRate());
 
 
 
 
-            List<GroupedBullionResponse.CategoryBullion.VaultInfo> vaultInfos = categoryBullions.stream()
+            List<GroupedBullionResponse.BullionNameBullion.VaultInfo> vaultInfos = bullionNameBullions.stream()
                     .map(b -> {
 
                         Vault vault = b.getVault();
                         boolean allowed = calculateAllowed(vault);
 
-                        return GroupedBullionResponse.CategoryBullion.VaultInfo.builder()
+                        return GroupedBullionResponse.BullionNameBullion.VaultInfo.builder()
                             .id(b.getVault().getId())
                             .name(b.getVault().getName())
                             .amount(b.getAmount())
@@ -240,22 +240,22 @@ public class BullionService {
                     .collect(Collectors.toList());
 
 
-            bullionsList.add(GroupedBullionResponse.CategoryBullion.builder()
-                    .categoryId(categoryId)
-                    .categoryName(categoryName)
-                    .categoryColor(categoryColor)
-                    .categoryAmount(averageDataCategory.totalAmount())
-                    .categoryAverageRate(averageDataCategory.avgRate())
+            bullionsList.add(GroupedBullionResponse.BullionNameBullion.builder()
+                    .bullionNameId(bullionNameId)
+                    .bullionNameTitle(bullionNameTitle)
+                    .bullionNameColor(bullionNameColor)
+                    .bullionNameAmount(averageDataBullionName.totalAmount())
+                    .bullionNameAverageRate(averageDataBullionName.avgRate())
                     .vaults(vaultInfos)
                     .build());
         }
 
-        bullionsList.sort((a, b) -> b.getCategoryAmount().compareTo(a.getCategoryAmount()));
+        bullionsList.sort((a, b) -> b.getBullionNameAmount().compareTo(a.getBullionNameAmount()));
 
         GroupedBullionResponse response = GroupedBullionResponse.builder()
                 .totalAmount(averageDataVault.totalAmount())
                 .averageRate(averageDataVault.avgRate())
-                .categoryBullionList(bullionsList)
+                .bullionNameBullionList(bullionsList)
                 .countVaults(vaults.size())
                 .countBullions(bullionsList.size()).build();
 
@@ -271,8 +271,8 @@ public class BullionService {
     }
 
     @Transactional(readOnly = true)
-    public BigDecimal getTotalAmountByCategory(User user, Category category) {
-        return bullionRepository.getTotalAmountByUserAndCategory(user, category);
+    public BigDecimal getTotalAmountByBullionName(User user, BullionName bullionName) {
+        return bullionRepository.getTotalAmountByUserAndBullionName(user, bullionName);
     }
 
     @Transactional(readOnly = true)
@@ -313,10 +313,10 @@ public class BullionService {
         if (request.isToLiquidityVault()) {
             Vault liquidityVault = vaultService.getLiquidityReserve(user);
             transactionService.transferBullion(bullion.getId(), liquidityVault.getId(), user,request.getDateOperation());
-            log.info("Bullion {} transfer to liquidity reverse id = {}", bullion.getCategory().getName(), liquidityVault.getId());
+            log.info("Bullion {} transfer to liquidity reverse id = {}", bullion.getBullionName().getTitle(), liquidityVault.getId());
         } else {
             transactionService.transferBullion(bullion.getId(), request.getToVaultId(), user, request.getDateOperation());
-            log.info("Bullion {} transfer to vault id = {}", bullion.getCategory().getName(), request.getToVaultId());
+            log.info("Bullion {} transfer to vault id = {}", bullion.getBullionName().getTitle(), request.getToVaultId());
         }
         bullionRepository.deleteByIdAndUser(bullionId, user);
         log.info("Bullion {} deleted", bullionId);

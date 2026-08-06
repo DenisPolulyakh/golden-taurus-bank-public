@@ -52,15 +52,15 @@ function Dashboard({ user, onLogout }) {
             setCountBullions(data?.countBullions || 0);
             setAverageRate(data?.averageRate || 0.0);
 
-            if (data?.categoryBullionList && data.categoryBullionList.length > 0) {
-                const distribution = data.categoryBullionList
-                    .filter(category => category.categoryAmount > 0)
-                    .map((category) => ({
-                        name: category.categoryName,
-                        amount: category.categoryAmount,
-                        categoryId: category.categoryId,
-                        color: category.categoryColor,
-                        bullionCount: category.vaults?.reduce((sum, vault) => sum + 1, 0) || 0
+            if (data?.bullionNameBullionList && data.bullionNameBullionList.length > 0) {
+                const distribution = data.bullionNameBullionList
+                    .filter(bullionName => bullionName.bullionNameAmount > 0)
+                    .map((bullionName) => ({
+                        name: bullionName.bullionNameTitle,
+                        amount: bullionName.bullionNameAmount,
+                        bullionNameId: bullionName.bullionNameId,
+                        color: bullionName.bullionNameColor,
+                        bullionCount: bullionName.vaults?.reduce((sum, vault) => sum + 1, 0) || 0
                     }));
                 setBullionDistribution(distribution);
             } else {
@@ -139,8 +139,8 @@ function Dashboard({ user, onLogout }) {
                     <Link to="/vaults" className="dashboard-link">
                         🏦 Хранилища
                     </Link>
-                    <Link to="/categories" className="dashboard-link">
-                        📁 Категории
+                    <Link to="/bullion-names" className="dashboard-link">
+                        📁 Наименования
                     </Link>
                     <Link to="/banks" className="dashboard-link">
                         🏛️ Банки
@@ -186,7 +186,7 @@ function Dashboard({ user, onLogout }) {
 
                 {hasChartData && (
                     <div className="chart-section">
-                        <h3>📊 Распределение слитков по категориям</h3>
+                        <h3>📊 Распределение слитков по наименованиям</h3>
                         <div className="chart-container pie-chart-container">
                             <PieChartComponent
                                 data={bullionDistribution}
@@ -205,8 +205,8 @@ function Dashboard({ user, onLogout }) {
                         <Link to="/vaults" className="action-btn">
                             🏦 Создать хранилище
                         </Link>
-                        <Link to="/categories" className="action-btn">
-                            📁 Управлять категориями
+                        <Link to="/bullion-names" className="action-btn">
+                            📁 Управлять наименованиями
                         </Link>
                         <Link to="/banks" className="action-btn">
                             🏛️ Управлять банками

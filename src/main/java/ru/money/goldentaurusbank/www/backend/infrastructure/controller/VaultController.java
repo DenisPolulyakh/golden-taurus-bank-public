@@ -118,7 +118,7 @@ public class VaultController {
         VaultImportResult result = vaultImportService.importVaultsFromExcel(user, file);
 
         String message = String.format("Импорт завершен. Хранилищ добавлено: %d, Категорий добавлено: %d, Слитков добавлено: %d",
-                result.getVaultsAdded(), result.getCategoriesAdded(), result.getBullionsAdded());
+                result.getVaultsAdded(), result.getBullionNamesAdded(), result.getBullionsAdded());
 
         if (!result.getErrors().isEmpty()) {
             message += ". Ошибок: " + result.getErrors().size();

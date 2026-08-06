@@ -32,7 +32,7 @@ public class TransactionLog {
     
     private Long toVaultId;
     
-    private Long categoryId;
+    private Long bullionNameId;
     
     @Column(precision = 19, scale = 2)
     private BigDecimal amount;

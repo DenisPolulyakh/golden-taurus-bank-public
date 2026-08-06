@@ -11,19 +11,19 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "categories", schema = "taurus")
+@Table(name = "bullion_names", schema = "taurus")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Category {
-    
+public class BullionName {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @Column(nullable = false, length = 100)
-    private String name;
+    private String title;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)

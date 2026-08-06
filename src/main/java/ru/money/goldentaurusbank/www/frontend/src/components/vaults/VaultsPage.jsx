@@ -217,7 +217,7 @@ function VaultsPage() {
 
             const result = response.data.data;
 
-            let description = `Хранилищ: ${result.vaultsAdded || 0}, категорий: ${result.categoriesAdded || 0}, слитков: ${result.bullionsAdded || 0}`;
+            let description = `Хранилищ: ${result.vaultsAdded || 0}, наименований: ${result.bullionNamesAdded || 0}, слитков: ${result.bullionsAdded || 0}`;
 
             if (result.errors && result.errors.length > 0) {
                 description += `\nОшибки (${result.errors.length}): ${result.errors.slice(0, 5).join('; ')}`;

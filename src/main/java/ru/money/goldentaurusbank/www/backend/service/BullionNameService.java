@@ -9,13 +9,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import ru.money.goldentaurusbank.www.backend.infrastructure.exception.ApplicationException;
-import ru.money.goldentaurusbank.www.backend.model.domain.Category;
+import ru.money.goldentaurusbank.www.backend.model.domain.BullionName;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
-import ru.money.goldentaurusbank.www.backend.model.dto.request.CategoryRequest;
-import ru.money.goldentaurusbank.www.backend.model.dto.response.CategoryImportResult;
-import ru.money.goldentaurusbank.www.backend.model.dto.response.CategoryResponse;
+import ru.money.goldentaurusbank.www.backend.model.dto.request.BullionNameRequest;
+import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionNameImportResult;
+import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionNameResponse;
 import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
-import ru.money.goldentaurusbank.www.backend.repository.CategoryRepository;
+import ru.money.goldentaurusbank.www.backend.repository.BullionNameRepository;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -32,61 +32,61 @@ import static ru.money.goldentaurusbank.www.backend.model.dto.enums.ResponseCode
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class CategoryService {
+public class BullionNameService {
 
-    private final CategoryRepository categoryRepository;
+    private final BullionNameRepository bullionNameRepository;
     private final ColorConstants colorConstants;
     private final BullionRepository bullionRepository;
 
     public List<String> getAvailableColors(User user) {
-        List<String> usedColors = categoryRepository.findUsedColorsByUser(user);
+        List<String> usedColors = bullionNameRepository.findUsedColorsByUser(user);
         return colorConstants.getAllColors().stream()
                 .filter(color -> !usedColors.contains(color))
                 .collect(Collectors.toList());
     }
 
     @Transactional
-    public CategoryResponse createCategory(User user, CategoryRequest request) {
-        String name = request.getName().trim();
+    public BullionNameResponse createBullionName(User user, BullionNameRequest request) {
+        String title = request.getTitle().trim();
 
-        Optional<Category> existingCategory = categoryRepository.findByUserAndNameIgnoreCase(user, name);
+        Optional<BullionName> existingBullionName = bullionNameRepository.findByUserAndTitleIgnoreCase(user, title);
 
-        if (existingCategory.isPresent()) {
-            return CategoryResponse.fromCategory(existingCategory.get());
+        if (existingBullionName.isPresent()) {
+            return BullionNameResponse.fromBullionName(existingBullionName.get());
         }
 
 
-        Category category = Category.builder()
-                .name(name)
+        BullionName bullionName = BullionName.builder()
+                .title(title)
                 .user(user)
                 .color(request.getColor())
                 .build();
-        categoryRepository.save(category);
+        bullionNameRepository.save(bullionName);
 
-        return CategoryResponse.fromCategory(category);
+        return BullionNameResponse.fromBullionName(bullionName);
     }
 
     @Transactional(readOnly = true)
-    public List<CategoryResponse> getAllCategories(User user) {
-        return categoryRepository.findByUserOrderByNameAsc(user).stream()
-                .map(CategoryResponse::fromCategory)
+    public List<BullionNameResponse> getAllBullionNames(User user) {
+        return bullionNameRepository.findByUserOrderByTitleAsc(user).stream()
+                .map(BullionNameResponse::fromBullionName)
                 .collect(Collectors.toList());
     }
 
     @Transactional
-    public CategoryResponse updateCategory(User user, Long categoryId, CategoryRequest request) {
-        Category category = categoryRepository.findByIdAndUser(categoryId, user)
+    public BullionNameResponse updateBullionName(User user, Long bullionNameId, BullionNameRequest request) {
+        BullionName bullionName = bullionNameRepository.findByIdAndUser(bullionNameId, user)
                 .orElseThrow(() -> new ApplicationException(
-                        CATEGORY_NOT_FOUND.getCode(),
-                        CATEGORY_NOT_FOUND.getMessage()
+                        BULLION_NAME_NOT_FOUND.getCode(),
+                        BULLION_NAME_NOT_FOUND.getMessage()
                 ));
 
-        String newName = request.getName().trim();
+        String newTitle = request.getTitle().trim();
 
-        boolean nameExists = categoryRepository.existsByUserAndNameIgnoreCase(user, newName);
+        boolean titleExists = bullionNameRepository.existsByUserAndTitleIgnoreCase(user, newTitle);
 
-        if (!nameExists || category.getName().equalsIgnoreCase(newName)) {
-            category.setName(newName);
+        if (!titleExists || bullionName.getTitle().equalsIgnoreCase(newTitle)) {
+            bullionName.setTitle(newTitle);
 
         }
 
@@ -100,40 +100,40 @@ public class CategoryService {
             }
 
 
-            validateColorAvailable(user, request.getColor(), categoryId);
+            validateColorAvailable(user, request.getColor(), bullionNameId);
 
             // Если цвет изменился - обновляем
-            if (!request.getColor().equals(category.getColor())) {
-                category.setColor(request.getColor());
+            if (!request.getColor().equals(bullionName.getColor())) {
+                bullionName.setColor(request.getColor());
             }
         }
 
-        Category updated = categoryRepository.save(category);
-        return CategoryResponse.fromCategory(updated);
+        BullionName updated = bullionNameRepository.save(bullionName);
+        return BullionNameResponse.fromBullionName(updated);
     }
 
     @Transactional
-    public void deleteCategory(User user, Long categoryId) {
-        if (!categoryRepository.existsByIdAndUser(categoryId, user)) {
+    public void deleteBullionName(User user, Long bullionNameId) {
+        if (!bullionNameRepository.existsByIdAndUser(bullionNameId, user)) {
             throw new ApplicationException(
-                    CATEGORY_NOT_FOUND.getCode(),
-                    CATEGORY_NOT_FOUND.getMessage()
+                    BULLION_NAME_NOT_FOUND.getCode(),
+                    BULLION_NAME_NOT_FOUND.getMessage()
             );
         }
-        if (bullionRepository.existsByCategoryIdAndUserId(categoryId, user.getId())) {
+        if (bullionRepository.existsByBullionNameIdAndUserId(bullionNameId, user.getId())) {
             throw new ApplicationException(
-                    CATEGORY_BULLION_LINK.getCode(), CATEGORY_BULLION_LINK.getMessage());
+                    BULLION_NAME_LINKED.getCode(), BULLION_NAME_LINKED.getMessage());
         }
 
-        categoryRepository.deleteByIdAndUser(categoryId, user);
+        bullionNameRepository.deleteByIdAndUser(bullionNameId, user);
     }
 
 
-    public byte[] exportCategoriesToExcel(User user) throws IOException {
-        List<Category> categories = categoryRepository.findByUserOrderByNameAsc(user);
+    public byte[] exportBullionNamesToExcel(User user) throws IOException {
+        List<BullionName> bullionNames = bullionNameRepository.findByUserOrderByTitleAsc(user);
 
         try (SXSSFWorkbook workbook = new SXSSFWorkbook()) {
-            Sheet sheet = workbook.createSheet("Категории");
+            Sheet sheet = workbook.createSheet("Наименования");
 
             // Стиль для заголовка
             CellStyle headerStyle = workbook.createCellStyle();
@@ -150,15 +150,15 @@ public class CategoryService {
             // Заголовок
             Row headerRow = sheet.createRow(0);
             Cell headerCell = headerRow.createCell(0);
-            headerCell.setCellValue("Название категории");
+            headerCell.setCellValue("Наименование слитка");
             headerCell.setCellStyle(headerStyle);
             sheet.setColumnWidth(0, 8000);
 
             // Данные
             int rowNum = 1;
-            for (Category category : categories) {
+            for (BullionName bullionName : bullionNames) {
                 Row row = sheet.createRow(rowNum++);
-                row.createCell(0).setCellValue(category.getName());
+                row.createCell(0).setCellValue(bullionName.getTitle());
             }
 
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -167,10 +167,10 @@ public class CategoryService {
         }
     }
 
-    // Импорт категорий из Excel (добавляет только новые, пропускает дубликаты)
+    // Импорт наименований слитков из Excel (добавляет только новые, пропускает дубликаты)
     @Transactional
-    public CategoryImportResult importCategoriesFromExcel(User user, MultipartFile file) throws IOException {
-        CategoryImportResult result = CategoryImportResult.builder().build();
+    public BullionNameImportResult importBullionNamesFromExcel(User user, MultipartFile file) throws IOException {
+        BullionNameImportResult result = BullionNameImportResult.builder().build();
 
         // Валидация файла
         if (file.isEmpty()) {
@@ -184,13 +184,13 @@ public class CategoryService {
             return result;
         }
 
-        // Существующие категории пользователя
-        Set<String> existingCategoryNames = categoryRepository.findByUserOrderByNameAsc(user).stream()
-                .map(Category::getName)
+        // Существующие наименования пользователя
+        Set<String> existingBullionNameTitles = bullionNameRepository.findByUserOrderByTitleAsc(user).stream()
+                .map(BullionName::getTitle)
                 .map(String::toLowerCase)
                 .collect(Collectors.toSet());
 
-        List<String> categoriesToAdd = new ArrayList<>();
+        List<String> bullionNamesToAdd = new ArrayList<>();
 
         try (InputStream inputStream = file.getInputStream();
              Workbook workbook = new XSSFWorkbook(inputStream)) {
@@ -205,43 +205,43 @@ public class CategoryService {
                 Cell cell = row.getCell(0);
                 if (cell == null) continue;
 
-                String categoryName = getCellValueAsString(cell).trim();
-                if (categoryName.isEmpty()) continue;
+                String bullionNameTitle = getCellValueAsString(cell).trim();
+                if (bullionNameTitle.isEmpty()) continue;
 
                 // Валидация
-                if (categoryName.length() < 2) {
-                    result.getErrors().add("Строка " + (i + 1) + ": '" + categoryName + "' - название слишком короткое (мин. 2 символа)");
+                if (bullionNameTitle.length() < 2) {
+                    result.getErrors().add("Строка " + (i + 1) + ": '" + bullionNameTitle + "' - название слишком короткое (мин. 2 символа)");
                     continue;
                 }
 
-                if (categoryName.length() > 100) {
-                    result.getErrors().add("Строка " + (i + 1) + ": '" + categoryName + "' - название слишком длинное (макс. 100 символов)");
+                if (bullionNameTitle.length() > 100) {
+                    result.getErrors().add("Строка " + (i + 1) + ": '" + bullionNameTitle + "' - название слишком длинное (макс. 100 символов)");
                     continue;
                 }
 
                 // Проверка на дубликат
-                if (existingCategoryNames.contains(categoryName.toLowerCase())) {
-                    result.getSkippedCategories().add(categoryName);
+                if (existingBullionNameTitles.contains(bullionNameTitle.toLowerCase())) {
+                    result.getSkippedBullionNames().add(bullionNameTitle);
                     result.setSkipped(result.getSkipped() + 1);
-                } else if (categoriesToAdd.stream().anyMatch(c -> c.equalsIgnoreCase(categoryName))) {
-                    result.getErrors().add("Строка " + (i + 1) + ": '" + categoryName + "' - дубликат внутри файла");
+                } else if (bullionNamesToAdd.stream().anyMatch(c -> c.equalsIgnoreCase(bullionNameTitle))) {
+                    result.getErrors().add("Строка " + (i + 1) + ": '" + bullionNameTitle + "' - дубликат внутри файла");
                 } else {
-                    categoriesToAdd.add(categoryName);
+                    bullionNamesToAdd.add(bullionNameTitle);
                 }
             }
 
-            // Сохраняем новые категории
-            for (String categoryName : categoriesToAdd) {
-                Category category = Category.builder()
-                        .name(categoryName)
+            // Сохраняем новые наименования
+            for (String bullionNameTitle : bullionNamesToAdd) {
+                BullionName bullionName = BullionName.builder()
+                        .title(bullionNameTitle)
                         .user(user)
                         .build();
-                categoryRepository.save(category);
-                result.getAddedCategories().add(categoryName);
+                bullionNameRepository.save(bullionName);
+                result.getAddedBullionNames().add(bullionNameTitle);
             }
 
-            result.setTotalProcessed(categoriesToAdd.size() + result.getSkipped());
-            result.setAdded(categoriesToAdd.size());
+            result.setTotalProcessed(bullionNamesToAdd.size() + result.getSkipped());
+            result.setAdded(bullionNamesToAdd.size());
 
         } catch (Exception e) {
             log.error("Ошибка при импорте файла", e);
@@ -274,19 +274,19 @@ public class CategoryService {
         }
     }
 
-    private void validateColorAvailable(User user, String color, Long excludeCategoryId) {
+    private void validateColorAvailable(User user, String color, Long excludeBullionNameId) {
         if (color == null) return;
 
-        List<String> usedColors = categoryRepository.findUsedColorsByUser(user);
+        List<String> usedColors = bullionNameRepository.findUsedColorsByUser(user);
 
-        // При редактировании исключаем текущую категорию
-        if (excludeCategoryId != null) {
-            Category currentCategory = categoryRepository.findById(excludeCategoryId)
+        // При редактировании исключаем текущее наименование
+        if (excludeBullionNameId != null) {
+            BullionName currentBullionName = bullionNameRepository.findById(excludeBullionNameId)
                     .orElseThrow(() -> new ApplicationException(
-                            CATEGORY_NOT_FOUND.getCode(),
-                            CATEGORY_NOT_FOUND.getMessage()
+                            BULLION_NAME_NOT_FOUND.getCode(),
+                            BULLION_NAME_NOT_FOUND.getMessage()
                     ));
-            usedColors.remove(currentCategory.getColor());
+            usedColors.remove(currentBullionName.getColor());
         }
 
         if (usedColors.contains(color)) {

@@ -24,8 +24,8 @@ public class Bullion {
     private Long id;
     
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", nullable = false)
-    private Category category;
+    @JoinColumn(name = "bullion_name_id", nullable = false)
+    private BullionName bullionName;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vault_id", nullable = false)

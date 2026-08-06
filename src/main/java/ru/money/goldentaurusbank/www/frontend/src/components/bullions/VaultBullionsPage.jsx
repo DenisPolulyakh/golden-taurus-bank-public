@@ -55,7 +55,7 @@ function VaultBullionsPage() {
         fromBullion: null,
         fromAmount: 0,
         fromBullionId: null,
-        fromCategoryId: null,
+        fromBullionNameId: null,
         dateOperation: null
     });
 
@@ -115,7 +115,7 @@ function VaultBullionsPage() {
             if (bullion.id !== fromBullionId && isAllowed) {
                 targets.push({
                     id: bullion.id,
-                    categoryName: bullion.category?.name || 'Без категории',
+                    bullionNameTitle: bullion.bullionName?.title || 'Без наименования',
                     vaultName: bullion.vault?.name || 'Без хранилища',
                     amount: bullion.amount || 0,
                     allowedTransfer: bullion.vault?.allowedTransfer
@@ -129,7 +129,7 @@ function VaultBullionsPage() {
         if (!vaultSummary?.bullions) return [];
         return vaultSummary.bullions.map(bullion => ({
             id: bullion.id,
-            categoryName: bullion.categoryName,
+            bullionNameTitle: bullion.bullionNameTitle,
             vaultName: vault?.name || 'Текущее хранилище',
             amount: bullion.amount || 0,
             allowedTransfer: vault?.allowedTransfer
@@ -143,13 +143,13 @@ function VaultBullionsPage() {
 
         if (searchTerm.trim()) {
             filtered = filtered.filter(item =>
-                item.categoryName?.toLowerCase().includes(searchTerm.toLowerCase())
+                item.bullionNameTitle?.toLowerCase().includes(searchTerm.toLowerCase())
             );
         }
 
         filtered.sort((a, b) => {
-            let aVal = sortConfig.field === 'amount' ? a.amount : (a.categoryName || '');
-            let bVal = sortConfig.field === 'amount' ? b.amount : (b.categoryName || '');
+            let aVal = sortConfig.field === 'amount' ? a.amount : (a.bullionNameTitle || '');
+            let bVal = sortConfig.field === 'amount' ? b.amount : (b.bullionNameTitle || '');
 
             if (typeof aVal === 'string') {
                 aVal = aVal.toLowerCase();
@@ -196,8 +196,8 @@ function VaultBullionsPage() {
     const handleEditBullion = (bullion) => {
         setEditingBullion({
             id: bullion.id,
-            categoryId: bullion.categoryId,
-            categoryName: bullion.categoryName,
+            bullionNameId: bullion.bullionNameId,
+            bullionNameTitle: bullion.bullionNameTitle,
             amount: bullion.amount,
             description: bullion.description || ''
         });
@@ -240,7 +240,7 @@ function VaultBullionsPage() {
             fromBullion: bullion,
             fromAmount: bullion.amount,
             fromBullionId: bullion.id,
-            fromCategoryId: bullion.categoryId,
+            fromBullionNameId: bullion.bullionNameId,
             dateOperation: null
         });
     };
@@ -257,7 +257,7 @@ function VaultBullionsPage() {
         setActionLoading(true);
         try {
             await api.post('/bullions/refill', {
-                categoryId: transactionModal.bullion.categoryId,
+                bullionNameId: transactionModal.bullion.bullionNameId,
                 vaultId: parseInt(vaultId),
                 amount: amount,
                 userComment: userComment,
@@ -277,7 +277,7 @@ function VaultBullionsPage() {
         setActionLoading(true);
         try {
             await api.post('/bullions/withdraw', {
-                categoryId: transactionModal.bullion.categoryId,
+                bullionNameId: transactionModal.bullion.bullionNameId,
                 vaultId: parseInt(vaultId),
                 amount: amount,
                 userComment: userComment,
@@ -336,11 +336,11 @@ function VaultBullionsPage() {
         await Promise.all([fetchVaultSummary(), fetchVault(), fetchAllVaults(), fetchAllBullions()]);
     }, [fetchVaultSummary, fetchVault, fetchAllVaults, fetchAllBullions]);
 
-    const handleSaveBullion = async (categoryId, vaultIdParam, amount, description, dateOperation) => {
+    const handleSaveBullion = async (bullionNameId, vaultIdParam, amount, description, dateOperation) => {
         setActionLoading(true);
         try {
             await api.post('/bullions', {
-                categoryId,
+                bullionNameId,
                 vaultId: vaultIdParam,
                 amount,
                 description,
@@ -356,11 +356,11 @@ function VaultBullionsPage() {
         }
     };
 
-    const handleUpdateBullion = async (bullionId, categoryId, vaultIdParam, amount, description, dateOperation) => {
+    const handleUpdateBullion = async (bullionId, bullionNameId, vaultIdParam, amount, description, dateOperation) => {
         setActionLoading(true);
         try {
             await api.put(`/bullions/${bullionId}`, {
-                categoryId,
+                bullionNameId,
                 vaultId: vaultIdParam,
                 amount,
                 description,
@@ -404,7 +404,7 @@ function VaultBullionsPage() {
             fromBullion: null,
             fromAmount: 0,
             fromBullionId: null,
-            fromCategoryId: null,
+            fromBullionNameId: null,
             dateOperation: null
         });
     };
@@ -449,7 +449,7 @@ function VaultBullionsPage() {
 
     const transactionConfig = {
         refill: {
-            title: `Пополнение слитка "${transactionModal.bullion?.categoryName}"`,
+            title: `Пополнение слитка "${transactionModal.bullion?.bullionNameTitle}"`,
             buttonText: 'Внести',
             buttonClass: 'refill-btn',
             handler: handleRefill,
@@ -462,7 +462,7 @@ function VaultBullionsPage() {
             type: 'refill'
         },
         withdraw: {
-            title: `Списание со слитка "${transactionModal.bullion?.categoryName}"`,
+            title: `Списание со слитка "${transactionModal.bullion?.bullionNameTitle}"`,
             buttonText: 'Снять',
             buttonClass: 'withdraw-btn',
             handler: handleWithdraw,
@@ -475,7 +475,7 @@ function VaultBullionsPage() {
             type: 'withdraw'
         },
         delete: {
-            title: `Удаление слитка "${transactionModal.bullion?.categoryName}"`,
+            title: `Удаление слитка "${transactionModal.bullion?.bullionNameTitle}"`,
             buttonText: 'Удалить и перенести',
             buttonClass: 'delete-btn',
             handler: handleDeleteWithTransfer,
@@ -520,7 +520,7 @@ function VaultBullionsPage() {
 
                 <div className="stats-cards">
                     <StatCard label="Общая сумма в хранилище" value={`${formatAmount(totalAmount)} ₽`} />
-                    <StatCard label="Количество категорий" value={bullionsCount} />
+                    <StatCard label="Количество наименований" value={bullionsCount} />
                     <StatCard label="Процентная ставка" value={`${vault.interestRate || 0}%`} />
                 </div>
 
@@ -528,7 +528,7 @@ function VaultBullionsPage() {
                     <div className="search-bar">
                         <input
                             type="text"
-                            placeholder="🔍 Поиск по категории..."
+                            placeholder="🔍 Поиск по наименованию..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             disabled={actionLoading}
@@ -544,8 +544,8 @@ function VaultBullionsPage() {
                             disabled={actionLoading}
                         />
                         <SortButton
-                            label="По категории"
-                            field="categoryName"
+                            label="По наименованию"
+                            field="bullionNameTitle"
                             currentField={sortConfig.field}
                             currentOrder={sortConfig.order}
                             onSort={handleSort}
@@ -589,13 +589,13 @@ function VaultBullionsPage() {
                     isOpen={modalOpen}
                     onClose={closeModal}
                     onSave={editingBullion
-                        ? (categoryId, vaultIdParam, amount, description, dateOperation) =>
-                            handleUpdateBullion(editingBullion.id, categoryId, vaultIdParam, amount, description, dateOperation)
-                        : (categoryId, vaultIdParam, amount, description, dateOperation) =>
-                            handleSaveBullion(categoryId, vaultIdParam, amount, description, dateOperation)
+                        ? (bullionNameId, vaultIdParam, amount, description, dateOperation) =>
+                            handleUpdateBullion(editingBullion.id, bullionNameId, vaultIdParam, amount, description, dateOperation)
+                        : (bullionNameId, vaultIdParam, amount, description, dateOperation) =>
+                            handleSaveBullion(bullionNameId, vaultIdParam, amount, description, dateOperation)
                     }
-                    initialCategoryId={editingBullion?.categoryId}
-                    initialCategoryName={editingBullion?.categoryName}
+                    initialBullionNameId={editingBullion?.bullionNameId}
+                    initialBullionNameTitle={editingBullion?.bullionNameTitle}
                     initialVaultId={parseInt(vaultId)}
                     initialAmount={editingBullion?.amount}
                     initialDescription={editingBullion?.description}
@@ -612,7 +612,7 @@ function VaultBullionsPage() {
                         title={currentTransaction.title}
                         buttonText={currentTransaction.buttonText}
                         buttonClass={currentTransaction.buttonClass}
-                        bullionName={transactionModal.bullion?.categoryName}
+                        bullionName={transactionModal.bullion?.bullionNameTitle}
                         showVaultSelector={currentTransaction.showVaultSelector}
                         vaults={currentTransaction.vaults || []}
                         initialVaultId={currentTransaction.initialVaultId}
@@ -705,7 +705,7 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
     return (
         <div className="bullion-card vault-card">
             <div className="card-header">
-                <h3>📁 {bullion.categoryName}</h3>
+                <h3>📁 {bullion.bullionNameTitle}</h3>
             </div>
             <div className="card-body">
                 <div className="card-stats">

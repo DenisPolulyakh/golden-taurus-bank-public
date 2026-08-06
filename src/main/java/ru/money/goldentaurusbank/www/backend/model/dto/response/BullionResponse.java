@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class BullionResponse {
     private Long id;
-    private CategoryInfo category;
+    private BullionNameInfo bullionName;
     private VaultInfo vault;
     private BigDecimal amount;
     private String description;
@@ -27,9 +27,9 @@ public class BullionResponse {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class CategoryInfo {
+    public static class BullionNameInfo {
         private Long id;
-        private String name;
+        private String title;
     }
 
     @Data

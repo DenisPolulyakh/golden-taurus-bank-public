@@ -18,7 +18,7 @@ import ru.money.goldentaurusbank.www.backend.model.dto.request.*;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.VaultImportResult;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.VaultResponse;
 import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
-import ru.money.goldentaurusbank.www.backend.repository.CategoryRepository;
+import ru.money.goldentaurusbank.www.backend.repository.BullionNameRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
 
 import java.io.IOException;
@@ -34,10 +34,10 @@ import java.util.Optional;
 public class VaultImportService {
 
     private final BankService bankService;
-    private final CategoryService categoryService;
+    private final BullionNameService bullionNameService;
     private final BullionService bullionService;
     private final VaultService vaultService;
-    private final CategoryRepository categoryRepository;
+    private final BullionNameRepository bullionNameRepository;
     private final BullionRepository bullionRepository;
 
     @Transactional
@@ -86,17 +86,17 @@ public class VaultImportService {
             result.setVaultsAdded(1);
             result.getAddedVaults().add(vault.getName());
 
-            // 4. Читаем категории и создаем слитки
+            // 4. Читаем наименования и создаем слитки
             int startRow = 7;
             for (int i = startRow; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
                 if (row == null) continue;
 
-                String categoryName = getCellValue(row.getCell(0)).trim();
-                if (categoryName.isEmpty()) continue;
+                String bullionNameTitle = getCellValue(row.getCell(0)).trim();
+                if (bullionNameTitle.isEmpty()) continue;
 
-                if (categoryName.equalsIgnoreCase("Итого") ||
-                        categoryName.equalsIgnoreCase("Итого было")) {
+                if (bullionNameTitle.equalsIgnoreCase("Итого") ||
+                        bullionNameTitle.equalsIgnoreCase("Итого было")) {
                     continue;
                 }
 
@@ -107,31 +107,31 @@ public class VaultImportService {
                     continue;
                 }
 
-                // 5. Создаем категорию через CategoryService
-                Cell categoryCell = row.getCell(8);
-                String cellColor = getCellColor(categoryCell);
+                // 5. Создаем наименование через BullionNameService
+                Cell bullionNameCell = row.getCell(8);
+                String cellColor = getCellColor(bullionNameCell);
 
-                CategoryRequest categoryRequest = new CategoryRequest();
-                categoryRequest.setName(categoryName);
+                BullionNameRequest bullionNameRequest = new BullionNameRequest();
+                bullionNameRequest.setTitle(bullionNameTitle);
                 if (cellColor != null && !cellColor.isEmpty()) {
-                    categoryRequest.setColor(cellColor);
+                    bullionNameRequest.setColor(cellColor);
                 }
-                categoryService.createCategory(user, categoryRequest);
+                bullionNameService.createBullionName(user, bullionNameRequest);
 
-                result.setCategoriesAdded(result.getCategoriesAdded() + 1);
-                result.getAddedCategories().add(categoryName);
+                result.setBullionNamesAdded(result.getBullionNamesAdded() + 1);
+                result.getAddedBullionNames().add(bullionNameTitle);
 
-                // 6. Находим ID категории
-                var categoryOpt = categoryRepository.findByUserAndNameIgnoreCase(user, categoryName);
-                if (categoryOpt.isEmpty()) {
-                    result.getErrors().add("Категория не найдена: " + categoryName);
+                // 6. Находим ID наименования
+                var bullionNameOpt = bullionNameRepository.findByUserAndTitleIgnoreCase(user, bullionNameTitle);
+                if (bullionNameOpt.isEmpty()) {
+                    result.getErrors().add("Наименование не найдено: " + bullionNameTitle);
                     continue;
                 }
 
                 // 7. Создаем слиток через BullionService
                 try {
                     BullionRequest bullionRequest = new BullionRequest();
-                    bullionRequest.setCategoryId(categoryOpt.get().getId());
+                    bullionRequest.setBullionNameId(bullionNameOpt.get().getId());
                     bullionRequest.setVaultId(vault.getId());
                     bullionRequest.setAmount(amount);
                     bullionRequest.setDescription("Импортировано из Excel");
@@ -139,7 +139,7 @@ public class VaultImportService {
 
                     result.setBullionsAdded(result.getBullionsAdded() + 1);
                 } catch (Exception e) {
-                    result.getErrors().add("Ошибка создания слитка для категории " + categoryName + ": " + e.getMessage());
+                    result.getErrors().add("Ошибка создания слитка для наименования " + bullionNameTitle + ": " + e.getMessage());
                 }
             }
 

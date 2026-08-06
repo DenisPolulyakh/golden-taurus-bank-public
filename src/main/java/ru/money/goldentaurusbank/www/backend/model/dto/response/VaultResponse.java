@@ -26,7 +26,7 @@ public class VaultResponse {
     private AccountType accountType;
     private LocalDate closeDate;
     private BigDecimal totalAmount;
-    private Integer categoriesCount;
+    private Integer bullionNamesCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private String displayName;

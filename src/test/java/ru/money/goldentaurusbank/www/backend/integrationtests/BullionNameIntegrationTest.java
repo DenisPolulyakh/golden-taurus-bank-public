@@ -24,8 +24,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
-import ru.money.goldentaurusbank.www.backend.model.dto.response.CategoryResponse;
-import ru.money.goldentaurusbank.www.backend.repository.CategoryRepository;
+import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionNameResponse;
+import ru.money.goldentaurusbank.www.backend.repository.BullionNameRepository;
 import ru.money.goldentaurusbank.www.backend.repository.UserRepository;
 
 import java.util.List;
@@ -39,8 +39,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @Testcontainers
 @Transactional
-@DisplayName("Интеграционные тесты категорий")
-class CategoryIntegrationTest {
+@DisplayName("Интеграционные тесты наименований слитков")
+class BullionNameIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -52,7 +52,7 @@ class CategoryIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private CategoryRepository categoryRepository;
+    private BullionNameRepository bullionNameRepository;
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
@@ -93,14 +93,14 @@ class CategoryIntegrationTest {
     @BeforeEach
     void setUp() throws Exception {
         userRepository.deleteAll();
-        categoryRepository.deleteAll();
+        bullionNameRepository.deleteAll();
         
         // Регистрация и подтверждение пользователя
         String registerRequest = """
                 {
-                    "email": "categoryuser@example.com",
+                    "email": "bullionNameuser@example.com",
                     "password": "Test123%",
-                    "fullName": "Category Test User"
+                    "fullName": "Bullion Test User"
                 }
                 """;
         
@@ -108,7 +108,7 @@ class CategoryIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(registerRequest));
         
-        User user = userRepository.findByEmail("categoryuser@example.com").get();
+        User user = userRepository.findByEmail("bullionNameuser@example.com").get();
         userId = user.getId();
         
         // Подтверждение email
@@ -118,7 +118,7 @@ class CategoryIntegrationTest {
         // Логин для получения токена
         String loginRequest = """
                 {
-                    "email": "categoryuser@example.com",
+                    "email": "bullionNameuser@example.com",
                     "password": "Test123%"
                 }
                 """;
@@ -135,39 +135,39 @@ class CategoryIntegrationTest {
 
     @Test
     @DisplayName("Создание категории - успешно")
-    void createCategorySuccess() throws Exception {
+    void createBullionNameSuccess() throws Exception {
         String request = """
                 {
-                    "name": "Продукты"
+                    "title": "Продукты"
                 }
                 """;
 
-        mockMvc.perform(post("/api/categories")
+        mockMvc.perform(post("/api/bullion-names")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.message").value("Категория успешно добавлена"))
-                .andExpect(jsonPath("$.data.name").value("Продукты"));
+                .andExpect(jsonPath("$.message").value("Наименование слитка успешно добавлено"))
+                .andExpect(jsonPath("$.data.title").value("Продукты"));
 
         // Проверяем, что категория сохранилась в БД
-        List<CategoryResponse> categories = getCategories();
-        assertThat(categories).hasSize(1);
-        assertThat(categories.get(0).getName()).isEqualTo("Продукты");
+        List<BullionNameResponse> bullionNames = getBullionNames();
+        assertThat(bullionNames).hasSize(1);
+        assertThat(bullionNames.get(0).getTitle()).isEqualTo("Продукты");
     }
 
     @Test
     @DisplayName("Создание категории с дублирующимся именем (без учёта регистра) - не создаёт дубль")
-    void createCategoryDuplicateNameDoesNotCreateDuplicate() throws Exception {
+    void createBullionNameDuplicateNameDoesNotCreateDuplicate() throws Exception {
         String request = """
                 {
-                    "name": "Транспорт"
+                    "title": "Транспорт"
                 }
                 """;
 
         // Первое создание
-        mockMvc.perform(post("/api/categories")
+        mockMvc.perform(post("/api/bullion-names")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
@@ -176,34 +176,34 @@ class CategoryIntegrationTest {
         // Второе создание с таким же именем (другой регистр)
         String requestDuplicate = """
                 {
-                    "name": "транспорт"
+                    "title": "транспорт"
                 }
                 """;
 
-        mockMvc.perform(post("/api/categories")
+        mockMvc.perform(post("/api/bullion-names")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestDuplicate))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.message").value("Категория успешно добавлена"));
+                .andExpect(jsonPath("$.message").value("Наименование слитка успешно добавлено"));
 
         // Проверяем, что в БД только одна категория
-        List<CategoryResponse> categories = getCategories();
-        assertThat(categories).hasSize(1);
-        assertThat(categories.get(0).getName()).isEqualTo("Транспорт");
+        List<BullionNameResponse> bullionNames = getBullionNames();
+        assertThat(bullionNames).hasSize(1);
+        assertThat(bullionNames.get(0).getTitle()).isEqualTo("Транспорт");
     }
 
     @Test
     @DisplayName("Создание категории с пустым именем - ошибка валидации")
-    void createCategoryEmptyNameValidationError() throws Exception {
+    void createBullionNameEmptyNameValidationError() throws Exception {
         String request = """
                 {
-                    "name": ""
+                    "title": ""
                 }
                 """;
 
-        mockMvc.perform(post("/api/categories")
+        mockMvc.perform(post("/api/bullion-names")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
@@ -213,13 +213,13 @@ class CategoryIntegrationTest {
 
     @Test
     @DisplayName("Получение всех категорий пользователя")
-    void getAllCategoriesSuccess() throws Exception {
+    void getAllBullionNamesSuccess() throws Exception {
         // Создаём несколько категорий
-        createCategory("Продукты");
-        createCategory("Транспорт");
-        createCategory("Развлечения");
+        createBullionName("Продукты");
+        createBullionName("Транспорт");
+        createBullionName("Развлечения");
 
-        MvcResult result = mockMvc.perform(get("/api/categories")
+        MvcResult result = mockMvc.perform(get("/api/bullion-names")
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
@@ -229,20 +229,20 @@ class CategoryIntegrationTest {
 
         String responseBody = result.getResponse().getContentAsString();
         JsonNode jsonNode = objectMapper.readTree(responseBody);
-        List<CategoryResponse> categories = objectMapper.convertValue(
+        List<BullionNameResponse> bullionNames = objectMapper.convertValue(
                 jsonNode.get("data"),
-                new TypeReference<List<CategoryResponse>>() {}
+                new TypeReference<List<BullionNameResponse>>() {}
         );
         
-        assertThat(categories).extracting(CategoryResponse::getName)
+        assertThat(bullionNames).extracting(BullionNameResponse::getName)
                 .containsExactlyInAnyOrder("Продукты", "Транспорт", "Развлечения");
     }
 
     @Test
     @DisplayName("Получение категорий у разных пользователей - изолированы")
-    void getAllCategoriesUserIsolation() throws Exception {
+    void getAllBullionNamesUserIsolation() throws Exception {
         // Создаём категорию для первого пользователя
-        createCategory("Категория Пользователя 1");
+        createBullionName("Категория Пользователя 1");
         
         // Создаём второго пользователя
         String registerRequest2 = """
@@ -276,50 +276,50 @@ class CategoryIntegrationTest {
         String tokenUser2 = jsonNode2.get("data").get("token").asText();
         
         // Создаём категорию для второго пользователя
-        String requestCategory2 = """
+        String requestBullionName2 = """
                 {
-                    "name": "Категория Пользователя 2"
+                    "title": "Категория Пользователя 2"
                 }
                 """;
-        mockMvc.perform(post("/api/categories")
+        mockMvc.perform(post("/api/bullion-names")
                         .header("Authorization", "Bearer " + tokenUser2)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestCategory2))
+                        .content(requestBullionName2))
                 .andExpect(status().isOk());
         
         // Проверяем категории первого пользователя
-        List<CategoryResponse> categoriesUser1 = getCategories();
-        assertThat(categoriesUser1).hasSize(1);
-        assertThat(categoriesUser1.get(0).getName()).isEqualTo("Категория Пользователя 1");
+        List<BullionNameResponse> bullionNamesUser1 = getBullionNames();
+        assertThat(bullionNamesUser1).hasSize(1);
+        assertThat(bullionNamesUser1.get(0).getTitle()).isEqualTo("Категория Пользователя 1");
         
         // Проверяем категории второго пользователя
-        MvcResult resultUser2 = mockMvc.perform(get("/api/categories")
+        MvcResult resultUser2 = mockMvc.perform(get("/api/bullion-names")
                         .header("Authorization", "Bearer " + tokenUser2))
                 .andExpect(status().isOk())
                 .andReturn();
         
         String responseUser2 = resultUser2.getResponse().getContentAsString();
         JsonNode jsonNodeUser2 = objectMapper.readTree(responseUser2);
-        List<CategoryResponse> categoriesUser2 = objectMapper.convertValue(
+        List<BullionNameResponse> bullionNamesUser2 = objectMapper.convertValue(
                 jsonNodeUser2.get("data"),
-                new TypeReference<List<CategoryResponse>>() {}
+                new TypeReference<List<BullionNameResponse>>() {}
         );
         
-        assertThat(categoriesUser2).hasSize(1);
-        assertThat(categoriesUser2.get(0).getName()).isEqualTo("Категория Пользователя 2");
+        assertThat(bullionNamesUser2).hasSize(1);
+        assertThat(bullionNamesUser2.get(0).getTitle()).isEqualTo("Категория Пользователя 2");
     }
 
     @Test
     @DisplayName("Обновление категории - успешно")
-    void updateCategorySuccess() throws Exception {
+    void updateBullionNameSuccess() throws Exception {
         // Создаём категорию
         String createRequest = """
                 {
-                    "name": "Старое название"
+                    "title": "Старое название"
                 }
                 """;
         
-        MvcResult createResult = mockMvc.perform(post("/api/categories")
+        MvcResult createResult = mockMvc.perform(post("/api/bullion-names")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createRequest))
@@ -327,42 +327,42 @@ class CategoryIntegrationTest {
         
         String createResponse = createResult.getResponse().getContentAsString();
         JsonNode createJson = objectMapper.readTree(createResponse);
-        Long categoryId = createJson.get("data").get("id").asLong();
+        Long bullionNameId = createJson.get("data").get("id").asLong();
         
         // Обновляем категорию
         String updateRequest = """
                 {
-                    "name": "Новое название"
+                    "title": "Новое название"
                 }
                 """;
         
-        mockMvc.perform(put("/api/categories/{categoryId}", categoryId)
+        mockMvc.perform(put("/api/bullion-names/{bullionNameId}", bullionNameId)
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateRequest))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.message").value("Категория успешно обновлена"))
-                .andExpect(jsonPath("$.data.name").value("Новое название"));
+                .andExpect(jsonPath("$.message").value("Наименование слитка успешно обновлено"))
+                .andExpect(jsonPath("$.data.title").value("Новое название"));
         
         // Проверяем в БД
-        List<CategoryResponse> categories = getCategories();
-        assertThat(categories).hasSize(1);
-        assertThat(categories.get(0).getName()).isEqualTo("Новое название");
+        List<BullionNameResponse> bullionNames = getBullionNames();
+        assertThat(bullionNames).hasSize(1);
+        assertThat(bullionNames.get(0).getTitle()).isEqualTo("Новое название");
     }
 
     @Test
     @DisplayName("Обновление категории на существующее имя (без учёта регистра) - не обновляет")
-    void updateCategoryToExistingNameDoesNotUpdate() throws Exception {
+    void updateBullionNameToExistingNameDoesNotUpdate() throws Exception {
         // Создаём две категории
-        createCategory("Еда");
+        createBullionName("Еда");
         String createRequest2 = """
                 {
-                    "name": "Транспорт"
+                    "title": "Транспорт"
                 }
                 """;
         
-        MvcResult createResult2 = mockMvc.perform(post("/api/categories")
+        MvcResult createResult2 = mockMvc.perform(post("/api/bullion-names")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createRequest2))
@@ -375,34 +375,34 @@ class CategoryIntegrationTest {
         // Пытаемся обновить "Транспорт" на "ЕДА" (существующее имя)
         String updateRequest = """
                 {
-                    "name": "ЕДА"
+                    "title": "ЕДА"
                 }
                 """;
         
-        mockMvc.perform(put("/api/categories/{categoryId}", transportId)
+        mockMvc.perform(put("/api/bullion-names/{bullionNameId}", transportId)
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateRequest))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.message").value("Категория успешно обновлена"));
+                .andExpect(jsonPath("$.message").value("Наименование слитка успешно обновлено"));
         
         // Проверяем, что имя не изменилось
-        List<CategoryResponse> categories = getCategories();
-        assertThat(categories).extracting(CategoryResponse::getName)
+        List<BullionNameResponse> bullionNames = getBullionNames();
+        assertThat(bullionNames).extracting(BullionNameResponse::getName)
                 .containsExactlyInAnyOrder("Еда", "Транспорт");
     }
 
     @Test
     @DisplayName("Обновление несуществующей категории - ошибка")
-    void updateCategoryNotFoundThrowsException() throws Exception {
+    void updateBullionNameNotFoundThrowsException() throws Exception {
         String updateRequest = """
                 {
-                    "name": "Новое имя"
+                    "title": "Новое имя"
                 }
                 """;
         
-        mockMvc.perform(put("/api/categories/{categoryId}", 99999L)
+        mockMvc.perform(put("/api/bullion-names/{bullionNameId}", 99999L)
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateRequest))
@@ -412,15 +412,15 @@ class CategoryIntegrationTest {
 
     @Test
     @DisplayName("Удаление категории - успешно")
-    void deleteCategorySuccess() throws Exception {
+    void deleteBullionNameSuccess() throws Exception {
         // Создаём категорию
         String createRequest = """
                 {
-                    "name": "Удаляемая категория"
+                    "title": "Удаляемая категория"
                 }
                 """;
         
-        MvcResult createResult = mockMvc.perform(post("/api/categories")
+        MvcResult createResult = mockMvc.perform(post("/api/bullion-names")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createRequest))
@@ -428,26 +428,26 @@ class CategoryIntegrationTest {
         
         String createResponse = createResult.getResponse().getContentAsString();
         JsonNode createJson = objectMapper.readTree(createResponse);
-        Long categoryId = createJson.get("data").get("id").asLong();
+        Long bullionNameId = createJson.get("data").get("id").asLong();
         
         // Проверяем, что категория создалась
-        assertThat(getCategories()).hasSize(1);
+        assertThat(getBullionNames()).hasSize(1);
         
         // Удаляем категорию
-        mockMvc.perform(delete("/api/categories/{categoryId}", categoryId)
+        mockMvc.perform(delete("/api/bullion-names/{bullionNameId}", bullionNameId)
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.message").value("Категория успешно удалена"));
+                .andExpect(jsonPath("$.message").value("Наименование слитка успешно удалено"));
         
         // Проверяем, что категория удалилась
-        assertThat(getCategories()).isEmpty();
+        assertThat(getBullionNames()).isEmpty();
     }
 
     @Test
     @DisplayName("Удаление несуществующей категории - ошибка")
-    void deleteCategoryNotFoundThrowsException() throws Exception {
-        mockMvc.perform(delete("/api/categories/{categoryId}", 99999L)
+    void deleteBullionNameNotFoundThrowsException() throws Exception {
+        mockMvc.perform(delete("/api/bullion-names/{bullionNameId}", 99999L)
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(4003));
@@ -455,7 +455,7 @@ class CategoryIntegrationTest {
 
     @Test
     @DisplayName("Удаление категории другого пользователя - ошибка")
-    void deleteCategoryAnotherUserThrowsException() throws Exception {
+    void deleteBullionNameAnotherUserThrowsException() throws Exception {
         // Создаём второго пользователя
         String registerRequest2 = """
                 {
@@ -490,10 +490,10 @@ class CategoryIntegrationTest {
         // Создаём категорию для второго пользователя
         String createRequest2 = """
                 {
-                    "name": "Категория другого пользователя"
+                    "title": "Категория другого пользователя"
                 }
                 """;
-        MvcResult createResult2 = mockMvc.perform(post("/api/categories")
+        MvcResult createResult2 = mockMvc.perform(post("/api/bullion-names")
                         .header("Authorization", "Bearer " + tokenUser2)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createRequest2))
@@ -501,53 +501,53 @@ class CategoryIntegrationTest {
         
         String createResponse2 = createResult2.getResponse().getContentAsString();
         JsonNode createJson2 = objectMapper.readTree(createResponse2);
-        Long anotherCategoryId = createJson2.get("data").get("id").asLong();
+        Long anotherBullionNameId = createJson2.get("data").get("id").asLong();
         
         // Пытаемся удалить категорию второго пользователя первым пользователем
-        mockMvc.perform(delete("/api/categories/{categoryId}", anotherCategoryId)
+        mockMvc.perform(delete("/api/bullion-names/{bullionNameId}", anotherBullionNameId)
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(4003));
         
         // Проверяем, что категория второго пользователя осталась
-        MvcResult resultUser2 = mockMvc.perform(get("/api/categories")
+        MvcResult resultUser2 = mockMvc.perform(get("/api/bullion-names")
                         .header("Authorization", "Bearer " + tokenUser2))
                 .andReturn();
         
         String responseUser2 = resultUser2.getResponse().getContentAsString();
         JsonNode jsonNodeUser2 = objectMapper.readTree(responseUser2);
-        List<CategoryResponse> categoriesUser2 = objectMapper.convertValue(
+        List<BullionNameResponse> bullionNamesUser2 = objectMapper.convertValue(
                 jsonNodeUser2.get("data"),
-                new TypeReference<List<CategoryResponse>>() {}
+                new TypeReference<List<BullionNameResponse>>() {}
         );
         
-        assertThat(categoriesUser2).hasSize(1);
+        assertThat(bullionNamesUser2).hasSize(1);
     }
 
     @Test
     @DisplayName("Попытка доступа к категориям без токена - ошибка")
     void accessWithoutTokenThrowsException() throws Exception {
-        mockMvc.perform(get("/api/categories"))
+        mockMvc.perform(get("/api/bullion-names"))
                 .andExpect(status().isForbidden());
     }
 
     // Вспомогательные методы
-    private void createCategory(String name) throws Exception {
+    private void createBullionName(String name) throws Exception {
         String request = String.format("""
                 {
-                    "name": "%s"
+                    "title": "%s"
                 }
                 """, name);
         
-        mockMvc.perform(post("/api/categories")
+        mockMvc.perform(post("/api/bullion-names")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isOk());
     }
 
-    private List<CategoryResponse> getCategories() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/categories")
+    private List<BullionNameResponse> getBullionNames() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/bullion-names")
                         .header("Authorization", "Bearer " + accessToken))
                 .andReturn();
         
@@ -555,7 +555,7 @@ class CategoryIntegrationTest {
         JsonNode jsonNode = objectMapper.readTree(responseBody);
         return objectMapper.convertValue(
                 jsonNode.get("data"),
-                new TypeReference<List<CategoryResponse>>() {}
+                new TypeReference<List<BullionNameResponse>>() {}
         );
     }
 }

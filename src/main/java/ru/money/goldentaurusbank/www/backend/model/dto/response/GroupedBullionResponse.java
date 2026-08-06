@@ -16,7 +16,7 @@ import java.util.List;
 public class GroupedBullionResponse {
     private BigDecimal totalAmount;
     private BigDecimal averageRate;
-    private List<CategoryBullion> categoryBullionList;
+    private List<BullionNameBullion> bullionNameBullionList;
     private Integer countVaults;
     private Integer countBullions;
 
@@ -25,12 +25,12 @@ public class GroupedBullionResponse {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class CategoryBullion {
-        private Long categoryId;
-        private String categoryName;
-        private String categoryColor;
-        private BigDecimal categoryAmount;
-        private BigDecimal categoryAverageRate;
+    public static class BullionNameBullion {
+        private Long bullionNameId;
+        private String bullionNameTitle;
+        private String bullionNameColor;
+        private BigDecimal bullionNameAmount;
+        private BigDecimal bullionNameAverageRate;
         private List<VaultInfo> vaults;
 
 

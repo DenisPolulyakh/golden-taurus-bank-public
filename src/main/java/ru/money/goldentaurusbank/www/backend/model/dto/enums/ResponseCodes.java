@@ -34,7 +34,7 @@ public enum ResponseCodes {
     CANNOT_TRANSFER_TO_SAME_VAULT(4000, "Нельзя переместить слиток в то же хранилище", HttpStatus.BAD_REQUEST),
     TRANSACTION_NOT_FOUND(4001, "Транзакция не найдена", HttpStatus.NOT_FOUND),
     INSUFFICIENT_FUNDS(4002, "Недостаточно средств", HttpStatus.BAD_REQUEST),
-    CATEGORY_NOT_FOUND(4003, "Категория не найдена", HttpStatus.BAD_REQUEST),
+    BULLION_NAME_NOT_FOUND(4003, "Наименование слитка не найдено", HttpStatus.BAD_REQUEST),
     VAULT_NOT_FOUND(4004, "Хранилище не найдено", HttpStatus.BAD_REQUEST),
     VAULT_ALREADY_EXISTS(4005, "Банк с таким названием уже существует", HttpStatus.CONFLICT),
     BULLION_NOT_FOUND(4006,"Слиток не найден", HttpStatus.BAD_REQUEST),
@@ -42,8 +42,8 @@ public enum ResponseCodes {
     CHANGE_AMOUNT_ZERO(4008, "Cумма пополнения или снятия должна отличаться от 0", HttpStatus.BAD_REQUEST),
     VAULT_NOT_SET(4009, "Хранилище для переноса не задано", HttpStatus.BAD_REQUEST),
     INVALID_COLOR(4010,"Недопустимый цвет. Выберите цвет из предложенных", HttpStatus.BAD_REQUEST),
-    COLOR_ALREADY_USE(4011,"Этот цвет уже используется в другой категории", HttpStatus.BAD_REQUEST),
-    CATEGORY_BULLION_LINK(4012, "Категория привязана к слитку, сначала удалите слиток",HttpStatus.BAD_REQUEST),
+    COLOR_ALREADY_USE(4011,"Этот цвет уже используется в другом наименовании", HttpStatus.BAD_REQUEST),
+    BULLION_NAME_LINKED(4012, "Наименование привязано к слитку, сначала удалите слиток",HttpStatus.BAD_REQUEST),
 
 
     // Системные ошибки (5xxx)

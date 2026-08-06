@@ -17,17 +17,17 @@ public class VaultSummaryResponse {
     private String vaultName;
     private BigDecimal totalAmount;
     private BigDecimal interestRate;
-    private Integer categoriesCount;
-    private List<BullionByCategoryResponse> bullions;
+    private Integer bullionNamesCount;
+    private List<BullionByBullionNameResponse> bullions;
     
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class BullionByCategoryResponse {
+    public static class BullionByBullionNameResponse {
         private Long id;
-        private Long categoryId;
-        private String categoryName;
+        private Long bullionNameId;
+        private String bullionNameTitle;
         private BigDecimal amount;
         private String description;
     }

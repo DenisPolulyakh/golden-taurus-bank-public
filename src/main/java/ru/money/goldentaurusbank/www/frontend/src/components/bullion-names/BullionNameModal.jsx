@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import api from '../../api/axios';
-import './Categories.css';
+import './BullionNames.css';
 
-function CategoryModal({ isOpen, onClose, onSave, initialName, initialColor, isEditing }) {
-    const [name, setName] = useState('');
+function BullionNameModal({ isOpen, onClose, onSave, initialTitle, initialColor, isEditing }) {
+    const [title, setTitle] = useState('');
     const [selectedColor, setSelectedColor] = useState('');
     const [availableColors, setAvailableColors] = useState([]);
     const [loadingColors, setLoadingColors] = useState(false);
@@ -12,17 +12,17 @@ function CategoryModal({ isOpen, onClose, onSave, initialName, initialColor, isE
 
     useEffect(() => {
         if (isOpen) {
-            setName(initialName || '');
+            setTitle(initialTitle || '');
             setSelectedColor(initialColor || '');
             setError('');
             fetchAvailableColors();
         }
-    }, [isOpen, initialName, initialColor]);
+    }, [isOpen, initialTitle, initialColor]);
 
     const fetchAvailableColors = async () => {
         setLoadingColors(true);
         try {
-            const response = await api.get('/categories/colors/available');
+            const response = await api.get('/bullion-names/colors/available');
             const colors = response.data.data || [];
             setAvailableColors(colors);
 
@@ -46,16 +46,16 @@ function CategoryModal({ isOpen, onClose, onSave, initialName, initialColor, isE
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        const trimmedName = name.trim();
-        if (!trimmedName) {
-            setError('Название категории обязательно');
+        const trimmedTitle = title.trim();
+        if (!trimmedTitle) {
+            setError('Название наименования обязательно');
             return;
         }
-        if (trimmedName.length < 2) {
+        if (trimmedTitle.length < 2) {
             setError('Название должно содержать минимум 2 символа');
             return;
         }
-        if (trimmedName.length > 100) {
+        if (trimmedTitle.length > 100) {
             setError('Название не должно превышать 100 символов');
             return;
         }
@@ -69,10 +69,10 @@ function CategoryModal({ isOpen, onClose, onSave, initialName, initialColor, isE
         setError('');
 
         try {
-            await onSave(trimmedName, selectedColor);
+            await onSave(trimmedTitle, selectedColor);
             onClose();
         } catch (err) {
-            setError(err.response?.data?.message || 'Ошибка сохранения категории');
+            setError(err.response?.data?.message || 'Ошибка сохранения наименования');
         } finally {
             setSaving(false);
         }
@@ -84,18 +84,18 @@ function CategoryModal({ isOpen, onClose, onSave, initialName, initialColor, isE
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
-                    <h2>{isEditing ? 'Редактирование категории' : 'Добавление категории'}</h2>
+                    <h2>{isEditing ? 'Редактирование наименования' : 'Добавление наименования'}</h2>
                     <button className="modal-close" onClick={onClose}>×</button>
                 </div>
 
                 <form onSubmit={handleSubmit}>
                     <div className="modal-body">
                         <div className="form-group">
-                            <label>Название категории</label>
+                            <label>Название наименования</label>
                             <input
                                 type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
                                 placeholder="например: Продукты, Транспорт, Зарплата"
                                 autoFocus
                             />
@@ -105,7 +105,7 @@ function CategoryModal({ isOpen, onClose, onSave, initialName, initialColor, isE
                         </div>
 
                         <div className="form-group">
-                            <label>Цвет категории</label>
+                            <label>Цвет наименования</label>
                             {loadingColors ? (
                                 <div className="colors-loading">Загрузка цветов...</div>
                             ) : (
@@ -124,7 +124,7 @@ function CategoryModal({ isOpen, onClose, onSave, initialName, initialColor, isE
                                     </div>
                                     {availableColors.length === 0 && (
                                         <div className="color-warning">
-                                            ⚠️ Все цвета заняты! Удалите или измените существующие категории.
+                                            ⚠️ Все цвета заняты! Удалите или измените существующие наименования.
                                         </div>
                                     )}
                                     <div className="color-info">
@@ -161,4 +161,4 @@ function CategoryModal({ isOpen, onClose, onSave, initialName, initialColor, isE
     );
 }
 
-export default CategoryModal;
+export default BullionNameModal;

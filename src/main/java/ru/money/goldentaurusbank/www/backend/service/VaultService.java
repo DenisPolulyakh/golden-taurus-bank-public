@@ -245,11 +245,11 @@ public class VaultService {
                 .map(Bullion::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        List<VaultSummaryResponse.BullionByCategoryResponse> bullionResponses = bullions.stream()
-                .map(b -> VaultSummaryResponse.BullionByCategoryResponse.builder()
+        List<VaultSummaryResponse.BullionByBullionNameResponse> bullionResponses = bullions.stream()
+                .map(b -> VaultSummaryResponse.BullionByBullionNameResponse.builder()
                         .id(b.getId())
-                        .categoryId(b.getCategory().getId())
-                        .categoryName(b.getCategory().getName())
+                        .bullionNameId(b.getBullionName().getId())
+                        .bullionNameTitle(b.getBullionName().getTitle())
                         .amount(b.getAmount())
                         .description(b.getDescription())
                         .build())
@@ -262,7 +262,7 @@ public class VaultService {
                 .vaultName(vault.getName())
                 .totalAmount(totalAmount)
                 .interestRate(vault.getInterestRate())
-                .categoriesCount(bullions.size())
+                .bullionNamesCount(bullions.size())
                 .bullions(bullionResponses)
                 .build();
     }

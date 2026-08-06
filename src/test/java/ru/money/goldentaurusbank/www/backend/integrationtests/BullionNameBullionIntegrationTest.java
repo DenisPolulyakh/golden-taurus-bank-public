@@ -28,7 +28,7 @@ import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.GroupedBullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.VaultSummaryResponse;
 import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
-import ru.money.goldentaurusbank.www.backend.repository.CategoryRepository;
+import ru.money.goldentaurusbank.www.backend.repository.BullionNameRepository;
 import ru.money.goldentaurusbank.www.backend.repository.UserRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
 
@@ -46,7 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Testcontainers
 @Transactional
 @DisplayName("Интеграционные тесты слитков")
-class CategoryBullionIntegrationTest {
+class BullionNameBullionIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -58,7 +58,7 @@ class CategoryBullionIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private CategoryRepository categoryRepository;
+    private BullionNameRepository bullionNameRepository;
 
     @Autowired
     private VaultRepository vaultRepository;
@@ -105,15 +105,15 @@ class CategoryBullionIntegrationTest {
 
     private String accessToken;
     private Long userId;
-    private Long categoryId1;
-    private Long categoryId2;
+    private Long bullionNameId1;
+    private Long bullionNameId2;
     private Long vaultId1;
     private Long vaultId2;
 
     @BeforeEach
     void setUp() throws Exception {
         userRepository.deleteAll();
-        categoryRepository.deleteAll();
+        bullionNameRepository.deleteAll();
         vaultRepository.deleteAll();
         bullionRepository.deleteAll();
 
@@ -151,30 +151,30 @@ class CategoryBullionIntegrationTest {
         JsonNode jsonNode = objectMapper.readTree(responseBody);
         accessToken = jsonNode.get("data").get("token").asText();
 
-        String createCategoryRequest1 = """
+        String createBullionNameRequest1 = """
                 {
-                    "name": "Финансовая подушка"
+                    "title": "Финансовая подушка"
                 }
                 """;
-        MvcResult categoryResult1 = mockMvc.perform(post("/api/categories")
+        MvcResult bullionNameResult1 = mockMvc.perform(post("/api/bullion-names")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createCategoryRequest1))
+                        .content(createBullionNameRequest1))
                 .andReturn();
-        categoryId1 = objectMapper.readTree(categoryResult1.getResponse().getContentAsString())
+        bullionNameId1 = objectMapper.readTree(bullionNameResult1.getResponse().getContentAsString())
                 .get("data").get("id").asLong();
 
-        String createCategoryRequest2 = """
+        String createBullionNameRequest2 = """
                 {
-                    "name": "Накопления"
+                    "title": "Накопления"
                 }
                 """;
-        MvcResult categoryResult2 = mockMvc.perform(post("/api/categories")
+        MvcResult bullionNameResult2 = mockMvc.perform(post("/api/bullion-names")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createCategoryRequest2))
+                        .content(createBullionNameRequest2))
                 .andReturn();
-        categoryId2 = objectMapper.readTree(categoryResult2.getResponse().getContentAsString())
+        bullionNameId2 = objectMapper.readTree(bullionNameResult2.getResponse().getContentAsString())
                 .get("data").get("id").asLong();
 
         String createVaultRequest1 = """
@@ -211,13 +211,13 @@ class CategoryBullionIntegrationTest {
     void createBullionSuccess() throws Exception {
         String request = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 100000,
                     "description": "На чёрный день",
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1);
+                """.formatted(bullionNameId1, vaultId1);
 
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
@@ -234,12 +234,12 @@ class CategoryBullionIntegrationTest {
     void createBullionDuplicateUpdatesAmount() throws Exception {
         String request1 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 100000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1);
+                """.formatted(bullionNameId1, vaultId1);
 
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
@@ -249,12 +249,12 @@ class CategoryBullionIntegrationTest {
 
         String request2 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 50000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1);
+                """.formatted(bullionNameId1, vaultId1);
 
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
@@ -271,12 +271,12 @@ class CategoryBullionIntegrationTest {
     void getGroupedBullionsSuccess() throws Exception {
         String createBullion1 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 100000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1);
+                """.formatted(bullionNameId1, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -285,12 +285,12 @@ class CategoryBullionIntegrationTest {
 
         String createBullion2 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 50000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId2);
+                """.formatted(bullionNameId1, vaultId2);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -299,12 +299,12 @@ class CategoryBullionIntegrationTest {
 
         String createBullion3 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 75000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId2, vaultId1);
+                """.formatted(bullionNameId2, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -321,8 +321,8 @@ class CategoryBullionIntegrationTest {
                 .andExpect(jsonPath("$.data.totalAmount").exists())
                 .andExpect(jsonPath("$.data.totalAmount").value(225000))
                 .andExpect(jsonPath("$.data.averageRate").value(5.22))
-                .andExpect(jsonPath("$.data.categoryBullionList").isArray())
-                .andExpect(jsonPath("$.data.categoryBullionList.length()").value(2))
+                .andExpect(jsonPath("$.data.bullionNameBullionList").isArray())
+                .andExpect(jsonPath("$.data.bullionNameBullionList.length()").value(2))
                 .andReturn();
 
 
@@ -334,35 +334,35 @@ class CategoryBullionIntegrationTest {
         BigDecimal averageRate = new BigDecimal(jsonNode.get("data").get("averageRate").asText());
 
         // Получаем список категорий
-        List<GroupedBullionResponse.CategoryBullion> categoryBullionList = objectMapper.convertValue(
-                jsonNode.get("data").get("categoryBullionList"),
-                new TypeReference<List<GroupedBullionResponse.CategoryBullion>>() {}
+        List<GroupedBullionResponse.BullionNameBullion> bullionNameBullionList = objectMapper.convertValue(
+                jsonNode.get("data").get("bullionNameBullionList"),
+                new TypeReference<List<GroupedBullionResponse.BullionNameBullion>>() {}
         );
 
         // Проверяем общую сумму
         assertThat(totalAmount).isEqualByComparingTo(new BigDecimal("225000"));
 
         // Проверяем первую категорию
-        GroupedBullionResponse.CategoryBullion group1 = categoryBullionList.stream()
-                .filter(g -> g.getCategoryId().equals(categoryId1))
+        GroupedBullionResponse.BullionNameBullion group1 = bullionNameBullionList.stream()
+                .filter(g -> g.getBullionNameId().equals(bullionNameId1))
                 .findFirst()
                 .orElse(null);
 
         assertThat(group1).isNotNull();
-        assertThat(group1.getCategoryName()).isNotEmpty();
-        assertThat(group1.getCategoryAmount()).isEqualByComparingTo(new BigDecimal("150000"));
-        assertThat(group1.getCategoryAverageRate()).isEqualByComparingTo(new BigDecimal("5.33"));
+        assertThat(group1.getBullionNameTitle()).isNotEmpty();
+        assertThat(group1.getBullionNameAmount()).isEqualByComparingTo(new BigDecimal("150000"));
+        assertThat(group1.getBullionNameAverageRate()).isEqualByComparingTo(new BigDecimal("5.33"));
         assertThat(group1.getVaults()).hasSize(2);
 
         // Проверяем хранилища в первой категории
-        GroupedBullionResponse.CategoryBullion.VaultInfo vault1 = group1.getVaults().stream()
+        GroupedBullionResponse.BullionNameBullion.VaultInfo vault1 = group1.getVaults().stream()
                 .filter(v -> v.getId().equals(vaultId1))
                 .findFirst()
                 .orElse(null);
         assertThat(vault1).isNotNull();
         assertThat(vault1.getAmount()).isEqualByComparingTo(new BigDecimal("100000"));
 
-        GroupedBullionResponse.CategoryBullion.VaultInfo vault2 = group1.getVaults().stream()
+        GroupedBullionResponse.BullionNameBullion.VaultInfo vault2 = group1.getVaults().stream()
                 .filter(v -> v.getId().equals(vaultId2))
                 .findFirst()
                 .orElse(null);
@@ -370,18 +370,18 @@ class CategoryBullionIntegrationTest {
         assertThat(vault2.getAmount()).isEqualByComparingTo(new BigDecimal("50000"));
 
         // Проверяем вторую категорию
-        GroupedBullionResponse.CategoryBullion group2 = categoryBullionList.stream()
-                .filter(g -> g.getCategoryId().equals(categoryId2))
+        GroupedBullionResponse.BullionNameBullion group2 = bullionNameBullionList.stream()
+                .filter(g -> g.getBullionNameId().equals(bullionNameId2))
                 .findFirst()
                 .orElse(null);
 
         assertThat(group2).isNotNull();
-        assertThat(group2.getCategoryName()).isNotEmpty();
-        assertThat(group2.getCategoryAmount()).isEqualByComparingTo(new BigDecimal("75000"));
+        assertThat(group2.getBullionNameTitle()).isNotEmpty();
+        assertThat(group2.getBullionNameAmount()).isEqualByComparingTo(new BigDecimal("75000"));
         assertThat(group2.getVaults()).hasSize(1);
 
         // Проверяем хранилище во второй категории
-        GroupedBullionResponse.CategoryBullion.VaultInfo vaultInGroup2 = group2.getVaults().stream()
+        GroupedBullionResponse.BullionNameBullion.VaultInfo vaultInGroup2 = group2.getVaults().stream()
                 .filter(v -> v.getId().equals(vaultId1))
                 .findFirst()
                 .orElse(null);
@@ -396,13 +396,13 @@ class CategoryBullionIntegrationTest {
     void getVaultSummarySuccess() throws Exception {
         String createBullion1 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 100000,
                     "description": "Описание 1",
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1);
+                """.formatted(bullionNameId1, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -411,13 +411,13 @@ class CategoryBullionIntegrationTest {
 
         String createBullion2 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 75000,
                     "description": "Описание 2",
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId2, vaultId1);
+                """.formatted(bullionNameId2, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -434,7 +434,7 @@ class CategoryBullionIntegrationTest {
                 .andExpect(jsonPath("$.data.vaultId").value(vaultId1))
                 .andExpect(jsonPath("$.data.vaultName").value("Сбербанк"))
                 .andExpect(jsonPath("$.data.totalAmount").value(175000))
-                .andExpect(jsonPath("$.data.categoriesCount").value(2))
+                .andExpect(jsonPath("$.data.bullionNamesCount").value(2))
                 .andExpect(jsonPath("$.data.bullions").isArray())
                 .andExpect(jsonPath("$.data.bullions.length()").value(2))
                 .andReturn();
@@ -464,12 +464,12 @@ class CategoryBullionIntegrationTest {
     void getTotalAmountSuccess() throws Exception {
         String createBullion1 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 100000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1);
+                """.formatted(bullionNameId1, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -478,12 +478,12 @@ class CategoryBullionIntegrationTest {
 
         String createBullion2 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 50000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId2, vaultId1);
+                """.formatted(bullionNameId2, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -502,12 +502,12 @@ class CategoryBullionIntegrationTest {
     void getAllBullionsSuccess() throws Exception {
         String createBullion1 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 100000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1);
+                """.formatted(bullionNameId1, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -516,12 +516,12 @@ class CategoryBullionIntegrationTest {
 
         String createBullion2 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 50000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId2, vaultId1);
+                """.formatted(bullionNameId2, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -541,13 +541,13 @@ class CategoryBullionIntegrationTest {
     void updateBullionSuccess() throws Exception {
         String createRequest = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 100000,
                     "description": "Старое описание",
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1);
+                """.formatted(bullionNameId1, vaultId1);
 
         MvcResult createResult = mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
@@ -560,13 +560,13 @@ class CategoryBullionIntegrationTest {
 
         String updateRequest = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 150000,
                     "description": "Новое описание",
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1);
+                """.formatted(bullionNameId1, vaultId1);
 
         mockMvc.perform(put("/api/bullions/{bullionId}", bullionId)
                         .header("Authorization", "Bearer " + accessToken)
@@ -583,12 +583,12 @@ class CategoryBullionIntegrationTest {
     void deleteBullionSuccess() throws Exception {
         String createRequest = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 100000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1);
+                """.formatted(bullionNameId1, vaultId1);
 
         MvcResult createResult = mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
@@ -620,22 +620,22 @@ class CategoryBullionIntegrationTest {
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.categoryBullionList").isArray())
-                .andExpect(jsonPath("$.data.categoryBullionList.length()").value(0))
+                .andExpect(jsonPath("$.data.bullionNameBullionList").isArray())
+                .andExpect(jsonPath("$.data.bullionNameBullionList.length()").value(0))
                 .andReturn();
     }
 
     @Test
     @DisplayName("Получение группированных слитков - несколько категорий в одном хранилище")
-    void getGroupedBullionsMultipleCategoriesOneVault() throws Exception {
+    void getGroupedBullionsMultipleBullionNamesOneVault() throws Exception {
         String createBullion1 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 100000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1);
+                """.formatted(bullionNameId1, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -644,12 +644,12 @@ class CategoryBullionIntegrationTest {
 
         String createBullion2 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 75000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId2, vaultId1);
+                """.formatted(bullionNameId2, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -665,45 +665,45 @@ class CategoryBullionIntegrationTest {
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.totalAmount").exists())
                 .andExpect(jsonPath("$.data.averageRate").exists())
-                .andExpect(jsonPath("$.data.categoryBullionList").isArray())
-                .andExpect(jsonPath("$.data.categoryBullionList.length()").value(2))
+                .andExpect(jsonPath("$.data.bullionNameBullionList").isArray())
+                .andExpect(jsonPath("$.data.bullionNameBullionList.length()").value(2))
                 .andReturn();
 
         String responseBody = result.getResponse().getContentAsString();
         JsonNode jsonNode = objectMapper.readTree(responseBody);
 
         // Получаем список категорий
-        List<GroupedBullionResponse.CategoryBullion> categoryBullionList = objectMapper.convertValue(
-                jsonNode.get("data").get("categoryBullionList"),
-                new TypeReference<List<GroupedBullionResponse.CategoryBullion>>() {}
+        List<GroupedBullionResponse.BullionNameBullion> bullionNameBullionList = objectMapper.convertValue(
+                jsonNode.get("data").get("bullionNameBullionList"),
+                new TypeReference<List<GroupedBullionResponse.BullionNameBullion>>() {}
         );
 
-        assertThat(categoryBullionList).hasSize(2);
-        assertThat(categoryBullionList).extracting(GroupedBullionResponse.CategoryBullion::getCategoryName)
+        assertThat(bullionNameBullionList).hasSize(2);
+        assertThat(bullionNameBullionList).extracting(GroupedBullionResponse.BullionNameBullion::getBullionNameTitle)
                 .containsExactlyInAnyOrder("Финансовая подушка", "Накопления");
 
         // Проверяем, что у обоих категорий vaults содержит одно хранилище
-        for (GroupedBullionResponse.CategoryBullion category : categoryBullionList) {
-            assertThat(category.getVaults()).hasSize(1);
-            assertThat(category.getVaults().get(0).getId()).isEqualTo(vaultId1);
-            assertThat(category.getVaults().get(0).getName()).isNotEmpty();
+        for (GroupedBullionResponse.BullionNameBullion bullionName : bullionNameBullionList) {
+            assertThat(bullionName.getVaults()).hasSize(1);
+            assertThat(bullionName.getVaults().get(0).getId()).isEqualTo(vaultId1);
+            assertThat(bullionName.getVaults().get(0).getName()).isNotEmpty();
         }
 
         // Проверяем сумму первой категории
-        GroupedBullionResponse.CategoryBullion category1 = categoryBullionList.stream()
-                .filter(c -> c.getCategoryId().equals(categoryId1))
+        GroupedBullionResponse.BullionNameBullion bullionName1 = bullionNameBullionList.stream()
+                .filter(c -> c.getBullionNameId().equals(bullionNameId1))
                 .findFirst()
                 .orElse(null);
-        assertThat(category1).isNotNull();
-        assertThat(category1.getCategoryAmount()).isEqualByComparingTo(new BigDecimal("100000"));
+        assertThat(bullionName1).isNotNull();
+        assertThat(bullionName1.getBullionNameAmount()).isEqualByComparingTo(new BigDecimal("100000"));
 
         // Проверяем сумму второй категории
-        GroupedBullionResponse.CategoryBullion category2 = categoryBullionList.stream()
-                .filter(c -> c.getCategoryId().equals(categoryId2))
+        GroupedBullionResponse.BullionNameBullion bullionName2 = bullionNameBullionList.stream()
+                .filter(c -> c.getBullionNameId().equals(bullionNameId2))
                 .findFirst()
                 .orElse(null);
-        assertThat(category2).isNotNull();
-        assertThat(category2.getCategoryAmount()).isEqualByComparingTo(new BigDecimal("75000"));
+        assertThat(bullionName2).isNotNull();
+        assertThat(bullionName2.getBullionNameAmount()).isEqualByComparingTo(new BigDecimal("75000"));
 
         // Проверяем общую сумму
         BigDecimal totalAmount = new BigDecimal(jsonNode.get("data").get("totalAmount").asText());
@@ -720,7 +720,7 @@ class CategoryBullionIntegrationTest {
                 .andExpect(jsonPath("$.data.id").value(vaultId1))
                 .andExpect(jsonPath("$.data.name").value("Сбербанк"))
                 .andExpect(jsonPath("$.data.totalAmount").value(0))
-                .andExpect(jsonPath("$.data.categoriesCount").value(0));
+                .andExpect(jsonPath("$.data.bullionNamesCount").value(0));
     }
 
     @Test
@@ -728,12 +728,12 @@ class CategoryBullionIntegrationTest {
     void getVaultSummaryMultipleBullions() throws Exception {
         String createBullion1 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 100000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1);
+                """.formatted(bullionNameId1, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -742,12 +742,12 @@ class CategoryBullionIntegrationTest {
 
         String createBullion2 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 50000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1);
+                """.formatted(bullionNameId1, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -762,7 +762,7 @@ class CategoryBullionIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.totalAmount").value(150000))
-                .andExpect(jsonPath("$.data.categoriesCount").value(1))
+                .andExpect(jsonPath("$.data.bullionNamesCount").value(1))
                 .andExpect(jsonPath("$.data.bullions.length()").value(1))
                 .andExpect(jsonPath("$.data.bullions[0].amount").value(150000))
                 .andReturn();
@@ -770,15 +770,15 @@ class CategoryBullionIntegrationTest {
 
     @Test
     @DisplayName("Получение сводки по хранилищу - несколько категорий")
-    void getVaultSummaryMultipleCategories() throws Exception {
+    void getVaultSummaryMultipleBullionNames() throws Exception {
         String createBullion1 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 100000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1);
+                """.formatted(bullionNameId1, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -787,12 +787,12 @@ class CategoryBullionIntegrationTest {
 
         String createBullion2 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 75000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId2, vaultId1);
+                """.formatted(bullionNameId2, vaultId1);
         mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -807,7 +807,7 @@ class CategoryBullionIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.totalAmount").value(175000))
-                .andExpect(jsonPath("$.data.categoriesCount").value(2))
+                .andExpect(jsonPath("$.data.bullionNamesCount").value(2))
                 .andExpect(jsonPath("$.data.bullions.length()").value(2))
                 .andReturn();
 
@@ -819,7 +819,7 @@ class CategoryBullionIntegrationTest {
         );
 
         assertThat(summary.getBullions()).hasSize(2);
-        assertThat(summary.getBullions()).extracting(VaultSummaryResponse.BullionByCategoryResponse::getCategoryName)
+        assertThat(summary.getBullions()).extracting(VaultSummaryResponse.BullionByBullionNameResponse::getBullionNameTitle)
                 .containsExactlyInAnyOrder("Финансовая подушка", "Накопления");
     }
 }

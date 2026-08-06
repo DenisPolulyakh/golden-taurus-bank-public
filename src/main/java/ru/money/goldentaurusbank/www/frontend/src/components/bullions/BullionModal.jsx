@@ -6,18 +6,18 @@ function BullionModal({
                           isOpen,
                           onClose,
                           onSave,
-                          initialCategoryId,
+                          initialBullionNameId,
                           initialVaultId,
                           initialAmount,
                           initialDescription,
                           isEditing,
-                          initialCategoryName,
+                          initialBullionNameTitle,
                           initialDateOperation,
                           allowedChangeAmount = true // 👈 ДОБАВИТЬ ЭТОТ ПРОПС
                       }) {
-    const [categories, setCategories] = useState([]);
+    const [bullionNames, setBullionNames] = useState([]);
     const [vaults, setVaults] = useState([]);
-    const [categoryId, setCategoryId] = useState('');
+    const [bullionNameId, setBullionNameId] = useState('');
     const [vaultId, setVaultId] = useState('');
     const [amount, setAmount] = useState('');
     const [amountDisplay, setAmountDisplay] = useState('');
@@ -72,17 +72,17 @@ function BullionModal({
     useEffect(() => {
         if (isOpen) {
             if (!isEditing) {
-                fetchCategories();
+                fetchBullionNames();
                 fetchVaults();
             } else {
                 fetchVaults();
             }
 
             if (isEditing) {
-                setCategoryId(initialCategoryId || '');
+                setBullionNameId(initialBullionNameId || '');
                 setVaultId(initialVaultId || '');
             } else {
-                setCategoryId(initialCategoryId || '');
+                setBullionNameId(initialBullionNameId || '');
                 setVaultId(initialVaultId || '');
             }
 
@@ -152,14 +152,14 @@ function BullionModal({
             setDescription(initialDescription || '');
             setError('');
         }
-    }, [isOpen, initialCategoryId, initialVaultId, initialAmount, initialDescription, isEditing, initialDateOperation]);
+    }, [isOpen, initialBullionNameId, initialVaultId, initialAmount, initialDescription, isEditing, initialDateOperation]);
 
-    const fetchCategories = async () => {
+    const fetchBullionNames = async () => {
         try {
-            const response = await api.get('/categories?sortBy=name&sortOrder=asc&size=100');
-            setCategories(response.data.data || []);
+            const response = await api.get('/bullion-names?sortBy=title&sortOrder=asc&size=100');
+            setBullionNames(response.data.data || []);
         } catch (err) {
-            console.error('Ошибка загрузки категорий:', err);
+            console.error('Ошибка загрузки наименований:', err);
         }
     };
 
@@ -176,8 +176,8 @@ function BullionModal({
         e.preventDefault();
 
         if (!isEditing) {
-            if (!categoryId) {
-                setError('Выберите категорию');
+            if (!bullionNameId) {
+                setError('Выберите наименование');
                 return;
             }
             if (!vaultId) {
@@ -208,7 +208,7 @@ function BullionModal({
 
         try {
             await onSave(
-                isEditing ? initialCategoryId : parseInt(categoryId),
+                isEditing ? initialBullionNameId : parseInt(bullionNameId),
                 isEditing ? parseInt(initialVaultId) : parseInt(vaultId),
                 amountNum,
                 description.trim() || null,
@@ -242,14 +242,14 @@ function BullionModal({
                         {isEditing ? (
                             <>
                                 <div className="form-group">
-                                    <label>Категория</label>
+                                    <label>Наименование</label>
                                     <input
                                         type="text"
-                                        value={initialCategoryName || ''}
+                                        value={initialBullionNameTitle || ''}
                                         disabled
                                         className="disabled-input"
                                     />
-                                    <small className="input-hint">Категорию нельзя изменить</small>
+                                    <small className="input-hint">Наименование нельзя изменить</small>
                                 </div>
 
                                 <div className="form-group">
@@ -266,15 +266,15 @@ function BullionModal({
                         ) : (
                             <>
                                 <div className="form-group">
-                                    <label>Категория *</label>
+                                    <label>Наименование *</label>
                                     <select
-                                        value={categoryId}
-                                        onChange={(e) => setCategoryId(e.target.value)}
+                                        value={bullionNameId}
+                                        onChange={(e) => setBullionNameId(e.target.value)}
                                         required
                                     >
-                                        <option value="">Выберите категорию</option>
-                                        {categories.map(cat => (
-                                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                        <option value="">Выберите наименование</option>
+                                        {bullionNames.map(bn => (
+                                            <option key={bn.id} value={bn.id}>{bn.title}</option>
                                         ))}
                                     </select>
                                 </div>

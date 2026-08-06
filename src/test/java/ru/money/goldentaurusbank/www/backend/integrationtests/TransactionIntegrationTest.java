@@ -50,7 +50,7 @@ class TransactionIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private CategoryRepository categoryRepository;
+    private BullionNameRepository bullionNameRepository;
 
     @Autowired
     private VaultRepository vaultRepository;
@@ -96,8 +96,8 @@ class TransactionIntegrationTest {
 
     private String accessToken;
     private Long userId;
-    private Long categoryId1;
-    private Long categoryId2;
+    private Long bullionNameId1;
+    private Long bullionNameId2;
     private Long vaultId1;
     private Long vaultId2;
     private Long bullionId1;
@@ -106,7 +106,7 @@ class TransactionIntegrationTest {
     @BeforeEach
     void setUp() throws Exception {
         userRepository.deleteAll();
-        categoryRepository.deleteAll();
+        bullionNameRepository.deleteAll();
         vaultRepository.deleteAll();
         bullionRepository.deleteAll();
         transactionLogRepository.deleteAll();
@@ -146,31 +146,31 @@ class TransactionIntegrationTest {
         JsonNode jsonNode = objectMapper.readTree(responseBody);
         accessToken = jsonNode.get("data").get("token").asText();
 
-        // 2. Создаем категории
-        String createCategory1 = """
+        // 2. Создаем наименования слитков
+        String createBullionName1 = """
                 {
-                    "name": "Финансовая подушка"
+                    "title": "Финансовая подушка"
                 }
                 """;
-        MvcResult catResult1 = mockMvc.perform(post("/api/categories")
+        MvcResult catResult1 = mockMvc.perform(post("/api/bullion-names")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createCategory1))
+                        .content(createBullionName1))
                 .andReturn();
-        categoryId1 = objectMapper.readTree(catResult1.getResponse().getContentAsString())
+        bullionNameId1 = objectMapper.readTree(catResult1.getResponse().getContentAsString())
                 .get("data").get("id").asLong();
 
-        String createCategory2 = """
+        String createBullionName2 = """
                 {
-                    "name": "Накопления"
+                    "title": "Накопления"
                 }
                 """;
-        MvcResult catResult2 = mockMvc.perform(post("/api/categories")
+        MvcResult catResult2 = mockMvc.perform(post("/api/bullion-names")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createCategory2))
+                        .content(createBullionName2))
                 .andReturn();
-        categoryId2 = objectMapper.readTree(catResult2.getResponse().getContentAsString())
+        bullionNameId2 = objectMapper.readTree(catResult2.getResponse().getContentAsString())
                 .get("data").get("id").asLong();
 
         // 3. Создаем хранилища
@@ -203,12 +203,12 @@ class TransactionIntegrationTest {
         // 4. Создаем слитки
         String createBullion1 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 100000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1);
+                """.formatted(bullionNameId1, vaultId1);
         MvcResult bullionResult1 = mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -219,12 +219,12 @@ class TransactionIntegrationTest {
 
         String createBullion2 = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": 50000,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId2, vaultId2);
+                """.formatted(bullionNameId2, vaultId2);
         MvcResult bullionResult2 = mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -432,13 +432,13 @@ class TransactionIntegrationTest {
 
         String request = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": %d,
                     "batchId": %d,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1, amount, batchId);
+                """.formatted(bullionNameId1, vaultId1, amount, batchId);
 
         mockMvc.perform(post("/api/bullions/refill")
                         .header("Authorization", "Bearer " + accessToken)
@@ -452,13 +452,13 @@ class TransactionIntegrationTest {
 
         String request = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": %d,
                     "batchId": %d,
                     "dateOperation": "2026-07-20T12:00:00"
                 }
-                """.formatted(categoryId1, vaultId1, amount, batchId);
+                """.formatted(bullionNameId1, vaultId1, amount, batchId);
 
         mockMvc.perform(post("/api/bullions/withdraw")
                         .header("Authorization", "Bearer " + accessToken)

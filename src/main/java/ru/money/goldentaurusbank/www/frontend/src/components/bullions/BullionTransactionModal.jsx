@@ -72,7 +72,7 @@ function BullionTransactionModal({
         })
         .map(target => ({
             value: target.id,
-            label: `${target.categoryName} | ${target.vaultName} | ${formatAmount(target.amount)} ₽`,
+            label: `${target.bullionNameTitle} | ${target.vaultName} | ${formatAmount(target.amount)} ₽`,
             data: target
         }));
 
@@ -80,7 +80,7 @@ function BullionTransactionModal({
         .filter(b => b.allowedTransfer !== false)
         .map(b => ({
             value: b.id,
-            label: `${b.categoryName} | ${b.vaultName} | ${formatAmount(b.amount)} ₽`,
+            label: `${b.bullionNameTitle} | ${b.vaultName} | ${formatAmount(b.amount)} ₽`,
             data: b
         }));
 
@@ -431,7 +431,7 @@ function BullionTransactionModal({
                         {isTransferModal && selectedFromOption && (
                             <div className="transaction-bullion-info">
                                 <span className="info-label">📤 Откуда:</span>
-                                <span className="info-value">{selectedFromOption.data?.categoryName} | {selectedFromOption.data?.vaultName}</span>
+                                <span className="info-value">{selectedFromOption.data?.bullionNameTitle} | {selectedFromOption.data?.vaultName}</span>
                                 <span className="info-label" style={{ marginLeft: '16px' }}>
                                     Доступно: {formatAmount(maxTransferAmount)} ₽
                                 </span>
@@ -455,12 +455,12 @@ function BullionTransactionModal({
                                             onChange={handleFromSelect}
                                             placeholder="Выберите слиток-отправитель..."
                                             isClearable
-                                            noOptionsMessage={() => "Нет доступных слитков в этой категории"}
+                                            noOptionsMessage={() => "Нет доступных слитков в этом наименовании"}
                                             className="react-select-container"
                                             classNamePrefix="react-select"
                                             formatOptionLabel={(option) => (
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                    <span>{option.data?.categoryName}</span>
+                                                    <span>{option.data?.bullionNameTitle}</span>
                                                     <span style={{ color: '#718096', fontSize: '13px' }}>
                                                         {option.data?.vaultName}
                                                     </span>
@@ -514,7 +514,7 @@ function BullionTransactionModal({
                                         classNamePrefix="react-select"
                                         formatOptionLabel={(option) => (
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <span>{option.data?.categoryName}</span>
+                                                <span>{option.data?.bullionNameTitle}</span>
                                                 <span style={{ color: '#718096', fontSize: '13px' }}>
                                                     {option.data?.vaultName}
                                                 </span>
@@ -534,8 +534,8 @@ function BullionTransactionModal({
                                         <div className="target-info-title">📥 Выбран получатель:</div>
                                         <div className="target-info-details">
                                             <div className="target-info-row">
-                                                <span className="target-info-label">Категория:</span>
-                                                <span className="target-info-value">{selectedTargetOption.data?.categoryName}</span>
+                                                <span className="target-info-label">Наименование:</span>
+                                                <span className="target-info-value">{selectedTargetOption.data?.bullionNameTitle}</span>
                                             </div>
                                             <div className="target-info-row">
                                                 <span className="target-info-label">Хранилище:</span>

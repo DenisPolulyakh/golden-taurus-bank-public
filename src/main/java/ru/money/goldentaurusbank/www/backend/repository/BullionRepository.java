@@ -4,7 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import ru.money.goldentaurusbank.www.backend.model.domain.Bullion;
-import ru.money.goldentaurusbank.www.backend.model.domain.Category;
+import ru.money.goldentaurusbank.www.backend.model.domain.BullionName;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.domain.Vault;
 
@@ -23,20 +23,20 @@ public interface BullionRepository extends JpaRepository<Bullion, Long> {
     void deleteByIdAndUser(Long id, User user);
 
 
-    Optional<Bullion> findByUserAndCategoryIdAndVaultId(User user, Long categoryId, Long vaultId);
+    Optional<Bullion> findByUserAndBullionNameIdAndVaultId(User user, Long bullionNameId, Long vaultId);
 
 
     @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user = :user")
     BigDecimal getTotalAmountByUser(@Param("user") User user);
 
 
-    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user = :user and b.category = :category")
-    BigDecimal getTotalAmountByUserAndCategory(@Param("user") User user, @Param("category") Category category);
+    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user = :user and b.bullionName = :bullionName")
+    BigDecimal getTotalAmountByUserAndBullionName(@Param("user") User user, @Param("bullionName") BullionName bullionName);
 
-    Optional<Bullion> findByVaultAndCategory(Vault vault, Category category);
+    Optional<Bullion> findByVaultAndBullionName(Vault vault, BullionName bullionName);
 
 
-    boolean existsByCategoryIdAndUserId(Long categoryId, Long userId);
+    boolean existsByBullionNameIdAndUserId(Long bullionNameId, Long userId);
     @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user.id = :userId")
     BigDecimal getTotalAmountByUserId(@Param("userId") Long userId);
 }
