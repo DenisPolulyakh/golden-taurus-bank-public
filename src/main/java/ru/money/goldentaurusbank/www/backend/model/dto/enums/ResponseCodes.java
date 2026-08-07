@@ -44,6 +44,7 @@ public enum ResponseCodes {
     INVALID_COLOR(4010,"Недопустимый цвет. Выберите цвет из предложенных", HttpStatus.BAD_REQUEST),
     COLOR_ALREADY_USE(4011,"Этот цвет уже используется в другом наименовании", HttpStatus.BAD_REQUEST),
     BULLION_NAME_LINKED(4012, "Наименование привязано к слитку, сначала удалите слиток",HttpStatus.BAD_REQUEST),
+    TRANSACTION_ALREADY_REVERSED(4013, "Транзакция уже откачена", HttpStatus.BAD_REQUEST),
 
 
     // Системные ошибки (5xxx)

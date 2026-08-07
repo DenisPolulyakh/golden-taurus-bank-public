@@ -41,6 +41,8 @@ public class BullionService {
     private static final BigDecimal ONE_HUNDRED = new BigDecimal(100);
     private static final String CREATE_FIRST_BULLION_COMMENT = "Первоначальное создание слитка";
     private static final String REFILL_EXISTS_BULLION_COMMENT = "Пополнение существующего слитка";
+    private static final String UPDATE_AMOUNT_COMMENT = "Ручная корректировка остатка слитка";
+    private static final String DELETE_BULLION_COMMENT = "Удаление слитка";
     private static final Logger log = LoggerFactory.getLogger(BullionService.class);
 
     private final BullionRepository bullionRepository;
@@ -91,28 +93,36 @@ public class BullionService {
         Optional<Bullion> existingBullion = bullionRepository.findByUserAndBullionNameIdAndVaultId(
                 user, request.getBullionNameId(), request.getVaultId());
 
-        if (existingBullion.isPresent()) {
+        if (existingBullion.isPresent() && !existingBullion.get().isArchived()) {
             RefillBullionRequest refillBullionRequest = bullionRequestMapper.toRefillBullionRequest(request, REFILL_EXISTS_BULLION_COMMENT);
             return refillBullion(user, refillBullionRequest);
         }
 
-        Bullion bullion = Bullion.builder()
+        // Архивный слиток возвращается к жизни вместе со своей историей: пара
+        // «наименование + хранилище» уникальна, второй такой слиток не завести.
+        Bullion bullion = existingBullion.orElseGet(() -> Bullion.builder()
                 .bullionName(bullionName)
                 .vault(vault)
                 .amount(BigDecimal.ZERO)
-                .description(request.getDescription())
                 .user(user)
-                .build();
-
+                .build());
+        bullion.setArchived(false);
+        bullion.setDescription(request.getDescription());
         bullionRepository.save(bullion);
-        RefillBullionRequest refillBullionRequest = bullionRequestMapper.toRefillBullionRequest(request, CREATE_FIRST_BULLION_COMMENT);
 
-        return refillBullion(user, refillBullionRequest);
+        // Стартовый остаток не идёт в «Доход за месяц» — иначе месяц создания слитка
+        // показал бы доход на всю сумму уже накопленного.
+        if (request.getAmount() != null && request.getAmount().compareTo(BigDecimal.ZERO) > 0) {
+            transactionService.openingBalance(bullion.getId(), request.getAmount(), user,
+                    CREATE_FIRST_BULLION_COMMENT, atStartOfDay(request.getDateOperation()));
+        }
+
+        return bullionMapper.toResponse(bullion);
     }
 
     @Transactional(readOnly = true)
     public List<BullionResponse> getAllBullions(User user) {
-        return bullionMapper.toResponseList(bullionRepository.findByUserOrderByCreatedAtDesc(user));
+        return bullionMapper.toResponseList(bullionRepository.findByUserAndArchivedFalseOrderByCreatedAtDesc(user));
     }
 
     @Transactional(readOnly = true)
@@ -133,8 +143,15 @@ public class BullionService {
                         BULLION_NOT_FOUND.getMessage()
                 ));
 
+        // Ручная правка суммы оформляется корректирующей транзакцией на дельту:
+        // иначе остаток разъезжается с графиком, который считается по операциям.
         if (request.getAmount() != null) {
-            bullion.setAmount(request.getAmount());
+            BigDecimal delta = request.getAmount().subtract(bullion.getAmount());
+            if (delta.compareTo(BigDecimal.ZERO) > 0) {
+                transactionService.deposit(bullionId, delta, user, UPDATE_AMOUNT_COMMENT, null, null);
+            } else if (delta.compareTo(BigDecimal.ZERO) < 0) {
+                transactionService.withdraw(bullionId, delta.negate(), user, UPDATE_AMOUNT_COMMENT, null, null);
+            }
         }
 
         bullion.setDescription(request.getDescription());
@@ -170,25 +187,18 @@ public class BullionService {
                         BULLION_NOT_FOUND.getMessage()
                 ));
 
-        // If bullion has nonzero amount, treat its deletion as a withdrawal of the full amount
-        if (bullion.getAmount().compareTo(BigDecimal.ZERO) != 0) {
-            WithdrawBullionRequest request = new WithdrawBullionRequest();
-            request.setAmount(bullion.getAmount());
-            request.setBullionNameId(bullion.getBullionName().getId());
-            request.setVaultId(bullion.getVault().getId());
-            request.setDateOperation(LocalDateTime.now());
-            request.setUserComment("Удаление слитка");
-            transactionService.withdrawBullion(request, user, null);
-            // After withdrawal, bullion amount should be zero; flush to ensure state
-            bullionRepository.flush();
+        // Остаток уходит снятием, сам слиток архивируется: физически удалить его нельзя,
+        // на него ссылается история операций.
+        if (bullion.getAmount().compareTo(BigDecimal.ZERO) > 0) {
+            transactionService.withdraw(bullionId, bullion.getAmount(), user, DELETE_BULLION_COMMENT, null, null);
         }
 
-        bullionRepository.deleteByIdAndUser(bullionId, user);
+        transactionService.archive(bullion);
     }
 
     @Transactional(readOnly = true)
     public GroupedBullionResponse getGroupedBullions(User user) {
-        List<Bullion> bullions = bullionRepository.findByUserOrderByCreatedAtDesc(user);
+        List<Bullion> bullions = bullionRepository.findByUserAndArchivedFalseOrderByCreatedAtDesc(user);
 
         Map<Long, List<Bullion>> groupedByBullionName = bullions.stream()
                 .collect(Collectors.groupingBy(b -> b.getBullionName().getId()));
@@ -277,7 +287,7 @@ public class BullionService {
 
     @Transactional(readOnly = true)
     public BigDecimal getAverageRate(User user) {
-        List<Bullion> bullions = bullionRepository.findByUserOrderByCreatedAtDesc(user);
+        List<Bullion> bullions = bullionRepository.findByUserAndArchivedFalseOrderByCreatedAtDesc(user);
 
         if (bullions.isEmpty()) {
             return BigDecimal.ZERO;
@@ -310,16 +320,17 @@ public class BullionService {
                         BULLION_NOT_FOUND.getCode(),
                         BULLION_NOT_FOUND.getMessage()
                 ));
-        if (request.isToLiquidityVault()) {
-            Vault liquidityVault = vaultService.getLiquidityReserve(user);
-            transactionService.transferBullion(bullion.getId(), liquidityVault.getId(), user,request.getDateOperation());
-            log.info("Bullion {} transfer to liquidity reverse id = {}", bullion.getBullionName().getTitle(), liquidityVault.getId());
-        } else {
-            transactionService.transferBullion(bullion.getId(), request.getToVaultId(), user, request.getDateOperation());
-            log.info("Bullion {} transfer to vault id = {}", bullion.getBullionName().getTitle(), request.getToVaultId());
-        }
-        bullionRepository.deleteByIdAndUser(bullionId, user);
-        log.info("Bullion {} deleted", bullionId);
+        Long toVaultId = request.isToLiquidityVault()
+                ? vaultService.getLiquidityReserve(user).getId()
+                : request.getToVaultId();
+
+        // transferBullion сам архивирует исходный слиток после перевода остатка.
+        transactionService.transferBullion(bullion.getId(), toVaultId, user, null, atStartOfDay(request.getDateOperation()));
+        log.info("Bullion {} transferred to vault id = {} and archived", bullion.getBullionName().getTitle(), toVaultId);
+    }
+
+    private static LocalDateTime atStartOfDay(LocalDate date) {
+        return date == null ? null : date.atStartOfDay();
     }
 
     private boolean calculateAllowed(Vault vault) {

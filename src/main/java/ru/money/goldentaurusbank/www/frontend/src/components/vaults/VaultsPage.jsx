@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';  // ← добавлено Link
-import { toast } from 'sonner';
 import api from '../../api/axios';
 import VaultModal from './VaultModal';
 import './Vaults.css';
@@ -21,10 +20,6 @@ function VaultsPage() {
 
     const [sortField, setSortField] = useState('name');
     const [sortOrder, setSortOrder] = useState('asc');
-
-    // Состояния для импорта
-    const [importing, setImporting] = useState(false);
-    const fileInputRef = useRef(null);
 
     const navigate = useNavigate();
     const timeoutRef = useRef(null);
@@ -170,12 +165,6 @@ function VaultsPage() {
     const isLiquidityReserve = (vaultName) => vaultName === LIQUIDITY_RESERVE_NAME;
     const hasAnyActions = vaults.some(v => !isLiquidityReserve(v.name));
 
-    // ==================== ИМПОРТ EXCEL ====================
-
-    const handleImportClick = () => {
-        fileInputRef.current.click();
-    };
-
     const formatAmount = (amount) => {
         if (!amount && amount !== 0) return '0';
         const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -193,54 +182,6 @@ function VaultsPage() {
         return formattedInteger;
     };
 
-    const handleFileChange = async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const fileExt = file.name.split('.').pop().toLowerCase();
-        if (!['xlsx', 'xls'].includes(fileExt)) {
-            toast.error('Пожалуйста, выберите файл с расширением .xlsx или .xls');
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        setImporting(true);
-
-        try {
-            const response = await api.post('/vaults/import', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            });
-
-            const result = response.data.data;
-
-            let description = `Хранилищ: ${result.vaultsAdded || 0}, наименований: ${result.bullionNamesAdded || 0}, слитков: ${result.bullionsAdded || 0}`;
-
-            if (result.errors && result.errors.length > 0) {
-                description += `\nОшибки (${result.errors.length}): ${result.errors.slice(0, 5).join('; ')}`;
-                if (result.errors.length > 5) {
-                    description += ` ...и еще ${result.errors.length - 5}`;
-                }
-                toast.warning('Импорт завершён с ошибками', { description });
-            } else {
-                toast.success('Импорт завершён', { description });
-            }
-
-            // Обновляем список хранилищ
-            fetchVaults(searchTerm, sortField, sortOrder, currentPage, pageSize, true);
-        } catch (err) {
-            console.error('Ошибка импорта:', err);
-        } finally {
-            setImporting(false);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
-    };
-
     if (loading && vaults.length === 0) {
         return <div className="vaults-container">Загрузка...</div>;
     }
@@ -254,35 +195,11 @@ function VaultsPage() {
                         <button onClick={() => navigate('/dashboard')} className="back-btn">
                             ← Назад
                         </button>
-                        <button
-                            onClick={handleImportClick}
-                            className="import-vault-btn"
-                            disabled={importing}
-                        >
-                            {importing ? '⏳ Импорт...' : '📂 Импорт Excel'}
-                        </button>
                         <button onClick={handleAddVault} className="add-vault-btn">
                             + Добавить хранилище
                         </button>
                     </div>
                 </div>
-
-                {/* Скрытый input для выбора файла */}
-                <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    accept=".xlsx,.xls"
-                    style={{ display: 'none' }}
-                />
-
-                {/* Индикатор импорта */}
-                {importing && (
-                    <div className="import-progress">
-                        <div className="spinner"></div>
-                        <span>Импорт данных из Excel...</span>
-                    </div>
-                )}
 
                 <div className="search-bar">
                     <input

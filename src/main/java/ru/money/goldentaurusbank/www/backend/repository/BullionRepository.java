@@ -14,29 +14,30 @@ import java.util.Optional;
 
 public interface BullionRepository extends JpaRepository<Bullion, Long> {
 
-    List<Bullion> findByUserOrderByCreatedAtDesc(User user);
+    /*
+     * Выборки «что у пользователя есть сейчас» исключают архивные слитки.
+     * Точечный поиск по id и по ключу (наименование + хранилище) их, наоборот,
+     * находит: истории нужно описание слитка, а созданию — реактивация вместо
+     * нарушения уникальности uk_bullions_user_bullion_name_vault.
+     */
+
+    List<Bullion> findByUserAndArchivedFalseOrderByCreatedAtDesc(User user);
 
     Optional<Bullion> findByIdAndUser(Long id, User user);
 
-    boolean existsByIdAndUser(Long id, User user);
-
-    void deleteByIdAndUser(Long id, User user);
-
-
     Optional<Bullion> findByUserAndBullionNameIdAndVaultId(User user, Long bullionNameId, Long vaultId);
-
-
-    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user = :user")
-    BigDecimal getTotalAmountByUser(@Param("user") User user);
-
-
-    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user = :user and b.bullionName = :bullionName")
-    BigDecimal getTotalAmountByUserAndBullionName(@Param("user") User user, @Param("bullionName") BullionName bullionName);
 
     Optional<Bullion> findByVaultAndBullionName(Vault vault, BullionName bullionName);
 
-
     boolean existsByBullionNameIdAndUserId(Long bullionNameId, Long userId);
-    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user.id = :userId")
+
+    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user = :user AND b.archived = false")
+    BigDecimal getTotalAmountByUser(@Param("user") User user);
+
+    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user.id = :userId AND b.archived = false")
     BigDecimal getTotalAmountByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b "
+            + "WHERE b.user = :user AND b.bullionName = :bullionName AND b.archived = false")
+    BigDecimal getTotalAmountByUserAndBullionName(@Param("user") User user, @Param("bullionName") BullionName bullionName);
 }

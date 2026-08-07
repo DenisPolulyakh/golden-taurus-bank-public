@@ -13,7 +13,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TransactionHistoryResponse {
-    private List<TransactionLogDto> content;
+    private List<TransactionDto> content;
     private long totalElements;
     private int totalPages;
     private int currentPage;

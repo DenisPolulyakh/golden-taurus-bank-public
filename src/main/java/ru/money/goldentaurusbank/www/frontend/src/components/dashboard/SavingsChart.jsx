@@ -65,46 +65,26 @@ const SavingsChart = ({ refreshKey }) => {
                 params: { year: selectedYear }
             });
 
-            let monthlyData = response.data.monthlyData || [];
+            // Бэкенд отдаёт готовые 12 месяцев с накоплениями и изменением за месяц:
+            // накопления считаются обратным ходом от фактической суммы слитков,
+            // поэтому правый край графика совпадает с «Общей суммой всех слитков».
+            const monthlyData = response.data.monthlyData || [];
 
-            // Если данных нет - создаем пустые месяцы
-            if (monthlyData.length === 0) {
-                for (let i = 0; i < 12; i++) {
-                    monthlyData.push({
-                        month: `${selectedYear}-${String(i + 1).padStart(2, '0')}`,
-                        monthLabel: `${monthNames[i]} ${selectedYear}`,
-                        income: 0,
-                        expense: 0,
-                        netChange: 0,
-                        savings: 0, // Добавляем savings
-                        transactionCount: 0
-                    });
-                }
-            }
+            setTotalSavings(monthlyData[monthlyData.length - 1]?.savings || 0);
 
-            // Берем итоговые накопления из последнего месяца
-            const lastMonth = monthlyData[monthlyData.length - 1];
-            const total = lastMonth?.savings || 0;
-            setTotalSavings(total);
-
-            // Трансформируем данные - savings уже приходит с бэкенда
-            const transformedData = monthlyData.map((item, index) => {
+            const transformedData = monthlyData.map((item) => {
                 const monthNum = parseInt(item.month.split('-')[1]);
                 const isFuture = selectedYear === currentYear && monthNum > currentMonth;
                 const isCurrentMonth = selectedYear === currentYear && monthNum === currentMonth;
-
-                // Изменение по сравнению с предыдущим месяцем
-                const prevSavings = index > 0 ? (monthlyData[index - 1].savings || 0) : 0;
-                const change = (item.savings || 0) - prevSavings;
+                const savings = item.savings || 0;
 
                 return {
                     ...item,
                     monthLabel: `${monthNames[monthNum - 1]} ${selectedYear}`,
                     monthNumber: monthNum,
-                    // savings берем из ответа бэкенда
-                    savings: item.savings || 0,
-                    change: change,
-                    barColor: (item.savings || 0) >= 0 ? '#667eea' : '#e53e3e',
+                    savings,
+                    change: item.netChange || 0,
+                    barColor: savings >= 0 ? '#667eea' : '#e53e3e',
                     barOpacity: isFuture ? 0.35 : (isCurrentMonth ? 0.7 : 1)
                 };
             });
@@ -130,53 +110,25 @@ const SavingsChart = ({ refreshKey }) => {
                 }
             });
 
+            // Бэкенд отдаёт все дни месяца, включая пустые, — достраивать нечего.
             const dailyData = response.data.dailyData || [];
-            // Use savings from the last day as total savings for the month
-            const total = dailyData.length > 0 ? dailyData[dailyData.length - 1].savings || 0 : 0;
-            setTotalSavings(total);
+            setTotalSavings(dailyData[dailyData.length - 1]?.savings || 0);
 
             const isCurrentMonth = selectedYear === currentYear && selectedMonth === currentMonth;
 
-            if (dailyData.length > 0) {
-                const transformedData = dailyData.map((item, index) => {
-                    const isFuture = isCurrentMonth && item.day > currentDay;
-                    const isToday = isCurrentMonth && item.day === currentDay;
+            setData(dailyData.map((item) => {
+                const isFuture = isCurrentMonth && item.day > currentDay;
+                const isToday = isCurrentMonth && item.day === currentDay;
+                const savings = item.savings || 0;
 
-                    // Изменение по сравнению с предыдущим днем
-                    const prevSavings = index > 0 ? (dailyData[index - 1].savings || 0) : 0;
-                    const change = (item.savings || 0) - prevSavings;
-
-                    return {
-                        ...item,
-                        date: `${String(item.day).padStart(2, '0')}.${String(selectedMonth).padStart(2, '0')}`,
-                        change: change,
-                        barColor: item.savings >= 0 ? '#667eea' : '#e53e3e',
-                        barOpacity: isFuture ? 0.35 : (isToday ? 0.7 : 1)
-                    };
-                });
-                setData(transformedData);
-            } else {
-                const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
-                let emptyData = [];
-                for (let day = 1; day <= daysInMonth; day++) {
-                    const isFuture = isCurrentMonth && day > currentDay;
-                    const isToday = isCurrentMonth && day === currentDay;
-
-                    emptyData.push({
-                        day: day,
-                        date: `${String(day).padStart(2, '0')}.${String(selectedMonth).padStart(2, '0')}`,
-                        savings: 0,
-                        dailyChange: 0,
-                        change: 0,
-                        income: 0,
-                        expense: 0,
-                        transactionCount: 0,
-                        barColor: '#667eea',
-                        barOpacity: isFuture ? 0.35 : (isToday ? 0.7 : 1)
-                    });
-                }
-                setData(emptyData);
-            }
+                return {
+                    ...item,
+                    date: `${String(item.day).padStart(2, '0')}.${String(selectedMonth).padStart(2, '0')}`,
+                    change: item.dailyChange || 0,
+                    barColor: savings >= 0 ? '#667eea' : '#e53e3e',
+                    barOpacity: isFuture ? 0.35 : (isToday ? 0.7 : 1)
+                };
+            }));
         } catch (err) {
             console.error('Error fetching daily statistics:', err);
             setData([]);

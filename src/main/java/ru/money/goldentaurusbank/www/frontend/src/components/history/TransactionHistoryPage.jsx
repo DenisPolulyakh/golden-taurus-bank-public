@@ -11,8 +11,7 @@ const TransactionHistoryPage = () => {
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
     const [filters, setFilters] = useState({
-        operationType: '',
-        status: '',
+        kind: '',
         fromDate: '',
         toDate: ''
     });
@@ -30,8 +29,7 @@ const TransactionHistoryPage = () => {
                 size: 20,
             };
 
-            if (filters.operationType) params.operationType = filters.operationType;
-            if (filters.status) params.status = filters.status;
+            if (filters.kind) params.kind = filters.kind;
             if (filters.fromDate) params.fromDate = filters.fromDate;
             if (filters.toDate) params.toDate = filters.toDate;
 
@@ -57,15 +55,25 @@ const TransactionHistoryPage = () => {
         }
     };
 
-    const getOperationTypeLabel = (type) => {
-        const labels = {
-            'REFILL_BULLION': 'Пополнение',
-            'WITHDRAW_BULLION': 'Списание',
-            'TRANSFER_AMOUNT': 'Перевод средств',
-            'TRANSFER_BULLION': 'Перемещение слитка'
-        };
-        return labels[type] || type;
+    // Вид операции выводится бэкендом из того, какие ноги заполнены.
+    const KIND_LABELS = {
+        DEPOSIT: 'Пополнение',
+        WITHDRAWAL: 'Списание',
+        TRANSFER: 'Перевод',
+        OPENING_BALANCE: 'Начальный остаток'
     };
+
+    // Перевод и начальный остаток накопления не двигают — красим их нейтрально.
+    const KIND_AMOUNT_CLASS = {
+        DEPOSIT: 'income',
+        WITHDRAWAL: 'expense',
+        TRANSFER: 'transfer',
+        OPENING_BALANCE: 'neutral'
+    };
+
+    const getKindLabel = (kind) => KIND_LABELS[kind] || kind || '—';
+
+    const getKindClass = (kind) => (kind ? `type-${kind.toLowerCase()}` : 'type-unknown');
 
     const formatDate = (date) => {
         if (!date) return '-';
@@ -100,7 +108,7 @@ const TransactionHistoryPage = () => {
                 </span>
             ));
         }
-        return tx.description || tx.userComment || '-';
+        return tx.description || tx.comment || '-';
     };
 
     if (loading && page === 0) {
@@ -125,7 +133,7 @@ const TransactionHistoryPage = () => {
                     </button>
                     <button
                         onClick={() => {
-                            setFilters({ operationType: '', status: '', fromDate: '', toDate: '' });
+                            setFilters({ kind: '', fromDate: '', toDate: '' });
                             setPage(0);
                         }}
                         className="reset-btn"
@@ -144,26 +152,15 @@ const TransactionHistoryPage = () => {
             {showFilters && (
                 <div className="filters-panel">
                     <select
-                        value={filters.operationType}
-                        onChange={(e) => setFilters({ ...filters, operationType: e.target.value })}
+                        value={filters.kind}
+                        onChange={(e) => setFilters({ ...filters, kind: e.target.value })}
                         className="filter-select"
                     >
                         <option value="">Все типы</option>
-                        <option value="REFILL_BULLION">Пополнение</option>
-                        <option value="WITHDRAW_BULLION">Списание</option>
-                        <option value="TRANSFER_AMOUNT">Перевод средств</option>
-                        <option value="TRANSFER_BULLION">Перемещение слитка</option>
-                    </select>
-
-                    <select
-                        value={filters.status}
-                        onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                        className="filter-select"
-                    >
-                        <option value="">Все статусы</option>
-                        <option value="SUCCESS">Успешно</option>
-                        <option value="FAILED">Ошибка</option>
-                        <option value="ROLLED_BACK">Откатано</option>
+                        <option value="DEPOSIT">Пополнение</option>
+                        <option value="WITHDRAWAL">Списание</option>
+                        <option value="TRANSFER">Перевод</option>
+                        <option value="OPENING_BALANCE">Начальный остаток</option>
                     </select>
 
                     <input
@@ -193,39 +190,38 @@ const TransactionHistoryPage = () => {
                     </tr>
                     </thead>
                     <tbody>
-                    {transactions.map((tx, index) => {
-                        // Показываем кнопку отката только если транзакция успешна
-                        const canRollback = tx.status === 'SUCCESS' && !tx.canRollback === false;
-
-                        return (
-                            <tr key={tx.id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
-                                <td>{formatDate(tx.dateOperation)}</td>
-                                <td>
-                    <span className={`type-badge type-${tx.operationType.toLowerCase()}`}>
-                      {getOperationTypeLabel(tx.operationType)}
-                    </span>
-                                </td>
-                                <td className={`amount-cell ${tx.operationType === 'REFILL_BULLION' ? 'income' : tx.operationType === 'WITHDRAW_BULLION' ? 'expense' : 'transfer'}`}>
-                                    {formatAmount(tx.amount)}
-                                </td>
-                                <td className="description-cell">{renderDescription(tx)}</td>
-                                <td className="actions-cell">
-                                    {tx.status === 'SUCCESS' && (
-                                        <button
-                                            onClick={() => handleRollback(tx.id)}
-                                            className="rollback-btn"
-                                            title="Откатить"
-                                        >
-                                            ↩️ Откатить
-                                        </button>
-                                    )}
-                                    {tx.status === 'ROLLED_BACK' && (
-                                        <span className="rolled-back-label">Откатано</span>
-                                    )}
-                                </td>
-                            </tr>
-                        );
-                    })}
+                    {transactions.map((tx, index) => (
+                        <tr key={tx.id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
+                            <td>{formatDate(tx.dateOperation)}</td>
+                            <td>
+                                <span className={`type-badge ${getKindClass(tx.kind)}`}>
+                                    {getKindLabel(tx.kind)}
+                                </span>
+                                {tx.reversalOfId && (
+                                    <span className="reversal-label" title={`Откат операции #${tx.reversalOfId}`}>
+                                        откат
+                                    </span>
+                                )}
+                            </td>
+                            <td className={`amount-cell ${KIND_AMOUNT_CLASS[tx.kind] || ''}`}>
+                                {formatAmount(tx.amount)}
+                            </td>
+                            <td className="description-cell">{renderDescription(tx)}</td>
+                            <td className="actions-cell">
+                                {tx.canRollback ? (
+                                    <button
+                                        onClick={() => handleRollback(tx.id)}
+                                        className="rollback-btn"
+                                        title="Откатить"
+                                    >
+                                        ↩️ Откатить
+                                    </button>
+                                ) : (
+                                    <span className="rolled-back-label">Откачена</span>
+                                )}
+                            </td>
+                        </tr>
+                    ))}
                     </tbody>
                 </table>
             </div>

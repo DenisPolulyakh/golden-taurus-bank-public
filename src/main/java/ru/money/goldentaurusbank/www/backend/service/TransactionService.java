@@ -8,16 +8,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.money.goldentaurusbank.www.backend.infrastructure.exception.ApplicationException;
 import ru.money.goldentaurusbank.www.backend.model.domain.*;
-import ru.money.goldentaurusbank.www.backend.model.dto.enums.OperationType;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.TransactionKind;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.RefillBullionRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.TransferRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.WithdrawBullionRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.*;
 import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
-import ru.money.goldentaurusbank.www.backend.repository.BullionNameRepository;
-import ru.money.goldentaurusbank.www.backend.repository.TransactionLogRepository;
+import ru.money.goldentaurusbank.www.backend.repository.TransactionRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
-import ru.money.goldentaurusbank.www.backend.util.JsonSerialization;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -28,9 +26,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static ru.money.goldentaurusbank.www.backend.model.dto.enums.OperationType.*;
 import static ru.money.goldentaurusbank.www.backend.model.dto.enums.ResponseCodes.*;
-import static ru.money.goldentaurusbank.www.backend.model.dto.enums.TransactionStatus.FAILED;
 
 @Slf4j
 @Service
@@ -39,442 +35,551 @@ public class TransactionService {
 
     private final BullionRepository bullionRepository;
     private final VaultRepository vaultRepository;
-    private final BullionNameRepository bullionNameRepository;
-    private final TransactionLogRepository transactionLogRepository;
+    private final TransactionRepository transactionRepository;
     private final ColorConstants colorConstants;
+
     private static final String BANK_COLOR = "#FFA502";  // оранжевый
     private static final String VAULT_COLOR = "#FFD93D"; // жёлтый
+    private static final LocalDateTime EPOCH = LocalDate.of(1970, 1, 1).atStartOfDay();
 
-    @Transactional(rollbackFor = Exception.class)
+    // ------------------------------------------------------------------
+    // Запись операций
+    // ------------------------------------------------------------------
+
+    @Transactional
+    public Transaction deposit(Long targetBullionId, BigDecimal amount, User user,
+                               String comment, LocalDateTime dateOperation, Long batchId) {
+        return record(null, targetBullionId, amount, user, comment, dateOperation, batchId, false, false, null);
+    }
+
+    @Transactional
+    public Transaction withdraw(Long sourceBullionId, BigDecimal amount, User user,
+                                String comment, LocalDateTime dateOperation, Long batchId) {
+        return record(sourceBullionId, null, amount, user, comment, dateOperation, batchId, false, false, null);
+    }
+
+    @Transactional
+    public Transaction transfer(Long sourceBullionId, Long targetBullionId, BigDecimal amount, User user,
+                                String comment, LocalDateTime dateOperation, Long batchId) {
+        return record(sourceBullionId, targetBullionId, amount, user, comment, dateOperation, batchId, false, false, null);
+    }
+
+    /**
+     * Стартовый остаток: двигает сам слиток, но не двигает график накоплений —
+     * иначе месяц создания слитка показал бы доход на всю сумму накоплений.
+     */
+    @Transactional
+    public Transaction openingBalance(Long targetBullionId, BigDecimal amount, User user,
+                                      String comment, LocalDateTime dateOperation) {
+        return record(null, targetBullionId, amount, user, comment, dateOperation, null, true, false, null);
+    }
+
+    /**
+     * Единственная точка записи в таблицу транзакций: проверяет ноги, двигает остатки, сохраняет запись.
+     * Неуспешные операции в таблицу не пишутся — ошибка уходит в лог приложения и в HTTP-ответ.
+     */
+    private Transaction record(Long sourceBullionId, Long targetBullionId, BigDecimal amount, User user,
+                               String comment, LocalDateTime dateOperation, Long batchId,
+                               boolean openingBalance, boolean imported, Long reversalOfId) {
+
+        if (sourceBullionId == null && targetBullionId == null) {
+            throw new ApplicationException(BULLION_NOT_FOUND.getCode(), "Не указан ни один слиток операции");
+        }
+        if (Objects.equals(sourceBullionId, targetBullionId)) {
+            throw new ApplicationException(CANNOT_TRANSFER_TO_SAME_VAULT.getCode(),
+                    "Слиток-отправитель и слиток-получатель совпадают");
+        }
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ApplicationException(CHANGE_AMOUNT_ZERO.getCode(), CHANGE_AMOUNT_ZERO.getMessage());
+        }
+
+        BigDecimal scaled = amount.setScale(2, RoundingMode.HALF_UP);
+
+        Bullion source = sourceBullionId == null ? null : loadBullion(sourceBullionId, user);
+        Bullion target = targetBullionId == null ? null : loadBullion(targetBullionId, user);
+
+        if (source != null) {
+            if (source.getAmount().compareTo(scaled) < 0) {
+                throw new ApplicationException(INSUFFICIENT_FUNDS.getCode(),
+                        "Недостаточно средств в слитке " + describeBullion(source) + ". Доступно: " + source.getAmount());
+            }
+            source.setAmount(source.getAmount().subtract(scaled).setScale(2, RoundingMode.HALF_UP));
+            bullionRepository.save(source);
+        }
+
+        if (target != null) {
+            target.setAmount(target.getAmount().add(scaled).setScale(2, RoundingMode.HALF_UP));
+            bullionRepository.save(target);
+        }
+
+        Transaction transaction = transactionRepository.save(Transaction.builder()
+                .userId(user.getId())
+                .dateOperation(dateOperation == null ? LocalDateTime.now() : dateOperation)
+                .amount(scaled)
+                .sourceBullionId(sourceBullionId)
+                .targetBullionId(targetBullionId)
+                .openingBalance(openingBalance)
+                .imported(imported)
+                .comment(comment)
+                .reversalOfId(reversalOfId)
+                .batchId(batchId)
+                .build());
+
+        log.info("Transaction recorded: id={}, kind={}, source={}, target={}, amount={}",
+                transaction.getId(), transaction.getKind(), sourceBullionId, targetBullionId, scaled);
+        return transaction;
+    }
+
+    private Bullion loadBullion(Long bullionId, User user) {
+        return bullionRepository.findByIdAndUser(bullionId, user)
+                .orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
+    }
+
+    // ------------------------------------------------------------------
+    // Операции, вызываемые из BullionService (форма запроса с фронта)
+    // ------------------------------------------------------------------
+
+    @Transactional
     public Bullion refillBullion(RefillBullionRequest request, User user, Long batchId) {
-        return refillAmountBullion(request, user, batchId);
+        Bullion bullion = resolveBullion(user, request.getBullionNameId(), request.getVaultId());
+        deposit(bullion.getId(), request.getAmount(), user, request.getUserComment(), request.getDateOperation(), batchId);
+        return bullion;
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional
     public Bullion withdrawBullion(WithdrawBullionRequest request, User user, Long batchId) {
-        return withdrawAmountBullion(request, user, batchId);
+        Bullion bullion = resolveBullion(user, request.getBullionNameId(), request.getVaultId());
+        withdraw(bullion.getId(), request.getAmount(), user, request.getUserComment(), request.getDateOperation(), batchId);
+        return bullion;
     }
 
-
+    /**
+     * Перевод между своими слитками — одна запись с двумя ногами.
+     * Раньше здесь писались две несвязанные операции, из-за чего перевод давал
+     * одновременно доход и расход на одну и ту же сумму.
+     */
     @Transactional
     public Bullion transferAmount(TransferRequest request, User user) {
-        log.info("[transferAmount] перевод денег: {}", JsonSerialization.toJson(request));
-        BigDecimal transferAmount = request.getAmount();
-        if (BigDecimal.ZERO.compareTo(transferAmount) == 0) {
-            throw new ApplicationException(CHANGE_AMOUNT_ZERO.getCode(), CHANGE_AMOUNT_ZERO.getMessage());
-        }
-        Bullion existingFromBullion = bullionRepository.findByIdAndUser(request.getFromBullionId(), user).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
-
-        Bullion existingToBullion = bullionRepository.findByIdAndUser(request.getToBullionId(), user).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
-
-        WithdrawBullionRequest withdrawRequest = new WithdrawBullionRequest();
-        withdrawRequest.setVaultId(existingFromBullion.getVault().getId());
-        withdrawRequest.setBullionNameId(existingFromBullion.getBullionName().getId());
-        withdrawRequest.setAmount(transferAmount);
-        withdrawRequest.setUserComment(request.getComment());
-        withdrawRequest.setDateOperation(request.getDateOperation());
-        Bullion withdrawBullion = withdrawAmountBullion(withdrawRequest, user, null);
-        log.info("[transferAmount] сумма {} списана со слитка {}",request.getAmount(), withdrawBullion.getBullionName().getTitle());
-        RefillBullionRequest refillRequest = new RefillBullionRequest();
-        refillRequest.setAmount(request.getAmount());
-        refillRequest.setBullionNameId(existingToBullion.getBullionName().getId());
-        refillRequest.setVaultId(existingToBullion.getVault().getId());
-        refillRequest.setUserComment(request.getComment());
-        refillRequest.setDateOperation(request.getDateOperation());
-        Bullion refillBullion = refillAmountBullion(refillRequest, user, null);
-        log.info("[transferAmount] сумма {} внесена в слиток {}", request.getAmount(),  refillBullion.getBullionName().getTitle());
-        return withdrawBullion;
+        Transaction transaction = transfer(request.getFromBullionId(), request.getToBullionId(),
+                request.getAmount(), user, request.getComment(), request.getDateOperation(), null);
+        return loadBullion(transaction.getSourceBullionId(), user);
     }
 
+    private Bullion resolveBullion(User user, Long bullionNameId, Long vaultId) {
+        return bullionRepository.findByUserAndBullionNameIdAndVaultId(user, bullionNameId, vaultId)
+                .orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
+    }
+
+    /**
+     * Перемещение слитка целиком в другое хранилище: сумма уходит переводом в слиток
+     * с тем же наименованием в целевом хранилище, исходный слиток архивируется.
+     * Физически удалить его нельзя — на него ссылается история.
+     */
     @Transactional
-    public void transferAmount(Long fromBullionId, Long toBullionId, BigDecimal amount, User user, String comment, LocalDateTime dateOperation) {
-        transferAmount(fromBullionId, toBullionId, amount, user, null, comment, dateOperation);
-    }
+    public void transferBullion(Long sourceBullionId, Long toVaultId, User user, Long batchId, LocalDateTime dateOperation) {
+        Bullion source = loadBullion(sourceBullionId, user);
 
+        Vault toVault = vaultRepository.findByIdAndUser(toVaultId, user)
+                .orElseThrow(() -> new ApplicationException(VAULT_NOT_FOUND.getCode(), "Целевое хранилище не найдено"));
 
-
-    @Transactional
-    public void transferAmount(Long fromBullionId, Long toBullionId, BigDecimal amount, User user, Long batchId, String comment, LocalDateTime dateOperation) {
-        TransactionLog.TransactionLogBuilder logBuilder = TransactionLog.builder()
-                .operationType(TRANSFER_AMOUNT.name())
-                .fromBullionId(fromBullionId)
-                .toBullionId(toBullionId)
-                .amount(amount)
-                .userId(user.getId())
-                .batchId(batchId)
-                .dateOperation(dateOperation)
-                .status("SUCCESS");
-
-        try {
-            if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new ApplicationException(INSUFFICIENT_FUNDS.getCode(), "Сумма перемещения должна быть больше 0");
-            }
-
-            Bullion fromBullion = bullionRepository.findById(fromBullionId)
-                    .orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), "Слиток-отправитель не найден"));
-
-            Bullion toBullion = bullionRepository.findById(toBullionId)
-                    .orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), "Слиток-получатель не найден"));
-
-            if (!fromBullion.getUser().getId().equals(toBullion.getUser().getId())) {
-                throw new ApplicationException(BULLION_ACCESS_DENIED.getCode(), BULLION_ACCESS_DENIED.getMessage());
-            }
-
-            if (fromBullion.getAmount().compareTo(amount) < 0) {
-                throw new ApplicationException(INSUFFICIENT_FUNDS.getCode(),
-                        "Недостаточно средств. Доступно: " + fromBullion.getAmount());
-            }
-
-            BigDecimal fromBefore = fromBullion.getAmount();
-            BigDecimal toBefore = toBullion.getAmount();
-
-            fromBullion.setAmount(fromBullion.getAmount().subtract(amount).setScale(2, RoundingMode.HALF_UP));
-            toBullion.setAmount(toBullion.getAmount().add(amount).setScale(2, RoundingMode.HALF_UP));
-
-            bullionRepository.save(fromBullion);
-            bullionRepository.save(toBullion);
-
-            logBuilder.fromBullionAmountBefore(fromBefore)
-                    .fromBullionAmountAfter(fromBullion.getAmount())
-                    .toBullionAmountBefore(toBefore)
-                    .toBullionAmountAfter(toBullion.getAmount())
-                    .description("Перевод суммы " + amount + " из слитка " + describeBullion(fromBullion) + " в " + describeBullion(toBullion));
-
-            transactionLogRepository.save(logBuilder.build());
-            log.info("Transfer amount success: from={}, to={}, amount={}", fromBullionId, toBullionId, amount);
-
-        } catch (ApplicationException e) {
-            logBuilder.status("FAILED").errorMessage(e.getMessage());
-            transactionLogRepository.save(logBuilder.build());
-            throw e;
+        if (source.getVault() != null && source.getVault().getId().equals(toVault.getId())) {
+            throw new ApplicationException(CANNOT_TRANSFER_TO_SAME_VAULT.getCode(), CANNOT_TRANSFER_TO_SAME_VAULT.getMessage());
         }
-    }
 
-
-    private Bullion refillAmountBullion(RefillBullionRequest request, User user, Long batchId) {
-        BigDecimal refillAmount = request.getAmount();
-        if (BigDecimal.ZERO.compareTo(refillAmount) == 0) {
-            throw new ApplicationException(CHANGE_AMOUNT_ZERO.getCode(), CHANGE_AMOUNT_ZERO.getMessage());
-        }
-        Bullion existingBullion = bullionRepository.findByUserAndBullionNameIdAndVaultId(
-                user, request.getBullionNameId(), request.getVaultId()).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
-
-        TransactionLog.TransactionLogBuilder logBuilder = TransactionLog.builder()
-                .operationType(REFILL_BULLION.name())
-                .fromBullionId(null)
-                .toBullionId(existingBullion.getId())
-                .amount(refillAmount)
-                .userId(user.getId())
-                .batchId(batchId)
-                .dateOperation(request.getDateOperation())
-                .status("SUCCESS");
-
-        try {
-            if (refillAmount.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new ApplicationException(INSUFFICIENT_FUNDS.getCode(), "Сумма пополнения должна быть больше 0");
-            }
-
-            BigDecimal toBefore = existingBullion.getAmount();
-            existingBullion.setAmount(toBefore.add(refillAmount).setScale(2, RoundingMode.HALF_UP));
-            bullionRepository.save(existingBullion);
-
-            logBuilder.fromBullionAmountBefore(null)
-                    .fromBullionAmountAfter(null)
-                    .toBullionAmountBefore(toBefore)
-                    .toBullionAmountAfter(existingBullion.getAmount())
-                    .userComment(request.getUserComment())
-                    .description("Пополнение на сумму " + refillAmount + " слитка " + describeBullion(existingBullion));
-
-            transactionLogRepository.save(logBuilder.build());
-            log.info("Refill amount success: bullion={}, amount={}", existingBullion.getId(), refillAmount);
-            return existingBullion;
-
-        } catch (ApplicationException e) {
-            logBuilder.status(FAILED.name()).errorMessage(e.getMessage());
-            transactionLogRepository.save(logBuilder.build());
-            throw new ApplicationException(INTERNAL_ERROR.getCode(), INTERNAL_ERROR.getMessage());
-        }
-    }
-
-    private Bullion withdrawAmountBullion(WithdrawBullionRequest request, User user, Long batchId) {
-        BigDecimal withDrawAmount = request.getAmount();
-        if (BigDecimal.ZERO.compareTo(withDrawAmount) == 0) {
-            throw new ApplicationException(CHANGE_AMOUNT_ZERO.getCode(), CHANGE_AMOUNT_ZERO.getMessage());
-        }
-        Bullion existingBullion = bullionRepository.findByUserAndBullionNameIdAndVaultId(
-                user, request.getBullionNameId(), request.getVaultId()).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
-
-        TransactionLog.TransactionLogBuilder logBuilder = TransactionLog.builder()
-                .operationType(WITHDRAW_BULLION.name())
-                .fromBullionId(null)
-                .toBullionId(existingBullion.getId())
-                .amount(withDrawAmount)
-                .userId(user.getId())
-                .batchId(batchId)
-                .dateOperation(request.getDateOperation())
-                .status("SUCCESS");
-
-        try {
-            if (withDrawAmount.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new ApplicationException(INSUFFICIENT_FUNDS.getCode(), "Сумма снятия должна отличаться от 0");
-            }
-            Bullion bullion = bullionRepository.findByIdAndUser(existingBullion.getId(), user).orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), BULLION_NOT_FOUND.getMessage()));
-
-            BigDecimal toBefore = bullion.getAmount();
-            bullion.setAmount(bullion.getAmount().subtract(withDrawAmount).setScale(2, RoundingMode.HALF_UP));
-            bullionRepository.save(bullion);
-
-            logBuilder.fromBullionAmountBefore(null)
-                    .fromBullionAmountAfter(null)
-                    .toBullionAmountBefore(toBefore)
-                    .toBullionAmountAfter(bullion.getAmount())
-                    .userComment(request.getUserComment())
-                    .description("Снятие суммы " + withDrawAmount + " слитка " + describeBullion(existingBullion));
-
-            transactionLogRepository.save(logBuilder.build());
-            log.info("Withdrawal amount success: bullion={}, amount={}", existingBullion.getId(), bullion.getAmount());
-            return existingBullion;
-
-        } catch (ApplicationException e) {
-            logBuilder.status(FAILED.name()).errorMessage(e.getMessage());
-            transactionLogRepository.save(logBuilder.build());
-            throw new ApplicationException(INTERNAL_ERROR.getCode(), INTERNAL_ERROR.getMessage());
-        }
-    }
-
-    @Transactional
-    public void transferBullion(Long fromBullionId, Long toVaultId, User user, LocalDate dateOperation) {
-        transferBullion(fromBullionId, toVaultId, user, null);
-    }
-
-    @Transactional
-    public void transferBullion(Long fromBullionId, Long toVaultId, User user, Long batchId, LocalDateTime dateOperation) {
-        TransactionLog.TransactionLogBuilder logBuilder = TransactionLog.builder()
-                .operationType(TRANSFER_BULLION.name())
-                .fromBullionId(fromBullionId)
-                .toVaultId(toVaultId)
-                .userId(user.getId())
-                .batchId(batchId)
-                .dateOperation(dateOperation)
-                .status("SUCCESS");
-
-        try {
-            Bullion fromBullion = bullionRepository.findById(fromBullionId)
-                    .orElseThrow(() -> new ApplicationException(BULLION_NOT_FOUND.getCode(), "Слиток для перемещения не найден"));
-
-            Vault toVault = vaultRepository.findByIdAndUser(toVaultId, user)
-                    .orElseThrow(() -> new ApplicationException(VAULT_NOT_FOUND.getCode(), "Целевое хранилище не найдено"));
-
-            Vault fromVault = fromBullion.getVault();
-
-            if (fromVault.getId().equals(toVault.getId())) {
-                throw new ApplicationException(CANNOT_TRANSFER_TO_SAME_VAULT.getCode(), CANNOT_TRANSFER_TO_SAME_VAULT.getMessage());
-            }
-
-            logBuilder.fromVaultId(fromVault.getId())
-                    .bullionNameId(fromBullion.getBullionName().getId());
-
-            BigDecimal fromAmount = fromBullion.getAmount();
-            BigDecimal toBullionAmountBefore = BigDecimal.ZERO;
-
-            var existingBullion = bullionRepository.findByVaultAndBullionName(toVault, fromBullion.getBullionName());
-
-            if (existingBullion.isPresent()) {
-                toBullionAmountBefore = existingBullion.get().getAmount();
-                existingBullion.get().setAmount(existingBullion.get().getAmount().add(fromAmount).setScale(2, RoundingMode.HALF_UP));
-                bullionRepository.save(existingBullion.get());
-                bullionRepository.delete(fromBullion);
-
-                logBuilder.toBullionId(existingBullion.get().getId())
-                        .toBullionAmountBefore(toBullionAmountBefore)
-                        .toBullionAmountAfter(existingBullion.get().getAmount());
-            } else {
-                Bullion newBullion = Bullion.builder()
-                        .bullionName(fromBullion.getBullionName())
+        Bullion target = bullionRepository.findByVaultAndBullionName(toVault, source.getBullionName())
+                .orElseGet(() -> bullionRepository.save(Bullion.builder()
+                        .bullionName(source.getBullionName())
                         .vault(toVault)
-                        .amount(fromAmount)
-                        .description(fromBullion.getDescription())
+                        .amount(BigDecimal.ZERO)
+                        .description(source.getDescription())
                         .user(user)
-                        .build();
-                bullionRepository.save(newBullion);
-                bullionRepository.delete(fromBullion);
+                        .build()));
 
-                logBuilder.toBullionId(newBullion.getId())
-                        .toBullionAmountBefore(BigDecimal.ZERO)
-                        .toBullionAmountAfter(newBullion.getAmount());
-            }
-
-            String toVaultLabel = (toVault.getBank() != null && toVault.getBank().getName() != null)
-                    ? toVault.getBank().getName() + " | " + toVault.getName()
-                    : toVault.getName();
-
-            logBuilder.fromBullionAmountBefore(fromAmount)
-                    .fromBullionAmountAfter(BigDecimal.ZERO)
-                    .description("Перемещение слитка " + describeBullion(fromBullion) + " в хранилище " + toVaultLabel);
-
-            transactionLogRepository.save(logBuilder.build());
-            log.info("Transfer bullion success: bullionId={}, toVaultId={}", fromBullionId, toVaultId);
-
-        } catch (ApplicationException e) {
-            logBuilder.status("FAILED").errorMessage(e.getMessage());
-            transactionLogRepository.save(logBuilder.build());
-            throw e;
+        if (target.isArchived()) {
+            target.setArchived(false);
+            bullionRepository.save(target);
         }
+
+        BigDecimal amount = source.getAmount();
+        if (amount.compareTo(BigDecimal.ZERO) > 0) {
+            transfer(source.getId(), target.getId(), amount, user,
+                    "Перемещение слитка в хранилище " + describeVault(toVault), dateOperation, batchId);
+        }
+
+        archive(source);
+        log.info("Transfer bullion success: bullionId={}, toVaultId={}", sourceBullionId, toVaultId);
+    }
+
+    /**
+     * Слиток с историей не удаляется физически — на него ссылаются транзакции.
+     * Архивный слиток пропадает из списков и из суммы накоплений, но история читается целиком.
+     */
+    @Transactional
+    public void archive(Bullion bullion) {
+        bullion.setArchived(true);
+        bullionRepository.save(bullion);
+    }
+
+    public Long createBatchId() {
+        return System.currentTimeMillis();
+    }
+
+    // ------------------------------------------------------------------
+    // Откат
+    // ------------------------------------------------------------------
+
+    /**
+     * Откат — обратная транзакция, а не восстановление снимка остатка:
+     * более поздние операции не затираются, арифметика сходится всегда.
+     */
+    @Transactional
+    public Transaction rollbackTransaction(Long transactionId, User user) {
+        Transaction original = transactionRepository.findById(transactionId)
+                .orElseThrow(() -> new ApplicationException(TRANSACTION_NOT_FOUND.getCode(), TRANSACTION_NOT_FOUND.getMessage()));
+
+        if (!original.getUserId().equals(user.getId())) {
+            throw new ApplicationException(ACCESS_DENIED.getCode(), ACCESS_DENIED.getMessage());
+        }
+
+        if (transactionRepository.existsByReversalOfId(transactionId)) {
+            throw new ApplicationException(TRANSACTION_ALREADY_REVERSED.getCode(), TRANSACTION_ALREADY_REVERSED.getMessage());
+        }
+
+        return record(
+                original.getTargetBullionId(),
+                original.getSourceBullionId(),
+                original.getAmount(),
+                user,
+                "Откат операции #" + transactionId,
+                LocalDateTime.now(),
+                original.getBatchId(),
+                original.isOpeningBalance(),
+                original.isImported(),
+                transactionId
+        );
     }
 
     @Transactional
-    public void rollbackLastTransaction(Long userId) {
-        List<TransactionLog> lastLogs = transactionLogRepository.findByUserIdOrderByCreatedAtDesc(userId);
+    public void rollbackLastTransaction(User user) {
+        Transaction last = transactionRepository.findFirstByUserIdOrderByCreatedAtDesc(user.getId())
+                .orElseThrow(() -> new ApplicationException(TRANSACTION_NOT_FOUND.getCode(), "Нет транзакций для отката"));
 
-        if (lastLogs.isEmpty()) {
-            throw new ApplicationException(4000, "Нет транзакций для отката");
-        }
-
-        rollbackTransaction(lastLogs.get(0).getId());
+        rollbackTransaction(last.getId(), user);
     }
 
     @Transactional
-    public void rollbackBatch(Long batchId) {
-        List<TransactionLog> batchLogs = transactionLogRepository.findByBatchIdOrderByCreatedAtDesc(batchId);
+    public void rollbackBatch(Long batchId, User user) {
+        List<Transaction> batch = transactionRepository.findByBatchIdOrderByCreatedAtAsc(batchId);
 
-        if (batchLogs.isEmpty()) {
-            throw new ApplicationException(4000, "Batch с id " + batchId + " не найден");
+        if (batch.isEmpty()) {
+            throw new ApplicationException(TRANSACTION_NOT_FOUND.getCode(), "Batch с id " + batchId + " не найден");
         }
 
-        for (TransactionLog log : batchLogs) {
-            if ("SUCCESS".equals(log.getStatus())) {
-                rollbackTransaction(log.getId());
+        // С конца: откат более поздней операции возвращает средства, нужные для отката ранней.
+        for (int i = batch.size() - 1; i >= 0; i--) {
+            Transaction transaction = batch.get(i);
+            if (transaction.getReversalOfId() == null && !transactionRepository.existsByReversalOfId(transaction.getId())) {
+                rollbackTransaction(transaction.getId(), user);
             }
         }
 
         log.info("Rollback batch success: batchId={}", batchId);
     }
 
-    @Transactional
-    public void rollbackTransaction(Long transactionLogId) {
-        TransactionLog originalLog = transactionLogRepository.findById(transactionLogId)
-                .orElseThrow(() -> new ApplicationException(TRANSACTION_NOT_FOUND.getCode(), TRANSACTION_NOT_FOUND.getMessage()));
+    // ------------------------------------------------------------------
+    // Статистика
+    // ------------------------------------------------------------------
 
-        if (!"SUCCESS".equals(originalLog.getStatus())) {
-            throw new ApplicationException(4000, "Можно откатить только успешную транзакцию. Текущий статус: " + originalLog.getStatus());
+    @Transactional(readOnly = true)
+    public DashboardStatisticsDto getDashboardStatistics(Long userId, Integer year) {
+        LocalDateTime fromDate;
+        LocalDateTime toDate;
+
+        if (year != null) {
+            fromDate = LocalDate.of(year, 1, 1).atStartOfDay();
+            toDate = LocalDate.of(year, 12, 31).atTime(LocalTime.MAX);
+        } else {
+            fromDate = EPOCH;
+            toDate = LocalDateTime.now();
         }
 
-        if ("ROLLED_BACK".equals(originalLog.getStatus())) {
-            throw new ApplicationException(4000, "Транзакция уже была откатана");
+        List<MonthlyDataDto> monthlyData = year != null
+                ? buildFullYearMonths(userId, year)
+                : buildSparseMonths(userId, fromDate, toDate);
+
+        BigDecimal totalIncome = BigDecimal.ZERO;
+        BigDecimal totalExpense = BigDecimal.ZERO;
+        Long totalTransactions = 0L;
+
+        List<Object[]> totalStats = transactionRepository.getTotalStatistics(userId, fromDate, toDate);
+        if (!totalStats.isEmpty()) {
+            Object[] row = totalStats.get(0);
+            totalIncome = toBigDecimal(row[0]);
+            totalExpense = toBigDecimal(row[1]);
+            totalTransactions = toLong(row[2]);
         }
 
-        try {
-            switch (originalLog.getOperationType()) {
-                case "REFILL_BULLION" -> rollbackRefillBullion(originalLog);
-                case "WITHDRAW_BULLION" -> rollbackWithdrawBullion(originalLog);
-                case "TRANSFER_AMOUNT" -> rollbackTransferAmount(originalLog);
-                case "TRANSFER_BULLION" -> rollbackTransferBullion(originalLog);
-                default -> throw new ApplicationException(4000, "Неизвестный тип операции: " + originalLog.getOperationType());
-            }
+        List<TransactionDto> recentTransactions =
+                toDtos(transactionRepository.findRecentTransactions(userId, 5));
 
-            originalLog.setStatus("ROLLED_BACK");
-            transactionLogRepository.save(originalLog);
+        List<KindStatsDto> kindStats = transactionRepository.getKindStatistics(userId, fromDate, toDate).stream()
+                .map(row -> KindStatsDto.builder()
+                        .kind(TransactionKind.valueOf((String) row[0]))
+                        .count(toLong(row[1]))
+                        .totalAmount(toBigDecimal(row[2]))
+                        .build())
+                .collect(Collectors.toList());
 
-            TransactionLog rollbackLog = TransactionLog.builder()
-                    .operationType(ROLLBACK_.name() + originalLog.getOperationType())
-                    .fromBullionId(originalLog.getToBullionId())
-                    .toBullionId(originalLog.getFromBullionId())
-                    .fromVaultId(originalLog.getToVaultId())
-                    .toVaultId(originalLog.getFromVaultId())
-                    .bullionNameId(originalLog.getBullionNameId())
-                    .amount(originalLog.getAmount())
-                    .userId(originalLog.getUserId())
-                    .batchId(originalLog.getBatchId())
-                    .parentTransactionId(originalLog.getId())
-                    .dateOperation(LocalDateTime.now())
-                    .status("SUCCESS")
-                    .description("Откат транзакции " + originalLog.getId())
-                    .build();
-
-            transactionLogRepository.save(rollbackLog);
-            log.info("Rollback transaction success: logId={}", transactionLogId);
-
-        } catch (Exception e) {
-            log.error("Rollback failed: {}", e.getMessage());
-            throw new ApplicationException(5000, "Ошибка при откате: " + e.getMessage());
-        }
-    }
-
-
-    private void rollbackRefillBullion(TransactionLog log) {
-        Bullion bullion = bullionRepository.findById(log.getToBullionId())
-                .orElseThrow(() -> new ApplicationException(4006, "Слиток не найден"));
-
-        bullion.setAmount(log.getToBullionAmountBefore());
-        bullionRepository.save(bullion);
-    }
-
-    private void rollbackWithdrawBullion(TransactionLog log) {
-        Bullion bullion = bullionRepository.findById(log.getToBullionId())
-                .orElseThrow(() -> new ApplicationException(4006, "Слиток не найден"));
-
-        bullion.setAmount(log.getToBullionAmountBefore());
-        bullionRepository.save(bullion);
-    }
-
-    private void rollbackTransferAmount(TransactionLog log) {
-        Bullion fromBullion = bullionRepository.findById(log.getFromBullionId())
-                .orElseThrow(() -> new ApplicationException(4006, "Слиток-отправитель не найден"));
-
-        Bullion toBullion = bullionRepository.findById(log.getToBullionId())
-                .orElseThrow(() -> new ApplicationException(4006, "Слиток-получатель не найден"));
-
-        fromBullion.setAmount(log.getFromBullionAmountBefore());
-        toBullion.setAmount(log.getToBullionAmountBefore());
-
-        bullionRepository.save(fromBullion);
-        bullionRepository.save(toBullion);
-    }
-
-    private void rollbackTransferBullion(TransactionLog log) {
-        if (log.getFromBullionAmountAfter() == null || log.getFromBullionAmountAfter().compareTo(BigDecimal.ZERO) != 0) {
-            throw new ApplicationException(4000, "Невозможно откатить: слиток уже был изменен");
-        }
-
-        BullionName bullionName = bullionNameRepository.findById(log.getBullionNameId())
-                .orElseThrow(() -> new ApplicationException(4006, "Наименование не найдено"));
-
-        Vault fromVault = vaultRepository.findById(log.getFromVaultId())
-                .orElseThrow(() -> new ApplicationException(4006, "Исходное хранилище не найдено"));
-
-        User user = new User();
-        user.setId(log.getUserId());
-
-        Bullion restoredBullion = Bullion.builder()
-                .bullionName(bullionName)
-                .vault(fromVault)
-                .amount(log.getFromBullionAmountBefore())
-                .description("Восстановлен при откате транзакции " + log.getId())
-                .user(user)
+        return DashboardStatisticsDto.builder()
+                .monthlyData(monthlyData)
+                .totalIncome(totalIncome)
+                .totalExpense(totalExpense)
+                .netChange(totalIncome.subtract(totalExpense))
+                .totalAmount(bullionRepository.getTotalAmountByUserId(userId))
+                .totalTransactions(totalTransactions)
+                .recentTransactions(recentTransactions)
+                .kindStats(kindStats)
                 .build();
-
-        Bullion savedBullion = bullionRepository.save(restoredBullion);
-
-        if (log.getToBullionId() != null) {
-            bullionRepository.findById(log.getToBullionId()).ifPresent(toBullion -> {
-                toBullion.setAmount(log.getToBullionAmountBefore());
-                bullionRepository.save(toBullion);
-            });
-        }
-
-        log.setFromBullionId(savedBullion.getId());
-    }
-
-
-    public Long createBatchId() {
-        return System.currentTimeMillis();
     }
 
     /**
-     * Человекочитаемое описание слитка в формате:
-     * «Наименование (Цвет) | Банк | Хранилище».
-     * Цвет берётся у наименования (единственная сущность с цветом),
-     * банк опускается, если у хранилища его нет.
+     * Полные 12 месяцев года: месяц без операций сохраняет накопления предыдущего,
+     * а не проваливается в ноль. Стартовая точка берётся обратным ходом от фактической
+     * суммы слитков, поэтому правый край графика по построению равен «Всего накоплений»
+     * на том же дашборде — дрейф невозможен.
+     */
+    private List<MonthlyDataDto> buildFullYearMonths(Long userId, int year) {
+        Map<String, Object[]> byMonth = new HashMap<>();
+        List<Object[]> rows = transactionRepository.getMonthlyStatistics(
+                userId, LocalDate.of(year, 1, 1).atStartOfDay(), LocalDate.of(year, 12, 31).atTime(LocalTime.MAX));
+        for (Object[] row : rows) {
+            byMonth.put(toLocalDateTime(row[0]).format(DateTimeFormatter.ofPattern("yyyy-MM")), row);
+        }
+
+        BigDecimal savings = balanceAt(userId, LocalDate.of(year, 1, 1).atStartOfDay());
+
+        List<MonthlyDataDto> result = new ArrayList<>(12);
+        for (int m = 1; m <= 12; m++) {
+            LocalDate monthDate = LocalDate.of(year, m, 1);
+            String month = monthDate.format(DateTimeFormatter.ofPattern("yyyy-MM"));
+            Object[] row = byMonth.get(month);
+
+            BigDecimal netChange = row == null ? BigDecimal.ZERO : toBigDecimal(row[3]);
+            savings = savings.add(netChange);
+
+            result.add(MonthlyDataDto.builder()
+                    .month(month)
+                    .monthLabel(monthDate.format(DateTimeFormatter.ofPattern("MMM yyyy")))
+                    .income(row == null ? BigDecimal.ZERO : toBigDecimal(row[1]))
+                    .expense(row == null ? BigDecimal.ZERO : toBigDecimal(row[2]))
+                    .netChange(netChange)
+                    .savings(savings)
+                    .transactionCount(row == null ? 0L : toLong(row[4]))
+                    .build());
+        }
+        return result;
+    }
+
+    private List<MonthlyDataDto> buildSparseMonths(Long userId, LocalDateTime fromDate, LocalDateTime toDate) {
+        List<Object[]> rows = transactionRepository.getMonthlyStatistics(userId, fromDate, toDate);
+        BigDecimal savings = balanceAt(userId, fromDate);
+
+        List<MonthlyDataDto> result = new ArrayList<>(rows.size());
+        for (Object[] row : rows) {
+            LocalDateTime monthDate = toLocalDateTime(row[0]);
+            BigDecimal netChange = toBigDecimal(row[3]);
+            savings = savings.add(netChange);
+
+            result.add(MonthlyDataDto.builder()
+                    .month(monthDate.format(DateTimeFormatter.ofPattern("yyyy-MM")))
+                    .monthLabel(monthDate.format(DateTimeFormatter.ofPattern("MMM yyyy")))
+                    .income(toBigDecimal(row[1]))
+                    .expense(toBigDecimal(row[2]))
+                    .netChange(netChange)
+                    .savings(savings)
+                    .transactionCount(toLong(row[4]))
+                    .build());
+        }
+        return result;
+    }
+
+    /**
+     * Накопления на указанный момент = фактическая сумма слитков минус изменения,
+     * произошедшие после него. Источник истины — сами слитки, а не лог операций.
+     */
+    private BigDecimal balanceAt(Long userId, LocalDateTime moment) {
+        BigDecimal current = bullionRepository.getTotalAmountByUserId(userId);
+        BigDecimal deltaAfter = transactionRepository.getDeltaAfter(userId, moment);
+        return current.subtract(deltaAfter == null ? BigDecimal.ZERO : deltaAfter);
+    }
+
+    @Transactional(readOnly = true)
+    public DashboardDailyStatisticsDto getDailyStatistics(Long userId, int year, int month) {
+        Map<Integer, Object[]> byDay = transactionRepository.getDailyStatistics(userId, year, month).stream()
+                .collect(Collectors.toMap(row -> toLong(row[0]).intValue(), row -> row));
+
+        int daysInMonth = LocalDate.of(year, month, 1).lengthOfMonth();
+        BigDecimal savings = balanceAt(userId, LocalDate.of(year, month, 1).atStartOfDay());
+
+        List<DashboardDailyStatisticsDto.DailyDataDto> dailyData = new ArrayList<>(daysInMonth);
+        for (int day = 1; day <= daysInMonth; day++) {
+            Object[] row = byDay.get(day);
+
+            BigDecimal income = row == null ? BigDecimal.ZERO : toBigDecimal(row[1]);
+            BigDecimal expense = row == null ? BigDecimal.ZERO : toBigDecimal(row[2]);
+            BigDecimal dailyChange = row == null ? BigDecimal.ZERO : toBigDecimal(row[3]);
+            savings = savings.add(dailyChange);
+
+            dailyData.add(DashboardDailyStatisticsDto.DailyDataDto.builder()
+                    .day(day)
+                    .date(String.format("%02d.%02d", day, month))
+                    .savings(savings)
+                    .dailyChange(dailyChange)
+                    .income(income)
+                    .expense(expense)
+                    .transactionCount(row == null ? 0L : toLong(row[4]))
+                    .build());
+        }
+
+        return DashboardDailyStatisticsDto.builder()
+                .year(year)
+                .month(month)
+                .monthLabel(LocalDate.of(year, month, 1).format(DateTimeFormatter.ofPattern("MMMM yyyy")))
+                .totalAmount(savings)
+                .dailyData(dailyData)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Integer> getAvailableYears(Long userId) {
+        List<Integer> years = transactionRepository.getAvailableYears(userId);
+        return years.isEmpty() ? List.of(LocalDate.now().getYear()) : years;
+    }
+
+    // ------------------------------------------------------------------
+    // История
+    // ------------------------------------------------------------------
+
+    @Transactional(readOnly = true)
+    public TransactionHistoryResponse getTransactionHistory(
+            Long userId, String kind, LocalDate fromDate, LocalDate toDate, Pageable pageable) {
+
+        int offset = (int) pageable.getOffset();
+        int limit = pageable.getPageSize();
+        LocalDateTime from = fromDate == null ? null : fromDate.atStartOfDay();
+        LocalDateTime to = toDate == null ? null : toDate.atTime(LocalTime.MAX);
+        String kindFilter = StringUtils.isBlank(kind) ? null : TransactionKind.valueOf(kind).name();
+
+        List<Transaction> transactions = transactionRepository.findTransactionHistory(
+                userId, offset, limit, from, to, kindFilter);
+        long total = transactionRepository.countTransactionHistory(userId, from, to, kindFilter);
+
+        return TransactionHistoryResponse.builder()
+                .content(toDtos(transactions))
+                .totalElements(total)
+                .totalPages((int) Math.ceil((double) total / limit))
+                .currentPage(pageable.getPageNumber())
+                .pageSize(limit)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TransactionDto> getTransactionChain(Long transactionId) {
+        return toDtos(transactionRepository.findByReversalOfIdOrIdOrderByCreatedAtAsc(transactionId, transactionId));
+    }
+
+    @Transactional(readOnly = true)
+    public List<TransactionDto> getBullionHistory(Long bullionId) {
+        return toDtos(transactionRepository.findBullionHistory(bullionId));
+    }
+
+    // ------------------------------------------------------------------
+    // Преобразование в DTO
+    // ------------------------------------------------------------------
+
+    private List<TransactionDto> toDtos(List<Transaction> transactions) {
+        if (transactions.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> ids = transactions.stream().map(Transaction::getId).collect(Collectors.toSet());
+        Map<Long, Long> reversedBy = transactionRepository.findReversalsOf(ids).stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+
+        return transactions.stream()
+                .map(transaction -> toDto(transaction, reversedBy.get(transaction.getId())))
+                .collect(Collectors.toList());
+    }
+
+    private TransactionDto toDto(Transaction transaction, Long reversedById) {
+        return TransactionDto.builder()
+                .id(transaction.getId())
+                .kind(transaction.getKind())
+                .sourceBullionId(transaction.getSourceBullionId())
+                .targetBullionId(transaction.getTargetBullionId())
+                .amount(transaction.getAmount())
+                .signedAmount(transaction.getSignedAmount())
+                .description(buildDescription(transaction))
+                .descriptionSegments(buildDescriptionSegments(transaction))
+                .comment(transaction.getComment())
+                .createdAt(transaction.getCreatedAt())
+                .dateOperation(transaction.getDateOperation())
+                .imported(transaction.isImported())
+                .canRollback(reversedById == null)
+                .reversalOfId(transaction.getReversalOfId())
+                .reversedById(reversedById)
+                .build();
+    }
+
+    private String buildDescription(Transaction transaction) {
+        BigDecimal amount = transaction.getAmount();
+        return switch (transaction.getKind()) {
+            case DEPOSIT -> "Пополнение на сумму " + amount + " слитка " + describeBullionById(transaction.getTargetBullionId());
+            case WITHDRAWAL -> "Снятие суммы " + amount + " со слитка " + describeBullionById(transaction.getSourceBullionId());
+            case TRANSFER -> "Перевод суммы " + amount + " из слитка " + describeBullionById(transaction.getSourceBullionId())
+                    + " в " + describeBullionById(transaction.getTargetBullionId());
+            case OPENING_BALANCE -> "Начальный остаток " + amount + " слитка "
+                    + describeBullionById(transaction.getTargetBullionId() != null
+                        ? transaction.getTargetBullionId() : transaction.getSourceBullionId());
+        };
+    }
+
+    /**
+     * Цветные сегменты описания: наименование слитка — своим цветом,
+     * банк — оранжевым, хранилище — жёлтым, служебный текст без цвета.
+     */
+    private List<DescriptionSegmentDto> buildDescriptionSegments(Transaction transaction) {
+        BigDecimal amount = transaction.getAmount();
+        List<DescriptionSegmentDto> segments = new ArrayList<>();
+
+        switch (transaction.getKind()) {
+            case DEPOSIT -> {
+                segments.add(segment("Пополнение на сумму " + amount + " слитка ", null));
+                segments.addAll(describeBullionSegmentsById(transaction.getTargetBullionId()));
+            }
+            case WITHDRAWAL -> {
+                segments.add(segment("Снятие суммы " + amount + " со слитка ", null));
+                segments.addAll(describeBullionSegmentsById(transaction.getSourceBullionId()));
+            }
+            case TRANSFER -> {
+                segments.add(segment("Перевод суммы " + amount + " из слитка ", null));
+                segments.addAll(describeBullionSegmentsById(transaction.getSourceBullionId()));
+                segments.add(segment(" в ", null));
+                segments.addAll(describeBullionSegmentsById(transaction.getTargetBullionId()));
+            }
+            case OPENING_BALANCE -> {
+                segments.add(segment("Начальный остаток " + amount + " слитка ", null));
+                segments.addAll(describeBullionSegmentsById(transaction.getTargetBullionId() != null
+                        ? transaction.getTargetBullionId() : transaction.getSourceBullionId()));
+            }
+        }
+
+        return segments;
+    }
+
+    /**
+     * Человекочитаемое описание слитка: «Наименование (Цвет) | Банк | Хранилище».
+     * Банк опускается, если у хранилища его нет.
      */
     private String describeBullion(Bullion bullion) {
         if (bullion == null) {
@@ -505,10 +610,6 @@ public class TransactionService {
         return sb.toString();
     }
 
-    /**
-     * То же, что {@link #describeBullion(Bullion)}, но в виде цветных сегментов:
-     * название слитка — цветом наименования, банк — оранжевым, хранилище — жёлтым.
-     */
     private List<DescriptionSegmentDto> describeBullionSegments(Bullion bullion) {
         List<DescriptionSegmentDto> segments = new ArrayList<>();
         if (bullion == null) {
@@ -519,14 +620,13 @@ public class TransactionService {
         BullionName bullionName = bullion.getBullionName();
         if (bullionName != null) {
             segments.add(segment(bullionName.getTitle(), bullionName.getColor()));
-            segments.add(segment(" | ", null));
         } else {
             segments.add(segment("слиток #" + bullion.getId(), null));
-            segments.add(segment(" | ", null));
         }
 
         Vault vault = bullion.getVault();
         if (vault != null) {
+            segments.add(segment(" | ", null));
             if (vault.getBank() != null && vault.getBank().getName() != null) {
                 segments.add(segment(vault.getBank().getName(), BANK_COLOR));
                 segments.add(segment(" | ", null));
@@ -537,315 +637,6 @@ public class TransactionService {
         return segments;
     }
 
-    private DescriptionSegmentDto segment(String text, String color) {
-        return DescriptionSegmentDto.builder().text(text).color(color).build();
-    }
-
-    public List<TransactionLog> getBullionHistory(Long bullionId) {
-        return transactionLogRepository.findByFromBullionIdOrderByCreatedAtDesc(bullionId);
-    }
-
-    @Transactional(readOnly = true)
-    public DashboardStatisticsDto getDashboardStatistics(Long userId, Integer year) {
-        LocalDateTime fromDate;
-        LocalDateTime toDate = LocalDateTime.now();
-
-        if (year != null) {
-            fromDate = LocalDate.of(year, 1, 1).atStartOfDay();
-            toDate = LocalDate.of(year, 12, 31).atTime(23, 59, 59);
-        } else {
-            fromDate = LocalDate.of(1970, 1, 1).atStartOfDay();
-        }
-
-        List<MonthlyDataDto> monthlyData = getMonthlyStatistics(userId, fromDate, toDate);
-
-        // Накопления не должны обнуляться в начале года — берём остаток за все
-        // предыдущие годы как стартовый баланс и ведём нарастающий итог.
-        BigDecimal startBalance = year != null
-                ? getBalanceBeforeYear(userId, year)
-                : BigDecimal.ZERO;
-
-        if (year != null) {
-            // Разворачиваем в полные 12 месяцев, чтобы месяцы без транзакций
-            // сохраняли накопления предыдущего месяца, а не проваливались в ноль.
-            monthlyData = buildFullYearMonths(monthlyData, year, startBalance);
-        } else {
-            BigDecimal cumulative = startBalance;
-            for (MonthlyDataDto month : monthlyData) {
-                cumulative = cumulative.add(month.getNetChange());
-                month.setSavings(cumulative);
-            }
-        }
-
-        List<Object[]> totalStats = transactionLogRepository.getTotalStatistics(userId, fromDate, toDate);
-
-        BigDecimal totalIncome = BigDecimal.ZERO;
-        BigDecimal totalExpense = BigDecimal.ZERO;
-        Long totalTransactions = 0L;
-
-        if (totalStats != null && !totalStats.isEmpty()) {
-            Object[] row = totalStats.get(0);
-            totalIncome = row[0] != null ? new BigDecimal(row[0].toString()) : BigDecimal.ZERO;
-            totalExpense = row[1] != null ? new BigDecimal(row[1].toString()) : BigDecimal.ZERO;
-            totalTransactions = row[2] != null ? ((Number) row[2]).longValue() : 0L;
-        }
-
-        List<TransactionLog> recentLogs = transactionLogRepository.findLastSuccessfulTransactions(userId, 5);
-        List<TransactionLogDto> recentTransactions = recentLogs.stream()
-                .map(this::convertToDto)
-                .collect(Collectors.toList());
-
-        // Получаем общую сумму всех слитков пользователя
-        BigDecimal totalAmount = bullionRepository.getTotalAmountByUserId(userId);
-
-        List<Object[]> opStats = transactionLogRepository.getOperationTypeStatistics(userId, fromDate, toDate);
-        List<OperationTypeStatsDto> operationTypeStats = opStats.stream()
-                .map(row -> OperationTypeStatsDto.builder()
-                        .operationType((String) row[0])
-                        .count(((Number) row[1]).longValue())
-                        .totalAmount((BigDecimal) row[2])
-                        .build())
-                .collect(Collectors.toList());
-
-        return DashboardStatisticsDto.builder()
-                .monthlyData(monthlyData)
-                .totalIncome(totalIncome)
-                .totalExpense(totalExpense)
-                .netChange(totalIncome.subtract(totalExpense))
-                .totalAmount(totalAmount)
-                .totalTransactions(totalTransactions)
-                .recentTransactions(recentTransactions)
-                .operationTypeStats(operationTypeStats.isEmpty() ? null : operationTypeStats.get(0))
-                .build();
-    }
-
-    @Transactional(readOnly = true)
-    public List<MonthlyDataDto> getMonthlyStatistics(Long userId, LocalDateTime fromDate, LocalDateTime toDate) {
-        List<Object[]> results = transactionLogRepository.getMonthlyStatistics(userId, fromDate, toDate);
-
-        if (results.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<MonthlyDataDto> monthlyData = new ArrayList<>();
-
-        for (Object[] row : results) {
-            java.sql.Timestamp timestamp;
-            if (row[0] instanceof java.time.Instant) {
-                timestamp = new java.sql.Timestamp(((java.time.Instant) row[0]).toEpochMilli());
-            } else if (row[0] instanceof java.sql.Timestamp) {
-                timestamp = (java.sql.Timestamp) row[0];
-            } else {
-                throw new ApplicationException(5000, "Unexpected type for date_operation column: " + row[0].getClass().getName());
-            }
-            LocalDateTime monthDate = timestamp.toLocalDateTime();
-
-            BigDecimal income = row[1] != null ? new BigDecimal(row[1].toString()) : BigDecimal.ZERO;
-            BigDecimal expense = row[2] != null ? new BigDecimal(row[2].toString()) : BigDecimal.ZERO;
-            Long transactionCount = row[3] != null ? ((Number) row[3]).longValue() : 0L;
-
-            String month = monthDate.format(DateTimeFormatter.ofPattern("yyyy-MM"));
-            String monthLabel = monthDate.format(DateTimeFormatter.ofPattern("MMM yyyy"));
-
-            MonthlyDataDto dto = MonthlyDataDto.builder()
-                    .month(month)
-                    .monthLabel(monthLabel)
-                    .income(income)
-                    .expense(expense)
-                    .netChange(income.subtract(expense))
-                    .transactionCount(transactionCount)
-                    .build();
-
-            monthlyData.add(dto);
-        }
-
-        return monthlyData;
-    }
-
-    /**
-     * Разворачивает статистику в полный список из 12 месяцев года.
-     * Месяцы без транзакций получают нулевое изменение, но нарастающий итог
-     * (savings) переносится с предыдущего месяца — накопления не теряются.
-     *
-     * @param sparseData   месяцы, где реально были транзакции (могут идти с пропусками)
-     * @param year         год, за который строим статистику
-     * @param startBalance накопления на начало года (остаток за прошлые годы)
-     */
-    private List<MonthlyDataDto> buildFullYearMonths(
-            List<MonthlyDataDto> sparseData, int year, BigDecimal startBalance) {
-
-        Map<String, MonthlyDataDto> byMonth = new HashMap<>();
-        for (MonthlyDataDto dto : sparseData) {
-            byMonth.put(dto.getMonth(), dto);
-        }
-
-        List<MonthlyDataDto> result = new ArrayList<>(12);
-        BigDecimal cumulative = startBalance;
-
-        for (int m = 1; m <= 12; m++) {
-            LocalDate monthDate = LocalDate.of(year, m, 1);
-            String month = monthDate.format(DateTimeFormatter.ofPattern("yyyy-MM"));
-            String monthLabel = monthDate.format(DateTimeFormatter.ofPattern("MMM yyyy"));
-
-            MonthlyDataDto existing = byMonth.get(month);
-
-            BigDecimal income = existing != null ? existing.getIncome() : BigDecimal.ZERO;
-            BigDecimal expense = existing != null ? existing.getExpense() : BigDecimal.ZERO;
-            BigDecimal netChange = income.subtract(expense);
-            Long transactionCount = existing != null ? existing.getTransactionCount() : 0L;
-
-            cumulative = cumulative.add(netChange);
-
-            result.add(MonthlyDataDto.builder()
-                    .month(month)
-                    .monthLabel(monthLabel)
-                    .income(income)
-                    .expense(expense)
-                    .netChange(netChange)
-                    .savings(cumulative)
-                    .transactionCount(transactionCount)
-                    .build());
-        }
-
-        return result;
-    }
-
-    @Transactional(readOnly = true)
-    public TransactionHistoryResponse getTransactionHistory(
-            Long userId,
-            String operationType,
-            String status,
-            LocalDate fromDate,
-            LocalDate toDate,
-            Pageable pageable) {
-
-        int offset = (int) pageable.getOffset();
-        int limit = pageable.getPageSize();
-        LocalDateTime from = fromDate == null ? null : fromDate.atStartOfDay();
-        LocalDateTime to = toDate == null ? null : toDate.atTime(LocalTime.MAX);
-        String opType = StringUtils.isBlank(operationType) ? null : OperationType.valueOf(operationType).name();
-        List<TransactionLog> logs = transactionLogRepository.findTransactionHistory(
-                userId, offset, limit, from, to, opType, status);
-        long total = transactionLogRepository.countTransactionHistory(
-                userId, from, to, opType, status);
-
-        List<TransactionLogDto> content = logs.stream()
-                .map(this::convertToDto)
-                .collect(Collectors.toList());
-
-        int totalPages = (int) Math.ceil((double) total / limit);
-
-        return TransactionHistoryResponse.builder()
-                .content(content)
-                .totalElements(total)
-                .totalPages(totalPages)
-                .currentPage(pageable.getPageNumber())
-                .pageSize(limit)
-                .build();
-    }
-
-    @Transactional(readOnly = true)
-    public List<TransactionLogDto> getTransactionChain(Long transactionLogId) {
-        List<TransactionLog> chain = transactionLogRepository
-                .findByParentTransactionIdOrIdOrderByCreatedAtAsc(transactionLogId, transactionLogId);
-
-        return chain.stream()
-                .map(this::convertToDto)
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public List<Integer> getAvailableYears(Long userId) {
-        Optional<TransactionLog> first = transactionLogRepository
-                .findFirstByUserIdOrderByCreatedAtDesc(userId);
-
-        if (first.isEmpty()) {
-            return Collections.singletonList(LocalDate.now().getYear());
-        }
-
-        int currentYear = LocalDate.now().getYear();
-        int firstYear = first.get().getCreatedAt().getYear();
-
-        List<Integer> years = new ArrayList<>();
-        for (int year = firstYear; year <= currentYear; year++) {
-            years.add(year);
-        }
-        return years;
-    }
-
-    private TransactionLogDto convertToDto(TransactionLog log) {
-        boolean canRollback = "SUCCESS".equals(log.getStatus()) &&
-                !"ROLLED_BACK".equals(log.getStatus()) &&
-                !"REDONE".equals(log.getStatus());
-
-        boolean canRedo = "ROLLED_BACK".equals(log.getStatus());
-
-        String rollbackStatus = null;
-        if ("ROLLED_BACK".equals(log.getStatus())) {
-            rollbackStatus = "ROLLED_BACK";
-        } else if ("REDONE".equals(log.getStatus())) {
-            rollbackStatus = "REDONE";
-        }
-
-        return TransactionLogDto.builder()
-                .id(log.getId())
-                .operationType(log.getOperationType())
-                .fromBullionId(log.getFromBullionId())
-                .toBullionId(log.getToBullionId())
-                .amount(log.getAmount())
-                .description(buildDescription(log))
-                .descriptionSegments(buildDescriptionSegments(log))
-                .userComment(log.getUserComment())
-                .status(log.getStatus())
-                .errorMessage(log.getErrorMessage())
-                .createdAt(log.getCreatedAt())
-                .dateOperation(log.getDateOperation())
-                .canRollback(canRollback)
-                .canRedo(canRedo)
-                .rollbackStatus(rollbackStatus)
-                .parentTransactionId(log.getParentTransactionId())
-                .build();
-    }
-
-    /**
-     * Строит описание транзакции с человекочитаемыми названиями слитков
-     * (наименование, цвет, банк, хранилище) вместо технических id.
-     * Работает и для старых записей истории, где в description сохранены id.
-     */
-    private String buildDescription(TransactionLog log) {
-        BigDecimal amount = log.getAmount();
-        String operationType = log.getOperationType();
-
-        switch (operationType) {
-            case "REFILL_BULLION" -> {
-                String to = describeBullionById(log.getToBullionId());
-                return "Пополнение на сумму " + amount + " слитка " + to;
-            }
-            case "WITHDRAW_BULLION" -> {
-                String to = describeBullionById(log.getToBullionId());
-                return "Снятие суммы " + amount + " слитка " + to;
-            }
-            case "TRANSFER_AMOUNT" -> {
-                String from = describeBullionById(log.getFromBullionId());
-                String to = describeBullionById(log.getToBullionId());
-                return "Перевод суммы " + amount + " из слитка " + from + " в " + to;
-            }
-            case "TRANSFER_BULLION" -> {
-                // Слиток-источник удаляется после перемещения, поэтому по id его
-                // уже не восстановить — используем описание, сохранённое при записи.
-                return log.getDescription();
-            }
-            default -> {
-                // Откаты и прочие типы — оставляем как есть
-                return log.getDescription();
-            }
-        }
-    }
-
-    /**
-     * Описание слитка по его id. Если слиток уже удалён (например, после
-     * перемещения), возвращает запасной вариант с id.
-     */
     private String describeBullionById(Long bullionId) {
         if (bullionId == null) {
             return "—";
@@ -853,42 +644,6 @@ public class TransactionService {
         return bullionRepository.findById(bullionId)
                 .map(this::describeBullion)
                 .orElse("слиток #" + bullionId);
-    }
-
-    /**
-     * Цветные сегменты описания транзакции — параллель к {@link #buildDescription}.
-     * Название слитка красится цветом наименования, банк — оранжевым, хранилище — жёлтым.
-     * Служебный текст («Пополнение на сумму …») идёт без цвета.
-     */
-    private List<DescriptionSegmentDto> buildDescriptionSegments(TransactionLog log) {
-        BigDecimal amount = log.getAmount();
-        String operationType = log.getOperationType();
-
-        List<DescriptionSegmentDto> segments = new ArrayList<>();
-
-        switch (operationType) {
-            case "REFILL_BULLION" -> {
-                segments.add(segment("Пополнение на сумму " + amount + " слитка ", null));
-                segments.addAll(describeBullionSegmentsById(log.getToBullionId()));
-            }
-            case "WITHDRAW_BULLION" -> {
-                segments.add(segment("Снятие суммы " + amount + " слитка ", null));
-                segments.addAll(describeBullionSegmentsById(log.getToBullionId()));
-            }
-            case "TRANSFER_AMOUNT" -> {
-                segments.add(segment("Перевод суммы " + amount + " из слитка ", null));
-                segments.addAll(describeBullionSegmentsById(log.getFromBullionId()));
-                segments.add(segment(" в ", null));
-                segments.addAll(describeBullionSegmentsById(log.getToBullionId()));
-            }
-            default -> {
-                // TRANSFER_BULLION, откаты и прочее — цветной разбивки нет,
-                // фронт отрисует плоский description.
-                segments.add(segment(buildDescription(log), null));
-            }
-        }
-
-        return segments;
     }
 
     private List<DescriptionSegmentDto> describeBullionSegmentsById(Long bullionId) {
@@ -900,101 +655,35 @@ public class TransactionService {
                 .orElse(List.of(segment("слиток #" + bullionId, null)));
     }
 
-    @Transactional(readOnly = true)
-    public DashboardDailyStatisticsDto getDailyStatistics(Long userId, int year, int month) {
-        List<Object[]> results = transactionLogRepository.getDailyStatistics(userId, year, month);
-
-        String monthName = LocalDate.of(year, month, 1)
-                .format(DateTimeFormatter.ofPattern("MMMM yyyy"));
-
-        List<DashboardDailyStatisticsDto.DailyDataDto> dailyData = new ArrayList<>();
-        // Стартуем не с нуля, а с накоплений на конец предыдущего месяца,
-        // чтобы дневной график продолжал общий нарастающий итог.
-        BigDecimal cumulativeTotal = getBalanceBefore(userId, LocalDate.of(year, month, 1).atStartOfDay());
-
-        // Получаем количество дней в месяце
-        int daysInMonth = LocalDate.of(year, month, 1).lengthOfMonth();
-
-        // Создаем мапу для быстрого доступа к данным по дням
-        Map<Integer, Object[]> dayMap = results.stream()
-                .collect(Collectors.toMap(
-                        row -> ((Number) row[0]).intValue(),
-                        row -> row
-                ));
-
-        for (int day = 1; day <= daysInMonth; day++) {
-            Object[] row = dayMap.get(day);
-
-            BigDecimal income = BigDecimal.ZERO;
-            BigDecimal expense = BigDecimal.ZERO;
-            Long transactionCount = 0L;
-
-            if (row != null) {
-                income = row[1] != null ? new BigDecimal(row[1].toString()) : BigDecimal.ZERO;
-                expense = row[2] != null ? new BigDecimal(row[2].toString()) : BigDecimal.ZERO;
-                transactionCount = row[3] != null ? ((Number) row[3]).longValue() : 0L;
-            }
-
-            BigDecimal dailyChange = income.subtract(expense);
-            cumulativeTotal = cumulativeTotal.add(dailyChange);
-
-            DashboardDailyStatisticsDto.DailyDataDto dto = DashboardDailyStatisticsDto.DailyDataDto.builder()
-                    .day(day)
-                    .date(String.format("%02d.%02d", day, month))
-                    .savings(cumulativeTotal)
-                    .dailyChange(dailyChange)
-                    .income(income)
-                    .expense(expense)
-                    .transactionCount(transactionCount)
-                    .build();
-
-            dailyData.add(dto);
+    private String describeVault(Vault vault) {
+        if (vault.getBank() != null && vault.getBank().getName() != null) {
+            return vault.getBank().getName() + " | " + vault.getName();
         }
-
-        return DashboardDailyStatisticsDto.builder()
-                .year(year)
-                .month(month)
-                .monthLabel(monthName)
-                .totalAmount(cumulativeTotal)
-                .dailyData(dailyData)
-                .build();
+        return vault.getName();
     }
 
-
-    @Transactional(readOnly = true)
-    public BigDecimal getBalanceBeforeYear(Long userId, int year) {
-        LocalDateTime startOfYear = LocalDate.of(year, 1, 1).atStartOfDay();
-        return getBalanceBefore(userId, startOfYear);
+    private DescriptionSegmentDto segment(String text, String color) {
+        return DescriptionSegmentDto.builder().text(text).color(color).build();
     }
 
-    /**
-     * Суммарный остаток (доходы − расходы) по всем успешным операциям
-     * строго до указанного момента времени.
-     */
-    @Transactional(readOnly = true)
-    public BigDecimal getBalanceBefore(Long userId, LocalDateTime before) {
-        LocalDateTime upperBound = before.minusNanos(1);
+    // ------------------------------------------------------------------
 
-        List<Object[]> stats = transactionLogRepository.getTotalStatistics(
-                userId,
-                LocalDate.of(1970, 1, 1).atStartOfDay(),
-                upperBound
-        );
+    private static BigDecimal toBigDecimal(Object value) {
+        return value == null ? BigDecimal.ZERO : new BigDecimal(value.toString());
+    }
 
-        if (stats != null && !stats.isEmpty()) {
-            Object[] row = stats.get(0);
+    private static Long toLong(Object value) {
+        return value == null ? 0L : ((Number) value).longValue();
+    }
 
-            BigDecimal totalIncome = row[0] != null
-                    ? new BigDecimal(row[0].toString())
-                    : BigDecimal.ZERO;
-
-            BigDecimal totalExpense = row[1] != null
-                    ? new BigDecimal(row[1].toString())
-                    : BigDecimal.ZERO;
-
-            return totalIncome.subtract(totalExpense);
+    private static LocalDateTime toLocalDateTime(Object value) {
+        if (value instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toLocalDateTime();
         }
-
-        return BigDecimal.ZERO;
+        if (value instanceof java.time.Instant instant) {
+            return LocalDateTime.ofInstant(instant, java.time.ZoneId.systemDefault());
+        }
+        throw new ApplicationException(INTERNAL_ERROR.getCode(),
+                "Неожиданный тип колонки date_operation: " + value.getClass().getName());
     }
 }

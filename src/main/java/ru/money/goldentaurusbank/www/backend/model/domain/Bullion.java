@@ -37,7 +37,15 @@ public class Bullion {
     
     @Column(length = 500)
     private String description;
-    
+
+    /**
+     * Слиток с историей нельзя удалить физически — на него ссылаются транзакции.
+     * Архивный слиток не попадает в списки и в сумму накоплений.
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean archived = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
