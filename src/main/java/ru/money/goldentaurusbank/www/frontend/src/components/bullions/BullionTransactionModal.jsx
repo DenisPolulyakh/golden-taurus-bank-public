@@ -19,6 +19,9 @@ const formatAmount = (amount) => {
     return formattedInteger;
 };
 
+// Кнопки быстрого ввода: прибавляются к текущей сумме
+const QUICK_AMOUNTS = [100, 500, 1000, 2000, 3000, 5000, 10000];
+
 function BullionTransactionModal({
                                      isOpen,
                                      onClose,
@@ -47,6 +50,7 @@ function BullionTransactionModal({
                                      onSelectFromBullion = null,
                                      selectedFromBullionId = null,
                                      initialDateOperation = null,
+                                     availableAmount = null,
                                  }) {
     const [amount, setAmount] = useState('');
     const [amountDisplay, setAmountDisplay] = useState('');
@@ -272,6 +276,67 @@ function BullionTransactionModal({
         setSelectedVaultId(option?.value || '');
     };
 
+    // Остаток, который подставляет кнопка "Всё":
+    // при переводе - остаток слитка-отправителя, при снятии - остаток текущего слитка.
+    const getAvailableBalance = () => {
+        if (isTransferModal) return maxTransferAmount || 0;
+        if (type !== 'withdraw') return 0;
+        if (availableAmount !== null && availableAmount !== undefined) {
+            const num = typeof availableAmount === 'string' ? parseFloat(availableAmount) : availableAmount;
+            return isNaN(num) ? 0 : num;
+        }
+        const vault = getAvailableVaults().find(v => v.id === parseInt(selectedVaultId));
+        return vault?.amount || 0;
+    };
+
+    // В пополнении кнопки "Всё" нет
+    const showAllButton = (isTransferModal || type === 'withdraw') && getAvailableBalance() > 0;
+
+    // Пока не выбран слиток-отправитель, поле суммы перевода заблокировано
+    const quickAmountsDisabled = isTransferModal && !selectedFromOption;
+
+    const applyAmount = (value) => {
+        const rounded = Math.round(value * 100) / 100;
+        setAmountDisplay(rounded.toLocaleString('ru-RU', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2
+        }));
+        setAmount(rounded.toString());
+        validateAmount(rounded);
+        setError('');
+    };
+
+    const handleQuickAdd = (value) => {
+        const current = parseFloat(amount);
+        applyAmount((isNaN(current) ? 0 : current) + value);
+    };
+
+    const renderQuickAmounts = () => (
+        <div className="quick-amount-row">
+            {QUICK_AMOUNTS.map(preset => (
+                <button
+                    key={preset}
+                    type="button"
+                    className="quick-amount-btn"
+                    onClick={() => handleQuickAdd(preset)}
+                    disabled={quickAmountsDisabled}
+                >
+                    {formatAmount(preset)}
+                </button>
+            ))}
+            {showAllButton && (
+                <button
+                    type="button"
+                    className="quick-amount-btn quick-amount-btn-all"
+                    onClick={() => applyAmount(getAvailableBalance())}
+                    disabled={quickAmountsDisabled}
+                >
+                    Всё
+                </button>
+            )}
+        </div>
+    );
+
     const isSubmitDisabled = () => {
         if (saving) return true;
         if (isTransferModal) {
@@ -491,6 +556,7 @@ function BullionTransactionModal({
                                         className={!isAmountValid && amountError ? 'input-error' : ''}
                                         disabled={!selectedFromOption}
                                     />
+                                    {renderQuickAmounts()}
                                     {amountError && (
                                         <div className="amount-warning">
                                             ⚠️ {amountError}
@@ -654,6 +720,7 @@ function BullionTransactionModal({
                                     inputMode="decimal"
                                     autoFocus
                                 />
+                                {renderQuickAmounts()}
                                 <small className="input-hint">
                                     Используйте точку или запятую для копеек
                                 </small>

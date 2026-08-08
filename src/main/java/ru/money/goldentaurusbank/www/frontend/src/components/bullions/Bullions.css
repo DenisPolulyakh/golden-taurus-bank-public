@@ -497,6 +497,55 @@
     margin-top: 5px;
 }
 
+/* ========== БЫСТРЫЙ ВВОД СУММЫ ========== */
+.quick-amount-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.quick-amount-btn {
+    background: #f8f9fa;
+    color: #4a5568;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.quick-amount-btn:hover:not(:disabled) {
+    background: #edf2f7;
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.quick-amount-btn:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.quick-amount-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.quick-amount-btn-all {
+    background: #667eea;
+    border-color: #667eea;
+    color: white;
+}
+
+.quick-amount-btn-all:hover:not(:disabled) {
+    background: #5a67d8;
+    border-color: #5a67d8;
+    color: white;
+}
+
 /* ========== MODAL FOOTER ========== */
 .modal-footer {
     display: flex;
@@ -1101,5 +1150,15 @@
 
     .react-select__control {
         min-height: 38px !important;
+    }
+
+    .quick-amount-row {
+        gap: 6px;
+        margin-top: 8px;
+    }
+
+    .quick-amount-btn {
+        padding: 5px 11px;
+        font-size: 12px;
     }
 }

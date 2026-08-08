@@ -627,6 +627,7 @@ function VaultBullionsPage() {
                         vaultSelectorLabel={currentTransaction.vaultSelectorLabel}
                         type={currentTransaction.type || null}
                         initialDateOperation={transactionModal.dateOperation}
+                        availableAmount={transactionModal.bullion?.amount}
                     />
                 )}
 
