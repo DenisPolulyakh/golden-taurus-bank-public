@@ -112,7 +112,3 @@ application-*.yml
 
 # Local config
 config.local.yml
-# Python (разовый скрипт импорта, tools/import-excel)
-__pycache__/
-*.pyc
-tools/import-excel/import.sql
