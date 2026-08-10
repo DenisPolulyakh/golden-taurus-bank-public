@@ -234,7 +234,7 @@ class BullionNameIntegrationTest {
                 new TypeReference<List<BullionNameResponse>>() {}
         );
         
-        assertThat(bullionNames).extracting(BullionNameResponse::getName)
+        assertThat(bullionNames).extracting(BullionNameResponse::getTitle)
                 .containsExactlyInAnyOrder("Продукты", "Транспорт", "Развлечения");
     }
 
@@ -389,7 +389,7 @@ class BullionNameIntegrationTest {
         
         // Проверяем, что имя не изменилось
         List<BullionNameResponse> bullionNames = getBullionNames();
-        assertThat(bullionNames).extracting(BullionNameResponse::getName)
+        assertThat(bullionNames).extracting(BullionNameResponse::getTitle)
                 .containsExactlyInAnyOrder("Еда", "Транспорт");
     }
 
