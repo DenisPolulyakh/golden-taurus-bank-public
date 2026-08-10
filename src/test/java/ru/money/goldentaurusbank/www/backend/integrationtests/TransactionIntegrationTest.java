@@ -18,6 +18,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -40,6 +42,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("Интеграционные тесты транзакций")
 class TransactionIntegrationTest {
 
+    private static final String OPERATION_DATE = "2026-07-20T12:00:00";
+    private static final BigDecimal OPENING_1 = new BigDecimal("100000");
+    private static final BigDecimal OPENING_2 = new BigDecimal("50000");
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -50,7 +56,7 @@ class TransactionIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private CategoryRepository categoryRepository;
+    private BullionNameRepository bullionNameRepository;
 
     @Autowired
     private VaultRepository vaultRepository;
@@ -59,7 +65,7 @@ class TransactionIntegrationTest {
     private BullionRepository bullionRepository;
 
     @Autowired
-    private TransactionLogRepository transactionLogRepository;
+    private TransactionRepository transactionRepository;
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
@@ -95,9 +101,8 @@ class TransactionIntegrationTest {
     }
 
     private String accessToken;
-    private Long userId;
-    private Long categoryId1;
-    private Long categoryId2;
+    private Long bullionNameId1;
+    private Long bullionNameId2;
     private Long vaultId1;
     private Long vaultId2;
     private Long bullionId1;
@@ -105,13 +110,12 @@ class TransactionIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        userRepository.deleteAll();
-        categoryRepository.deleteAll();
-        vaultRepository.deleteAll();
+        transactionRepository.deleteAll();
         bullionRepository.deleteAll();
-        transactionLogRepository.deleteAll();
+        vaultRepository.deleteAll();
+        bullionNameRepository.deleteAll();
+        userRepository.deleteAll();
 
-        // 1. Регистрация пользователя
         String registerRequest = """
                 {
                     "email": "transactionuser@example.com",
@@ -124,8 +128,7 @@ class TransactionIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(registerRequest));
 
-        User user = userRepository.findByEmail("transactionuser@example.com").get();
-        userId = user.getId();
+        User user = userRepository.findByEmail("transactionuser@example.com").orElseThrow();
 
         mockMvc.perform(get("/api/auth/verify")
                 .param("token", user.getVerificationToken()));
@@ -142,170 +145,171 @@ class TransactionIntegrationTest {
                         .content(loginRequest))
                 .andReturn();
 
-        String responseBody = loginResult.getResponse().getContentAsString();
-        JsonNode jsonNode = objectMapper.readTree(responseBody);
-        accessToken = jsonNode.get("data").get("token").asText();
+        accessToken = json(loginResult).get("data").get("token").asText();
 
-        // 2. Создаем категории
-        String createCategory1 = """
-                {
-                    "name": "Финансовая подушка"
-                }
-                """;
-        MvcResult catResult1 = mockMvc.perform(post("/api/categories")
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(createCategory1))
-                .andReturn();
-        categoryId1 = objectMapper.readTree(catResult1.getResponse().getContentAsString())
-                .get("data").get("id").asLong();
+        bullionNameId1 = createBullionName("Финансовая подушка");
+        bullionNameId2 = createBullionName("Накопления");
+        vaultId1 = createVault("Сбербанк");
+        vaultId2 = createVault("Тинькофф");
 
-        String createCategory2 = """
-                {
-                    "name": "Накопления"
-                }
-                """;
-        MvcResult catResult2 = mockMvc.perform(post("/api/categories")
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(createCategory2))
-                .andReturn();
-        categoryId2 = objectMapper.readTree(catResult2.getResponse().getContentAsString())
-                .get("data").get("id").asLong();
-
-        // 3. Создаем хранилища
-        String createVault1 = """
-                {
-                    "name": "Сбербанк"
-                }
-                """;
-        MvcResult vaultResult1 = mockMvc.perform(post("/api/vaults")
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(createVault1))
-                .andReturn();
-        vaultId1 = objectMapper.readTree(vaultResult1.getResponse().getContentAsString())
-                .get("data").get("id").asLong();
-
-        String createVault2 = """
-                {
-                    "name": "Тинькофф"
-                }
-                """;
-        MvcResult vaultResult2 = mockMvc.perform(post("/api/vaults")
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(createVault2))
-                .andReturn();
-        vaultId2 = objectMapper.readTree(vaultResult2.getResponse().getContentAsString())
-                .get("data").get("id").asLong();
-
-        // 4. Создаем слитки
-        String createBullion1 = """
-                {
-                    "categoryId": %d,
-                    "vaultId": %d,
-                    "amount": 100000,
-                    "dateOperation": "2026-07-20T12:00:00"
-                }
-                """.formatted(categoryId1, vaultId1);
-        MvcResult bullionResult1 = mockMvc.perform(post("/api/bullions")
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBullion1))
-                .andReturn();
-        bullionId1 = objectMapper.readTree(bullionResult1.getResponse().getContentAsString())
-                .get("data").get("id").asLong();
-
-        String createBullion2 = """
-                {
-                    "categoryId": %d,
-                    "vaultId": %d,
-                    "amount": 50000,
-                    "dateOperation": "2026-07-20T12:00:00"
-                }
-                """.formatted(categoryId2, vaultId2);
-        MvcResult bullionResult2 = mockMvc.perform(post("/api/bullions")
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBullion2))
-                .andReturn();
-        bullionId2 = objectMapper.readTree(bullionResult2.getResponse().getContentAsString())
-                .get("data").get("id").asLong();
+        // Создание слитка с суммой пишется стартовым остатком (opening_balance),
+        // а не пополнением — см. отдельный тест ниже.
+        bullionId1 = createBullion(bullionNameId1, vaultId1, OPENING_1);
+        bullionId2 = createBullion(bullionNameId2, vaultId2, OPENING_2);
     }
 
-    // ==================== ТЕСТЫ СТАТИСТИКИ ====================
+    // ==================== ДВИЖЕНИЕ НАКОПЛЕНИЙ ====================
 
     @Test
-    @DisplayName("Получение статистики дашборда - успешно")
-    void getDashboardStatisticsSuccess() throws Exception {
-        // Делаем несколько операций через существующие эндпоинты
-        performRefill(50000);
-        performRefill(30000);
-        performWithdraw(20000);
+    @DisplayName("Перевод между слитками не меняет накопления и создаёт ровно одну запись")
+    void transferKeepsSavingsAndWritesSingleRow() throws Exception {
+        long transactionsBefore = countTransactions();
+        BigDecimal savingsBefore = totalAmount();
 
-        mockMvc.perform(get("/api/transactions/dashboard/statistics")
+        performTransfer(bullionId1, bullionId2, 30000);
+
+        assertThat(countTransactions()).isEqualTo(transactionsBefore + 1);
+        assertThat(totalAmount()).isEqualByComparingTo(savingsBefore);
+        assertThat(bullionAmount(bullionId1)).isEqualByComparingTo(OPENING_1.subtract(new BigDecimal("30000")));
+        assertThat(bullionAmount(bullionId2)).isEqualByComparingTo(OPENING_2.add(new BigDecimal("30000")));
+
+        MvcResult result = mockMvc.perform(get("/api/transactions/history")
+                        .param("kind", "TRANSFER")
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.monthlyData").isArray())
-                .andExpect(jsonPath("$.totalIncome").exists())
-                .andExpect(jsonPath("$.totalExpense").exists())
-                .andExpect(jsonPath("$.netChange").exists())
-                .andExpect(jsonPath("$.totalTransactions").exists())
-                .andExpect(jsonPath("$.recentTransactions").isArray());
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].kind").value("TRANSFER"))
+                .andReturn();
+
+        JsonNode transfer = json(result).get("content").get(0);
+        assertThat(new BigDecimal(transfer.get("signedAmount").asText())).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     @Test
-    @DisplayName("Получение статистики дашборда за конкретный год")
-    void getDashboardStatisticsByYear() throws Exception {
+    @DisplayName("Пополнение и снятие двигают накопления на свою величину")
+    void depositAndWithdrawalMoveSavings() throws Exception {
+        BigDecimal savingsBefore = totalAmount();
+
+        performRefill(40000);
+        assertThat(totalAmount()).isEqualByComparingTo(savingsBefore.add(new BigDecimal("40000")));
+
+        performWithdraw(15000);
+        assertThat(totalAmount()).isEqualByComparingTo(savingsBefore.add(new BigDecimal("25000")));
+    }
+
+    @Test
+    @DisplayName("Снятие больше остатка отклоняется и не пишет запись")
+    void withdrawalOverBalanceIsRejected() throws Exception {
+        long transactionsBefore = countTransactions();
+
+        performWithdrawExpecting(OPENING_1.longValue() + 1, status().isBadRequest());
+
+        assertThat(countTransactions()).isEqualTo(transactionsBefore);
+        assertThat(bullionAmount(bullionId1)).isEqualByComparingTo(OPENING_1);
+    }
+
+    // ==================== СТАТИСТИКА ====================
+
+    @Test
+    @DisplayName("Начальный остаток не попадает в «Доход за месяц»")
+    void openingBalanceIsNotIncome() throws Exception {
+        // В setUp заведены только стартовые остатки, обычных операций ещё не было.
+        MvcResult result = mockMvc.perform(get("/api/transactions/dashboard/statistics")
+                        .param("year", "2026")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode statistics = json(result);
+        assertThat(new BigDecimal(statistics.get("totalIncome").asText())).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(new BigDecimal(statistics.get("totalExpense").asText())).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(new BigDecimal(statistics.get("totalAmount").asText()))
+                .isEqualByComparingTo(OPENING_1.add(OPENING_2));
+    }
+
+    @Test
+    @DisplayName("Правый край графика равен сумме слитков, месяц без операций держит накопления")
+    void chartRightEdgeMatchesTotalAndEmptyMonthsHoldSavings() throws Exception {
+        performRefill(40000);
+        performWithdraw(10000);
+
+        MvcResult result = mockMvc.perform(get("/api/transactions/dashboard/statistics")
+                        .param("year", "2026")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.monthlyData.length()").value(12))
+                .andReturn();
+
+        JsonNode monthlyData = json(result).get("monthlyData");
+        BigDecimal expected = totalAmount();
+
+        BigDecimal lastMonthSavings = new BigDecimal(monthlyData.get(11).get("savings").asText());
+        assertThat(lastMonthSavings).isEqualByComparingTo(expected);
+
+        // Операции датированы июлем; август–декабрь пустые и обязаны сохранить накопления июля.
+        BigDecimal july = new BigDecimal(monthlyData.get(6).get("savings").asText());
+        for (int month = 7; month < 12; month++) {
+            assertThat(new BigDecimal(monthlyData.get(month).get("savings").asText()))
+                    .isEqualByComparingTo(july);
+        }
+    }
+
+    @Test
+    @DisplayName("Доступные года берутся по дате операции")
+    void availableYearsComeFromOperationDate() throws Exception {
+        mockMvc.perform(get("/api/transactions/available-years")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$[0]").value(2026));
+    }
+
+    // ==================== ИСТОРИЯ ====================
+
+    @Test
+    @DisplayName("История отдаёт вид операции и признак возможности отката")
+    void historyExposesKindAndRollbackFlag() throws Exception {
         performRefill(100000);
+        performWithdraw(30000);
 
-        mockMvc.perform(get("/api/transactions/dashboard/statistics")
-                        .param("year", "2024")
+        MvcResult result = mockMvc.perform(get("/api/transactions/history")
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.monthlyData").isArray());
+                .andExpect(jsonPath("$.totalElements").value(4))
+                .andExpect(jsonPath("$.content[0].kind").value("WITHDRAWAL"))
+                .andExpect(jsonPath("$.content[0].canRollback").value(true))
+                .andExpect(jsonPath("$.content[0].reversedById").doesNotExist())
+                .andReturn();
+
+        JsonNode withdrawal = json(result).get("content").get(0);
+        assertThat(new BigDecimal(withdrawal.get("signedAmount").asText()))
+                .isEqualByComparingTo(new BigDecimal("-30000"));
     }
 
-
-    // ==================== ТЕСТЫ ИСТОРИИ ====================
-
     @Test
-    @DisplayName("Получение истории транзакций - успешно")
-    void getTransactionHistorySuccess() throws Exception {
+    @DisplayName("Фильтр истории по виду операции")
+    void historyFilterByKind() throws Exception {
         performRefill(100000);
         performRefill(50000);
         performWithdraw(30000);
 
         mockMvc.perform(get("/api/transactions/history")
+                        .param("kind", "DEPOSIT")
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content").isArray())
-                .andExpect(jsonPath("$.totalElements").value(5))
-                .andExpect(jsonPath("$.content[0].operationType").exists())
-                .andExpect(jsonPath("$.content[0].amount").exists())
-                .andExpect(jsonPath("$.content[0].status").exists())
-                .andExpect(jsonPath("$.content[0].canRollback").exists());
-    }
-
-    @Test
-    @DisplayName("Получение истории с фильтром по типу операции")
-    void getTransactionHistoryFilterByType() throws Exception {
-        performRefill(100000);
-        performRefill(50000);
-        performWithdraw(30000);
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[0].kind").value("DEPOSIT"));
 
         mockMvc.perform(get("/api/transactions/history")
-                        .param("operationType", "REFILL_BULLION")
+                        .param("kind", "OPENING_BALANCE")
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(5))
-                .andExpect(jsonPath("$.content[0].operationType").value("REFILL_BULLION"));
+                .andExpect(jsonPath("$.totalElements").value(2));
     }
 
     @Test
-    @DisplayName("Получение истории с пагинацией")
-    void getTransactionHistoryWithPagination() throws Exception {
+    @DisplayName("Пагинация истории")
+    void historyPagination() throws Exception {
         for (int i = 0; i < 10; i++) {
             performRefill(10000 + i * 1000);
         }
@@ -321,124 +325,147 @@ class TransactionIntegrationTest {
                 .andExpect(jsonPath("$.currentPage").value(0));
     }
 
-    @Test
-    @DisplayName("Получение доступных годов для фильтрации")
-    void getAvailableYears() throws Exception {
-        performRefill(100000);
+    // ==================== ОТКАТ ====================
 
-        mockMvc.perform(get("/api/transactions/available-years")
+    @Test
+    @DisplayName("Откат перевода возвращает оба слитка и создаёт обратную запись")
+    void rollbackOfTransferRestoresBothBullions() throws Exception {
+        performTransfer(bullionId1, bullionId2, 30000);
+        Long transferId = lastTransactionId();
+        long transactionsBefore = countTransactions();
+
+        rollback(transferId).andExpect(status().isOk());
+
+        assertThat(countTransactions()).isEqualTo(transactionsBefore + 1);
+        assertThat(bullionAmount(bullionId1)).isEqualByComparingTo(OPENING_1);
+        assertThat(bullionAmount(bullionId2)).isEqualByComparingTo(OPENING_2);
+
+        mockMvc.perform(get("/api/transactions/{id}/chain", transferId)
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[1].reversalOfId").value(transferId));
     }
 
-    // ==================== ТЕСТЫ ОТКАТА ====================
+    @Test
+    @DisplayName("Откат не затирает более позднюю операцию")
+    void rollbackDoesNotWipeLaterOperations() throws Exception {
+        performRefill(40000);
+        Long refillId = lastTransactionId();
+
+        performRefill(5000);
+
+        rollback(refillId).andExpect(status().isOk());
+
+        // 100000 стартовых + 40000 + 5000 − 40000 отката: поздние 5000 должны уцелеть.
+        assertThat(bullionAmount(bullionId1)).isEqualByComparingTo(OPENING_1.add(new BigDecimal("5000")));
+    }
 
     @Test
-    @DisplayName("Откат последней транзакции - успешно")
-    void rollbackLastTransactionSuccess() throws Exception {
-        // Получаем начальную сумму
-        BigDecimal initialAmount = getBullionAmount(bullionId1);
+    @DisplayName("Повторный откат той же транзакции отклоняется")
+    void secondRollbackOfSameTransactionIsRejected() throws Exception {
+        performRefill(40000);
+        Long refillId = lastTransactionId();
 
-        // Создаем транзакцию
+        rollback(refillId).andExpect(status().isOk());
+        rollback(refillId).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Откаченная операция помечается как неоткатываемая")
+    void reversedTransactionIsMarkedInHistory() throws Exception {
+        performRefill(40000);
+        Long refillId = lastTransactionId();
+
+        rollback(refillId).andExpect(status().isOk());
+
+        MvcResult result = mockMvc.perform(get("/api/transactions/{id}/chain", refillId)
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode original = json(result).get(0);
+        assertThat(original.get("canRollback").asBoolean()).isFalse();
+        assertThat(original.get("reversedById").asLong()).isPositive();
+    }
+
+    @Test
+    @DisplayName("Откат последней транзакции")
+    void rollbackLastTransaction() throws Exception {
         performRefill(50000);
-        BigDecimal afterRefill = getBullionAmount(bullionId1);
-        assertThat(afterRefill).isGreaterThan(initialAmount);
+        BigDecimal beforeRollback = bullionAmount(bullionId1);
 
-        // Откатываем последнюю
         mockMvc.perform(post("/api/transactions/rollback-last")
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk());
 
-        // Проверяем, что сумма вернулась
-        BigDecimal afterRollback = getBullionAmount(bullionId1);
-        assertThat(afterRollback).isEqualByComparingTo(initialAmount);
+        assertThat(bullionAmount(bullionId1))
+                .isEqualByComparingTo(beforeRollback.subtract(new BigDecimal("50000")));
     }
 
     @Test
-    @DisplayName("Откат конкретной транзакции по ID - успешно")
-    void rollbackTransactionByIdSuccess() throws Exception {
-        // Создаем транзакцию и получаем её ID
-        Long transactionId = getLastTransactionId();
-        BigDecimal beforeRollback = getBullionAmount(bullionId1);
-
-        // Откатываем
-        mockMvc.perform(post("/api/transactions/{id}/rollback", transactionId)
-                        .header("Authorization", "Bearer " + accessToken))
-                .andExpect(status().isOk());
-
-        // Проверяем
-        BigDecimal afterRollback = getBullionAmount(bullionId1);
-        assertThat(afterRollback).isLessThan(beforeRollback);
+    @DisplayName("Откат несуществующей транзакции — ошибка")
+    void rollbackOfMissingTransactionFails() throws Exception {
+        rollback(99999L).andExpect(status().isNotFound());
     }
 
-    @Test
-    @DisplayName("Откат несуществующей транзакции - ошибка")
-    void rollbackNonExistentTransactionThrowsException() throws Exception {
-        mockMvc.perform(post("/api/transactions/{id}/rollback", 99999L)
-                        .header("Authorization", "Bearer " + accessToken))
-                .andExpect(status().isNotFound());
-    }
+    // ==================== ДОСТУП ====================
 
     @Test
-    @DisplayName("Повтор откатанной транзакции - успешно")
-    void redoRolledBackTransactionSuccess() throws Exception {
-        // Создаем транзакцию
-        Long transactionId = getLastTransactionId();
-        BigDecimal afterRefill = getBullionAmount(bullionId1);
-
-        // Откатываем
-        mockMvc.perform(post("/api/transactions/{id}/rollback", transactionId)
-                        .header("Authorization", "Bearer " + accessToken))
-                .andExpect(status().isOk());
-
-        BigDecimal afterRollback = getBullionAmount(bullionId1);
-        assertThat(afterRollback).isLessThan(afterRefill);
-
-
-    }
-
-    @Test
-    @DisplayName("Получение цепочки операций для транзакции")
-    void getTransactionChainSuccess() throws Exception {
-        Long transactionId = getLastTransactionId();
-
-        // Откатываем
-        mockMvc.perform(post("/api/transactions/{id}/rollback", transactionId)
-                        .header("Authorization", "Bearer " + accessToken))
-                .andExpect(status().isOk());
-
-        // Получаем цепочку
-        mockMvc.perform(get("/api/transactions/{id}/chain", transactionId)
-                        .header("Authorization", "Bearer " + accessToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$.length()").value(2));
-    }
-
-    // ==================== ТЕСТЫ НА ОШИБКИ ====================
-
-    @Test
-    @DisplayName("Попытка доступа без токена - ошибка")
-    void accessWithoutTokenThrowsException() throws Exception {
+    @DisplayName("Обращение без токена — ошибка")
+    void accessWithoutTokenIsRejected() throws Exception {
         mockMvc.perform(get("/api/transactions/history"))
                 .andExpect(status().isForbidden());
     }
 
     // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
 
-    private void performRefill(long amount) throws Exception {
-        Long batchId = System.currentTimeMillis();
+    private Long createBullionName(String title) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/bullion-names")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\": \"%s\"}".formatted(title)))
+                .andReturn();
+        return json(result).get("data").get("id").asLong();
+    }
 
+    private Long createVault(String name) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/vaults")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"%s\"}".formatted(name)))
+                .andReturn();
+        return json(result).get("data").get("id").asLong();
+    }
+
+    private Long createBullion(Long bullionNameId, Long vaultId, BigDecimal amount) throws Exception {
         String request = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
+                    "vaultId": %d,
+                    "amount": %s,
+                    "dateOperation": "2026-07-20"
+                }
+                """.formatted(bullionNameId, vaultId, amount.toPlainString());
+
+        MvcResult result = mockMvc.perform(post("/api/bullions")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andReturn();
+        return json(result).get("data").get("id").asLong();
+    }
+
+    private void performRefill(long amount) throws Exception {
+        String request = """
+                {
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": %d,
-                    "batchId": %d,
-                    "dateOperation": "2026-07-20T12:00:00"
+                    "dateOperation": "%s"
                 }
-                """.formatted(categoryId1, vaultId1, amount, batchId);
+                """.formatted(bullionNameId1, vaultId1, amount, OPERATION_DATE);
 
         mockMvc.perform(post("/api/bullions/refill")
                         .header("Authorization", "Bearer " + accessToken)
@@ -448,56 +475,80 @@ class TransactionIntegrationTest {
     }
 
     private void performWithdraw(long amount) throws Exception {
-        Long batchId = System.currentTimeMillis();
+        performWithdrawExpecting(amount, status().isOk());
+    }
 
+    private void performWithdrawExpecting(long amount, ResultMatcher matcher) throws Exception {
         String request = """
                 {
-                    "categoryId": %d,
+                    "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": %d,
-                    "batchId": %d,
-                    "dateOperation": "2026-07-20T12:00:00"
+                    "dateOperation": "%s"
                 }
-                """.formatted(categoryId1, vaultId1, amount, batchId);
+                """.formatted(bullionNameId1, vaultId1, amount, OPERATION_DATE);
 
         mockMvc.perform(post("/api/bullions/withdraw")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(matcher);
+    }
+
+    private void performTransfer(Long fromBullionId, Long toBullionId, long amount) throws Exception {
+        String request = """
+                {
+                    "fromBullionId": %d,
+                    "toBullionId": %d,
+                    "amount": %d,
+                    "dateOperation": "%s"
+                }
+                """.formatted(fromBullionId, toBullionId, amount, OPERATION_DATE);
+
+        mockMvc.perform(post("/api/bullions/transfer")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isOk());
     }
 
-    private Long getLastTransactionId() throws Exception {
-        // Сначала делаем транзакцию
-        performRefill(50000);
+    private ResultActions rollback(Long transactionId) throws Exception {
+        return mockMvc.perform(post("/api/transactions/{id}/rollback", transactionId)
+                .header("Authorization", "Bearer " + accessToken));
+    }
 
-        // Получаем последнюю транзакцию из истории
-        MvcResult historyResult = mockMvc.perform(get("/api/transactions/history")
+    private Long lastTransactionId() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/transactions/history")
                         .param("page", "0")
                         .param("size", "1")
                         .header("Authorization", "Bearer " + accessToken))
                 .andReturn();
-
-        String responseBody = historyResult.getResponse().getContentAsString();
-        JsonNode jsonNode = objectMapper.readTree(responseBody);
-
-        if (jsonNode.has("content") && jsonNode.get("content").size() > 0) {
-            return jsonNode.get("content").get(0).get("id").asLong();
-        }
-        return null;
+        return json(result).get("content").get(0).get("id").asLong();
     }
 
-    private BigDecimal getBullionAmount(Long bullionId) throws Exception {
+    private long countTransactions() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/transactions/history")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andReturn();
+        return json(result).get("totalElements").asLong();
+    }
+
+    private BigDecimal totalAmount() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/transactions/dashboard/statistics")
+                        .param("year", "2026")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andReturn();
+        return new BigDecimal(json(result).get("totalAmount").asText());
+    }
+
+    private BigDecimal bullionAmount(Long bullionId) throws Exception {
         MvcResult result = mockMvc.perform(get("/api/bullions/{bullionId}", bullionId)
                         .header("Authorization", "Bearer " + accessToken))
                 .andReturn();
+        return new BigDecimal(json(result).get("data").get("amount").asText());
+    }
 
-        String responseBody = result.getResponse().getContentAsString();
-        JsonNode jsonNode = objectMapper.readTree(responseBody);
-
-        if (jsonNode.has("data") && jsonNode.get("data").has("amount")) {
-            return new BigDecimal(jsonNode.get("data").get("amount").asText());
-        }
-        return BigDecimal.ZERO;
+    private JsonNode json(MvcResult result) throws Exception {
+        return objectMapper.readTree(result.getResponse().getContentAsString());
     }
 }

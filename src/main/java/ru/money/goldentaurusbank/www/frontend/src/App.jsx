@@ -5,7 +5,7 @@ import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/dashboard/Dashboard.jsx';
 import VerifyEmail from './components/VerifyEmail';
-import CategoriesPage from './components/categories/CategoriesPage';
+import BullionNamesPage from './components/bullion-names/BullionNamesPage';
 import BanksPage from './components/banks/BanksPage';
 import VaultsPage from './components/vaults/VaultsPage';
 import BullionsPage from './components/bullions/BullionsPage';
@@ -109,10 +109,10 @@ function App() {
                 />
 
                 <Route
-                    path="/categories"
+                    path="/bullion-names"
                     element={
                         <ProtectedRoute>
-                            <CategoriesPage />
+                            <BullionNamesPage />
                         </ProtectedRoute>
                     }
                 />

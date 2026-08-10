@@ -20,6 +20,6 @@ public class DashboardStatisticsDto {
     private BigDecimal netChange;
     private BigDecimal totalAmount; // сумма всех слитков пользователя
     private Long totalTransactions;
-    private List<TransactionLogDto> recentTransactions;
-    private OperationTypeStatsDto operationTypeStats;
+    private List<TransactionDto> recentTransactions;
+    private List<KindStatsDto> kindStats;
 }

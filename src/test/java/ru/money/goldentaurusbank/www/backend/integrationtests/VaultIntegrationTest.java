@@ -627,8 +627,8 @@ class VaultIntegrationTest {
     }
 
     @Test
-    @DisplayName("Создание банка с дублирующимся именем (без учёта регистра) - возвращает существующий")
-    void createVaultDuplicateNameReturnsExisting() throws Exception {
+    @DisplayName("Создание хранилища с дублирующимся именем (без учёта регистра) - ошибка")
+    void createVaultDuplicateNameThrowsException() throws Exception {
         String request = """
                 {
                     "name": "Сбербанк",
@@ -636,23 +636,15 @@ class VaultIntegrationTest {
                 }
                 """;
 
-        // Первое создание
-        MvcResult firstResult = mockMvc.perform(post("/api/vaults")
+        mockMvc.perform(post("/api/vaults")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        String firstResponse = firstResult.getResponse().getContentAsString();
-        JsonNode firstJson = objectMapper.readTree(firstResponse);
-        Long firstId = firstJson.get("data").get("id").asLong();
-        String firstName = firstJson.get("data").get("name").asText();
+                .andExpect(status().isOk());
 
         entityManager.flush();
         entityManager.clear();
 
-        // Второе создание с таким же именем (другой регистр)
         String requestDuplicate = """
                 {
                     "name": "сбербанк",
@@ -660,29 +652,75 @@ class VaultIntegrationTest {
                 }
                 """;
 
-        MvcResult secondResult = mockMvc.perform(post("/api/vaults")
+        mockMvc.perform(post("/api/vaults")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestDuplicate))
-                .andExpect(status().isOk())
-                .andReturn();
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(4005));
 
-        String secondResponse = secondResult.getResponse().getContentAsString();
-        JsonNode secondJson = objectMapper.readTree(secondResponse);
-        Long secondId = secondJson.get("data").get("id").asLong();
-        String secondName = secondJson.get("data").get("name").asText();
-
-        // Проверяем, что вернулся тот же банк (ID совпадает, имя оригинальное)
-        assertThat(secondId).isEqualTo(firstId);
-        assertThat(secondName).isEqualTo(firstName);
-        assertThat(secondJson.get("data").get("description").asText()).isEqualTo("Первый раз");
-
-        // Проверяем, что в БД только один банк
         List<VaultResponse> vaults = getVaults();
         assertThat(vaults).hasSize(1);
+        assertThat(vaults.get(0).getDescription()).isEqualTo("Первый раз");
+    }
+
+    @Test
+    @DisplayName("Создание хранилища с тем же именем в другом банке - успешно")
+    void createVaultSameNameInAnotherBankSuccess() throws Exception {
+        Long bankId1 = createBank("Сбер");
+        Long bankId2 = createBank("Тинькофф");
+
+        String request1 = """
+                {
+                    "name": "Накопительный",
+                    "bankId": %d
+                }
+                """.formatted(bankId1);
+
+        mockMvc.perform(post("/api/vaults")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request1))
+                .andExpect(status().isOk());
+
+        entityManager.flush();
+        entityManager.clear();
+
+        String request2 = """
+                {
+                    "name": "Накопительный",
+                    "bankId": %d
+                }
+                """.formatted(bankId2);
+
+        mockMvc.perform(post("/api/vaults")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request2))
+                .andExpect(status().isOk());
+
+        assertThat(getVaults()).hasSize(2);
     }
 
     // Вспомогательные методы
+    private Long createBank(String name) throws Exception {
+        String request = """
+                {
+                    "name": "%s"
+                }
+                """.formatted(name);
+
+        MvcResult result = mockMvc.perform(post("/api/banks")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        return objectMapper.readTree(result.getResponse().getContentAsString())
+                .get("data").get("id").asLong();
+    }
+
     private void createVault(String name, String description) throws Exception {
         String request = String.format("""
                 {

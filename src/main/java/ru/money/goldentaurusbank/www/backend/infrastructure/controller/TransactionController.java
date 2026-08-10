@@ -18,8 +18,8 @@ import ru.money.goldentaurusbank.www.backend.model.dto.request.TransferRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.SuccessResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.DashboardDailyStatisticsDto;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.DashboardStatisticsDto;
+import ru.money.goldentaurusbank.www.backend.model.dto.statistic.TransactionDto;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.TransactionHistoryResponse;
-import ru.money.goldentaurusbank.www.backend.model.dto.statistic.TransactionLogDto;
 import ru.money.goldentaurusbank.www.backend.repository.UserRepository;
 import ru.money.goldentaurusbank.www.backend.service.TransactionService;
 
@@ -60,17 +60,16 @@ public class TransactionController {
      */
     @GetMapping("/history")
     public ResponseEntity<TransactionHistoryResponse> getTransactionHistory(
-            @AuthenticationPrincipal UserDetails userDetails,  // Изменено
-            @RequestParam(required = false) String operationType,
-            @RequestParam(required = false) String status,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(required = false) String kind,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 
-        User user = getUserFromUserDetails(userDetails);  // Добавить
+        User user = getUserFromUserDetails(userDetails);
         log.info("Get transaction history for user: {}", user.getId());
         TransactionHistoryResponse response = transactionService.getTransactionHistory(
-                user.getId(), operationType, status, fromDate, toDate, pageable);
+                user.getId(), kind, fromDate, toDate, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -78,13 +77,13 @@ public class TransactionController {
      * Получить цепочку операций для транзакции
      */
     @GetMapping("/{id}/chain")
-    public ResponseEntity<List<TransactionLogDto>> getTransactionChain(
-            @AuthenticationPrincipal UserDetails userDetails,  // Изменено
+    public ResponseEntity<List<TransactionDto>> getTransactionChain(
+            @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long id) {
 
-        User user = getUserFromUserDetails(userDetails);  // Добавить
+        User user = getUserFromUserDetails(userDetails);
         log.info("Get transaction chain for user: {}, transaction: {}", user.getId(), id);
-        List<TransactionLogDto> chain = transactionService.getTransactionChain(id);
+        List<TransactionDto> chain = transactionService.getTransactionChain(id);
         return ResponseEntity.ok(chain);
     }
 
@@ -106,12 +105,12 @@ public class TransactionController {
      */
     @PostMapping("/{id}/rollback")
     public ResponseEntity<Void> rollbackTransaction(
-            @AuthenticationPrincipal UserDetails userDetails,  // Изменено
+            @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long id) {
 
-        User user = getUserFromUserDetails(userDetails);  // Добавить
+        User user = getUserFromUserDetails(userDetails);
         log.info("Rollback transaction: {}, user: {}", id, user.getId());
-        transactionService.rollbackTransaction(id);
+        transactionService.rollbackTransaction(id, user);
         return ResponseEntity.ok().build();
     }
 
@@ -120,11 +119,11 @@ public class TransactionController {
      */
     @PostMapping("/rollback-last")
     public ResponseEntity<Void> rollbackLastTransaction(
-            @AuthenticationPrincipal UserDetails userDetails) {  // Изменено
+            @AuthenticationPrincipal UserDetails userDetails) {
 
-        User user = getUserFromUserDetails(userDetails);  // Добавить
+        User user = getUserFromUserDetails(userDetails);
         log.info("Rollback last transaction for user: {}", user.getId());
-        transactionService.rollbackLastTransaction(user.getId());
+        transactionService.rollbackLastTransaction(user);
         return ResponseEntity.ok().build();
     }
 

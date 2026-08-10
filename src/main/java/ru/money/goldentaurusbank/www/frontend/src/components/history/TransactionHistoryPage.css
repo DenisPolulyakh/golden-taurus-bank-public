@@ -170,24 +170,39 @@
     font-weight: 500;
 }
 
-.type-refill_bullion {
+.type-deposit {
     background: #c6f6d5;
     color: #276749;
 }
 
-.type-withdraw_bullion {
+.type-withdrawal {
     background: #fed7d7;
     color: #9b2c2c;
 }
 
-.type-transfer_amount {
+.type-transfer {
     background: #bee3f8;
     color: #2a69ac;
 }
 
-.type-transfer_bullion {
+.type-opening_balance {
+    background: #e9d8fd;
+    color: #553c9a;
+}
+
+.type-unknown {
     background: #e2e8f0;
     color: #4a5568;
+}
+
+.reversal-label {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #edf2f7;
+    color: #718096;
+    font-size: 11px;
 }
 
 .amount-cell {
@@ -204,6 +219,11 @@
 
 .amount-cell.transfer {
     color: #667eea;
+}
+
+/* Начальный остаток не движение денег, а базовая линия графика. */
+.amount-cell.neutral {
+    color: #718096;
 }
 
 .description-cell {

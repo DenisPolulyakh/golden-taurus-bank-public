@@ -4,7 +4,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import ru.money.goldentaurusbank.www.backend.model.domain.BankDictionary;
@@ -30,29 +29,18 @@ public interface VaultRepository extends JpaRepository<Vault, Long> {
 
 
 
-    @Query("SELECT v FROM Vault v WHERE v.user = :user AND LOWER(v.name) = LOWER(:name) AND v.bank.id = :bankId")
-    Optional<Vault> findByUserAndNameIgnoreCaseAndBank(
+    @Query("SELECT v FROM Vault v LEFT JOIN v.bank b WHERE v.user = :user AND LOWER(v.name) = LOWER(:name) "
+            + "AND ((:bankId IS NULL AND b IS NULL) OR b.id = :bankId)")
+    List<Vault> findByUserAndNameIgnoreCaseAndBankId(
             @Param("user") User user,
             @Param("name") String name,
             @Param("bankId") Long bankId
     );
-
-    @Query("SELECT v FROM Vault v WHERE v.user = :user AND LOWER(v.name) = LOWER(:name)")
-    Optional<Vault> findByUserAndNameIgnoreCase(
-            @Param("user") User user,
-            @Param("name") String name
-    );
-
 
 
     @EntityGraph(attributePaths = {"bullions"})
     List<Vault> findByUser(User user);
 
     Optional<Vault> findVaultByUserAndVaultType(User user, VaultType vaultType);
-    
-    @Modifying
-    @Query("DELETE FROM Vault v WHERE v.id = :id AND v.user = :user")
-    void deleteByIdAndUser(@Param("id") Long id, @Param("user") User user);
-
 
 }

@@ -21,6 +21,7 @@ import ru.money.goldentaurusbank.www.backend.model.dto.response.VaultResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.VaultSummaryResponse;
 import ru.money.goldentaurusbank.www.backend.model.mapper.VaultMapper;
 import ru.money.goldentaurusbank.www.backend.repository.BankRepository;
+import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
 
 import java.math.BigDecimal;
@@ -42,6 +43,7 @@ public class VaultService {
 
     private final VaultRepository vaultRepository;
     private final BankRepository bankRepository;
+    private final BullionRepository bullionRepository;
     private final VaultMapper vaultMapper;
     private final TransactionService transactionService;
 
@@ -49,13 +51,11 @@ public class VaultService {
     public Vault createVault(User user, VaultRequest request) {
         String name = request.getName().trim();
 
-        Optional<Vault> existingVault = vaultRepository.findByUserAndNameIgnoreCase(user, name);
-        if (existingVault.isPresent()) {
-           /* throw new ApplicationException(
+        if (!vaultRepository.findByUserAndNameIgnoreCaseAndBankId(user, name, request.getBankId()).isEmpty()) {
+            throw new ApplicationException(
                     VAULT_ALREADY_EXISTS.getCode(),
                     "Хранилище с названием \"" + name + "\" уже существует"
-            );*/
-            return existingVault.get();
+            );
         }
 
         Vault.VaultBuilder builder = Vault.builder()
@@ -107,8 +107,10 @@ public class VaultService {
 
         String newName = request.getName().trim();
 
-        Optional<Vault> existingVault = vaultRepository.findByUserAndNameIgnoreCaseAndBank(user, newName, request.getBankId());
-        if (existingVault.isPresent() && !existingVault.get().getId().equals(vaultId)) {
+        boolean duplicate = vaultRepository.findByUserAndNameIgnoreCaseAndBankId(user, newName, request.getBankId())
+                .stream()
+                .anyMatch(existing -> !existing.getId().equals(vaultId));
+        if (duplicate) {
             throw new ApplicationException(
                     VAULT_ALREADY_EXISTS.getCode(),
                     "Хранилище с названием \"" + newName + "\" уже существует"
@@ -141,24 +143,45 @@ public class VaultService {
 
     @Transactional
     public void deleteVault(User user, Long vaultId) {
-        Optional<Vault> existingVault = vaultRepository.findByIdAndUser(vaultId, user);
+        Vault vault = vaultRepository.findByIdAndUser(vaultId, user)
+                .orElseThrow(() -> new ApplicationException(
+                        VAULT_NOT_FOUND.getCode(),
+                        VAULT_NOT_FOUND.getMessage()
+                ));
 
-        if (existingVault.isEmpty()) {
+        List<Bullion> activeBullions = List.copyOf(vault.getBullions());
+        long fundedCount = activeBullions.stream().filter(this::hasAmount).count();
+        boolean hasFunded = fundedCount > 0;
+
+        if (vault.getVaultType() == VaultType.LIQUIDITY_BUFFER && hasFunded) {
             throw new ApplicationException(
-                    VAULT_NOT_FOUND.getCode(),
-                    VAULT_NOT_FOUND.getMessage()
+                    LIQUIDITY_RESERVE_NOT_EMPTY.getCode(),
+                    LIQUIDITY_RESERVE_NOT_EMPTY.getMessage()
             );
         }
-        List<Bullion> bullions = existingVault.get().getBullions();
-        if (!bullions.isEmpty()) {
-            Vault liquidityReserve = getLiquidityReserve(user);
-            Long batchId = transactionService.createBatchId();
-            for (Bullion bullion : bullions) {
+
+        Vault liquidityReserve = hasFunded ? getLiquidityReserve(user) : null;
+        Long batchId = hasFunded ? transactionService.createBatchId() : null;
+
+        for (Bullion bullion : activeBullions) {
+            if (hasAmount(bullion)) {
                 transactionService.transferBullion(bullion.getId(), liquidityReserve.getId(), user, batchId, LocalDateTime.now());
+            } else {
+                transactionService.archive(bullion);
             }
-            log.info("To Reserve Vault move {} bullion", bullions.size());
         }
-        vaultRepository.deleteByIdAndUser(vaultId, user);
+
+        for (Bullion bullion : bullionRepository.findAllByVault(vault)) {
+            bullion.setVault(null);
+            bullionRepository.save(bullion);
+        }
+
+        vaultRepository.delete(vault);
+        log.info("[VaultService.deleteVault] vault id = {} deleted, bullions moved to reserve = {}", vaultId, fundedCount);
+    }
+
+    private boolean hasAmount(Bullion bullion) {
+        return bullion.getAmount() != null && bullion.getAmount().compareTo(BigDecimal.ZERO) > 0;
     }
 
     @Transactional(readOnly = true)
@@ -245,15 +268,15 @@ public class VaultService {
                 .map(Bullion::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        List<VaultSummaryResponse.BullionByCategoryResponse> bullionResponses = bullions.stream()
-                .map(b -> VaultSummaryResponse.BullionByCategoryResponse.builder()
+        List<VaultSummaryResponse.BullionByBullionNameResponse> bullionResponses = bullions.stream()
+                .map(b -> VaultSummaryResponse.BullionByBullionNameResponse.builder()
                         .id(b.getId())
-                        .categoryId(b.getCategory().getId())
-                        .categoryName(b.getCategory().getName())
+                        .bullionNameId(b.getBullionName().getId())
+                        .bullionNameTitle(b.getBullionName().getTitle())
                         .amount(b.getAmount())
                         .description(b.getDescription())
                         .build())
-                .sorted(((a, b) -> b.getAmount().compareTo(totalAmount)))
+                .sorted((a, b) -> b.getAmount().compareTo(a.getAmount()))
                 .toList();
 
 
@@ -262,7 +285,7 @@ public class VaultService {
                 .vaultName(vault.getName())
                 .totalAmount(totalAmount)
                 .interestRate(vault.getInterestRate())
-                .categoriesCount(bullions.size())
+                .bullionNamesCount(bullions.size())
                 .bullions(bullionResponses)
                 .build();
     }
@@ -276,11 +299,15 @@ public class VaultService {
             return existingVault.get();
         }
         log.info("[VaultService.getLiquidityReserve] liquidity reserve not found. It will be create");
-        VaultRequest vaultRequest = new VaultRequest();
-        vaultRequest.setName(NAME_LIQUIDITY_RESERVE);
-        vaultRequest.setDescription(DESCRIPTION_LIQUIDITY_RESERVE);
-        vaultRequest.setInterestRate(BigDecimal.ZERO);
-        vaultRequest.setVaultType(VaultType.LIQUIDITY_BUFFER);
-        return this.createVault(user, vaultRequest);
+        Vault liquidityReserve = Vault.builder()
+                .name(NAME_LIQUIDITY_RESERVE)
+                .description(DESCRIPTION_LIQUIDITY_RESERVE)
+                .interestRate(BigDecimal.ZERO)
+                .vaultType(VaultType.LIQUIDITY_BUFFER)
+                .accountType(AccountType.SAVINGS)
+                .user(user)
+                .build();
+        vaultRepository.save(liquidityReserve);
+        return liquidityReserve;
     }
 }

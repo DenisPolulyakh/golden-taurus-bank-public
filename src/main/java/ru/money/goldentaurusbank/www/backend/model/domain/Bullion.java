@@ -24,11 +24,11 @@ public class Bullion {
     private Long id;
     
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", nullable = false)
-    private Category category;
+    @JoinColumn(name = "bullion_name_id", nullable = false)
+    private BullionName bullionName;
     
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "vault_id", nullable = false)
+    @JoinColumn(name = "vault_id")
     private Vault vault;
     
     @Column(nullable = false, precision = 19, scale = 2)
@@ -37,7 +37,15 @@ public class Bullion {
     
     @Column(length = 500)
     private String description;
-    
+
+    /**
+     * Слиток с историей нельзя удалить физически — на него ссылаются транзакции.
+     * Архивный слиток не попадает в списки и в сумму накоплений.
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean archived = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;

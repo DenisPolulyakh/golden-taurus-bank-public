@@ -2,17 +2,17 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import api from '../../api/axios';
-import CategoryModal from './CategoryModal';
-import './Categories.css';
+import BullionNameModal from './BullionNameModal';
+import './BullionNames.css';
 
-function CategoriesPage() {
-    const [categories, setCategories] = useState([]);
-    const [filteredCategories, setFilteredCategories] = useState([]);
+function BullionNamesPage() {
+    const [bullionNames, setBullionNames] = useState([]);
+    const [filteredBullionNames, setFilteredBullionNames] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
-    const [editingCategory, setEditingCategory] = useState(null);
+    const [editingBullionName, setEditingBullionName] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
     const [importing, setImporting] = useState(false);
@@ -25,84 +25,84 @@ function CategoriesPage() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        fetchCategories();
+        fetchBullionNames();
     }, []);
 
     useEffect(() => {
-        let filtered = [...categories];
+        let filtered = [...bullionNames];
 
         if (searchTerm) {
-            filtered = filtered.filter(cat =>
-                cat.name.toLowerCase().includes(searchTerm.toLowerCase())
+            filtered = filtered.filter(bn =>
+                bn.title.toLowerCase().includes(searchTerm.toLowerCase())
             );
         }
 
         filtered.sort((a, b) => {
             if (sortOrder === 'asc') {
-                return a.name.localeCompare(b.name, 'ru');
+                return a.title.localeCompare(b.title, 'ru');
             } else {
-                return b.name.localeCompare(a.name, 'ru');
+                return b.title.localeCompare(a.title, 'ru');
             }
         });
 
-        setFilteredCategories(filtered);
+        setFilteredBullionNames(filtered);
         setCurrentPage(1);
-    }, [searchTerm, categories, sortOrder]);
+    }, [searchTerm, bullionNames, sortOrder]);
 
-    const fetchCategories = async () => {
+    const fetchBullionNames = async () => {
         try {
-            const response = await api.get('/categories');
-            setCategories(response.data.data || []);
+            const response = await api.get('/bullion-names');
+            setBullionNames(response.data.data || []);
         } catch (err) {
-            console.error('Ошибка загрузки категорий:', err);
-            setError('Не удалось загрузить категории');
+            console.error('Ошибка загрузки наименований:', err);
+            setError('Не удалось загрузить наименования');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleAddCategory = () => {
-        setEditingCategory(null);
+    const handleAddBullionName = () => {
+        setEditingBullionName(null);
         setModalOpen(true);
     };
 
-    const handleEditCategory = (category) => {
-        setEditingCategory(category);
+    const handleEditBullionName = (bullionName) => {
+        setEditingBullionName(bullionName);
         setModalOpen(true);
     };
 
-    const handleSaveCategory = async (name, color) => {
+    const handleSaveBullionName = async (title, color) => {
         try {
-            if (editingCategory) {
-                const response = await api.put(`/categories/${editingCategory.id}`, {
-                    name,
+            if (editingBullionName) {
+                const response = await api.put(`/bullion-names/${editingBullionName.id}`, {
+                    title,
                     color
                 });
-                setCategories(prev => prev.map(cat =>
-                    cat.id === editingCategory.id ? response.data.data : cat
+                setBullionNames(prev => prev.map(bn =>
+                    bn.id === editingBullionName.id ? response.data.data : bn
                 ));
             } else {
-                const response = await api.post('/categories', {
-                    name,
+                const response = await api.post('/bullion-names', {
+                    title,
                     color
                 });
-                setCategories(prev => [...prev, response.data.data]);
+                setBullionNames(prev => [...prev, response.data.data]);
             }
             setModalOpen(false);
-            setEditingCategory(null);
+            setEditingBullionName(null);
         } catch (err) {
-            console.error('Ошибка сохранения категории:', err);
+            console.error('Ошибка сохранения наименования:', err);
             throw err;
         }
     };
 
-    const handleDeleteCategory = async (id, name) => {
-        if (window.confirm(`Удалить категорию "${name}"?`)) {
+    const handleDeleteBullionName = async (id, title) => {
+        if (window.confirm(`Удалить наименование "${title}"?`)) {
             try {
-                await api.delete(`/categories/${id}`);
-                setCategories(prev => prev.filter(cat => cat.id !== id));
+                await api.delete(`/bullion-names/${id}`);
+                setBullionNames(prev => prev.filter(bn => bn.id !== id));
             } catch (err) {
-                console.error('Ошибка удаления категории:', err);
+                console.error('Ошибка удаления наименования:', err);
             }
         }
     };
@@ -110,7 +110,7 @@ function CategoriesPage() {
     // Экспорт в Excel
     const handleExport = async () => {
         try {
-            const response = await api.get('/categories/export', {
+            const response = await api.get('/bullion-names/export', {
                 responseType: 'blob',
                 _skipErrorToast: true  // тело ответа — blob, message не прочитать, показываем свой тост
             });
@@ -118,14 +118,14 @@ function CategoriesPage() {
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', 'categories.xlsx');
+            link.setAttribute('download', 'bullion-names.xlsx');
             document.body.appendChild(link);
             link.click();
             link.remove();
             window.URL.revokeObjectURL(url);
         } catch (err) {
             console.error('Ошибка экспорта:', err);
-            toast.error('Не удалось экспортировать категории');
+            toast.error('Не удалось экспортировать наименования');
         }
     };
 
@@ -150,7 +150,7 @@ function CategoriesPage() {
         setImporting(true);
 
         try {
-            const response = await api.post('/categories/import', formData, {
+            const response = await api.post('/bullion-names/import', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
@@ -169,7 +169,7 @@ function CategoriesPage() {
                 toast.success('Импорт завершён', { description });
             }
 
-            await fetchCategories();
+            await fetchBullionNames();
         } catch (err) {
             console.error('Ошибка импорта:', err);
             toast.error('Ошибка при импорте файла: ' + (err.response?.data?.message || err.message));
@@ -187,20 +187,20 @@ function CategoriesPage() {
 
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentItems = filteredCategories.slice(indexOfFirstItem, indexOfLastItem);
-    const totalPages = Math.ceil(filteredCategories.length / itemsPerPage);
+    const currentItems = filteredBullionNames.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filteredBullionNames.length / itemsPerPage);
 
     const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
     if (loading) {
-        return <div className="categories-container">Загрузка...</div>;
+        return <div className="bullionNames-container">Загрузка...</div>;
     }
 
     return (
-        <div className="categories-container">
-            <div className="categories-content">
-                <div className="categories-header">
-                    <h1>📁 Управление категориями</h1>
+        <div className="bullionNames-container">
+            <div className="bullionNames-content">
+                <div className="bullionNames-header">
+                    <h1>📁 Управление наименованиями</h1>
                     <div className="header-actions">
                         <button onClick={() => navigate('/dashboard')} className="back-btn">
                             ← Назад
@@ -211,8 +211,8 @@ function CategoriesPage() {
                         <button onClick={handleImportClick} className="import-btn" disabled={importing}>
                             📂 Импорт Excel
                         </button>
-                        <button onClick={handleAddCategory} className="add-category-btn">
-                            + Добавить категорию
+                        <button onClick={handleAddBullionName} className="add-bullionName-btn">
+                            + Добавить наименование
                         </button>
                     </div>
                 </div>
@@ -220,7 +220,7 @@ function CategoriesPage() {
                 <div className="search-bar">
                     <input
                         type="text"
-                        placeholder="🔍 Поиск категорий..."
+                        placeholder="🔍 Поиск наименований..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -245,12 +245,12 @@ function CategoriesPage() {
                     </div>
                 )}
 
-                <div className="categories-table-wrapper">
-                    <table className="categories-table">
+                <div className="bullionNames-table-wrapper">
+                    <table className="bullionNames-table">
                         <thead>
                         <tr>
                             <th className="sortable-header" onClick={toggleSortOrder}>
-                                Название категории
+                                Название наименования
                                 <span className="sort-indicator">
                                     {sortOrder === 'asc' ? ' ↑' : ' ↓'}
                                 </span>
@@ -262,31 +262,31 @@ function CategoriesPage() {
                         {currentItems.length === 0 ? (
                             <tr>
                                 <td colSpan="2" className="empty-row">
-                                    {searchTerm ? 'Ничего не найдено' : 'Нет категорий. Добавьте первую или импортируйте из Excel!'}
+                                    {searchTerm ? 'Ничего не найдено' : 'Нет наименований. Добавьте первое или импортируйте из Excel!'}
                                 </td>
                             </tr>
                         ) : (
-                            currentItems.map((category) => (
-                                <tr key={category.id}>
+                            currentItems.map((bullionName) => (
+                                <tr key={bullionName.id}>
                                     <td>
-                                        <div className="category-name-with-color">
+                                        <div className="bullionName-name-with-color">
                                             <span
-                                                className="category-color-dot"
-                                                style={{ backgroundColor: category.color || '#cccccc' }}
+                                                className="bullionName-color-dot"
+                                                style={{ backgroundColor: bullionName.color || '#cccccc' }}
                                             />
-                                            <span className="category-name">{category.name}</span>
+                                            <span className="bullionName-name">{bullionName.title}</span>
                                         </div>
                                     </td>
                                     <td className="actions">
                                         <button
-                                            onClick={() => handleEditCategory(category)}
+                                            onClick={() => handleEditBullionName(bullionName)}
                                             className="edit-btn"
                                             title="Редактировать"
                                         >
                                             ✏️
                                         </button>
                                         <button
-                                            onClick={() => handleDeleteCategory(category.id, category.name)}
+                                            onClick={() => handleDeleteBullionName(bullionName.id, bullionName.title)}
                                             className="delete-btn"
                                             title="Удалить"
                                         >
@@ -322,20 +322,20 @@ function CategoriesPage() {
                     </div>
                 )}
 
-                <CategoryModal
+                <BullionNameModal
                     isOpen={modalOpen}
                     onClose={() => {
                         setModalOpen(false);
-                        setEditingCategory(null);
+                        setEditingBullionName(null);
                     }}
-                    onSave={handleSaveCategory}
-                    initialName={editingCategory?.name || ''}
-                    initialColor={editingCategory?.color || ''}
-                    isEditing={!!editingCategory}
+                    onSave={handleSaveBullionName}
+                    initialTitle={editingBullionName?.title || ''}
+                    initialColor={editingBullionName?.color || ''}
+                    isEditing={!!editingBullionName}
                 />
             </div>
         </div>
     );
 }
 
-export default CategoriesPage;
+export default BullionNamesPage;

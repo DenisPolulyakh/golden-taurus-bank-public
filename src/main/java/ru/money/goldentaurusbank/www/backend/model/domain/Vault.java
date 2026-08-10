@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.annotations.UpdateTimestamp;
 import ru.money.goldentaurusbank.www.backend.model.dto.enums.AccountType;
 import ru.money.goldentaurusbank.www.backend.model.dto.enums.VaultType;
@@ -43,7 +44,10 @@ public class Vault {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @OneToMany(mappedBy = "vault", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    // Архивные слитки живут только ради истории — в состав хранилища они не входят.
+    // Удаление хранилища их не трогает: на уровне БД vault_id просто обнуляется.
+    @OneToMany(mappedBy = "vault", fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @SQLRestriction("NOT archived")
     @Builder.Default
     private List<Bullion> bullions = new ArrayList<>();
 
@@ -81,14 +85,14 @@ public class Vault {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    public Integer getCategoriesCount() {
+    public Integer getBullionNamesCount() {
         if (bullions == null || bullions.isEmpty()) {
             return 0;
         }
         return (int) bullions.stream()
-                .map(Bullion::getCategory)
+                .map(Bullion::getBullionName)
                 .filter(Objects::nonNull)
-                .map(Category::getId)
+                .map(BullionName::getId)
                 .distinct()
                 .count();
     }

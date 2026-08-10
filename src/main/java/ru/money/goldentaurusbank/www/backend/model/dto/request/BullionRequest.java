@@ -11,8 +11,8 @@ import java.time.LocalDate;
 @Data
 public class BullionRequest {
 
-    @NotNull(message = "ID категории обязательно")
-    private Long categoryId;
+    @NotNull(message = "ID наименования обязательно")
+    private Long bullionNameId;
 
     @NotNull(message = "ID хранилища обязательно")
     private Long vaultId;

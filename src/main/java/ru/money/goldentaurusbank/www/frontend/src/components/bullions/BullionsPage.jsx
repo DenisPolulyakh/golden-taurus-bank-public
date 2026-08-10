@@ -24,21 +24,21 @@ const formatAmount = (amount) => {
 
 function BullionsPage() {
     const [groupedData, setGroupedData] = useState(null);
-    const [categoryBullions, setCategoryBullions] = useState([]);
+    const [bullionNameBullions, setBullionNameBullions] = useState([]);
     const [allVaults, setAllVaults] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
     const [editingBullion, setEditingBullion] = useState(null);
-    const [sortField, setSortField] = useState('categoryAmount');
+    const [sortField, setSortField] = useState('bullionNameAmount');
     const [sortOrder, setSortOrder] = useState('desc');
 
     const [transactionModal, setTransactionModal] = useState({
         isOpen: false,
         type: null,
-        categoryId: null,
-        categoryName: null,
+        bullionNameId: null,
+        bullionNameTitle: null,
         selectedVaultId: null,
         selectedVaultName: null,
         amount: null,
@@ -60,7 +60,7 @@ function BullionsPage() {
             const response = await api.get('/bullions/grouped');
             const data = response.data.data;
             setGroupedData(data);
-            setCategoryBullions(data.categoryBullionList || []);
+            setBullionNameBullions(data.bullionNameBullionList || []);
         } catch (err) {
             console.error('Ошибка загрузки слитков:', err);
             setError('Не удалось загрузить слитки');
@@ -79,22 +79,22 @@ function BullionsPage() {
     };
 
     const getFilteredAndSorted = useMemo(() => {
-        let filtered = [...categoryBullions];
+        let filtered = [...bullionNameBullions];
 
         if (searchTerm && searchTerm.trim()) {
             const searchLower = searchTerm.toLowerCase().trim();
-            filtered = filtered.filter(category => {
-                const categoryMatch = category.categoryName?.toLowerCase().includes(searchLower);
-                const vaultMatch = category.vaults?.some(vault =>
+            filtered = filtered.filter(bullionName => {
+                const bullionNameMatch = bullionName.bullionNameTitle?.toLowerCase().includes(searchLower);
+                const vaultMatch = bullionName.vaults?.some(vault =>
                     vault.name && vault.name.toLowerCase().includes(searchLower)
                 );
-                return categoryMatch || vaultMatch;
+                return bullionNameMatch || vaultMatch;
             });
         }
 
         filtered.sort((a, b) => {
-            let aVal = sortField === 'categoryAmount' ? (a.categoryAmount || 0) : (a.categoryName || '');
-            let bVal = sortField === 'categoryAmount' ? (b.categoryAmount || 0) : (b.categoryName || '');
+            let aVal = sortField === 'bullionNameAmount' ? (a.bullionNameAmount || 0) : (a.bullionNameTitle || '');
+            let bVal = sortField === 'bullionNameAmount' ? (b.bullionNameAmount || 0) : (b.bullionNameTitle || '');
 
             if (typeof aVal === 'string') {
                 aVal = aVal.toLowerCase();
@@ -109,19 +109,19 @@ function BullionsPage() {
         });
 
         return filtered;
-    }, [categoryBullions, searchTerm, sortField, sortOrder]);
+    }, [bullionNameBullions, searchTerm, sortField, sortOrder]);
 
     const handleAddBullion = () => {
         setEditingBullion(null);
         setModalOpen(true);
     };
 
-    const handleOpenRefill = (categoryId, categoryName, vaultId) => {
+    const handleOpenRefill = (bullionNameId, bullionNameTitle, vaultId) => {
         setTransactionModal({
             isOpen: true,
             type: 'refill',
-            categoryId: categoryId,
-            categoryName: categoryName,
+            bullionNameId: bullionNameId,
+            bullionNameTitle: bullionNameTitle,
             selectedVaultId: vaultId,
             selectedVaultName: null,
             amount: null,
@@ -132,12 +132,12 @@ function BullionsPage() {
         });
     };
 
-    const handleOpenWithdraw = (categoryId, categoryName, vaultId) => {
+    const handleOpenWithdraw = (bullionNameId, bullionNameTitle, vaultId) => {
         setTransactionModal({
             isOpen: true,
             type: 'withdraw',
-            categoryId: categoryId,
-            categoryName: categoryName,
+            bullionNameId: bullionNameId,
+            bullionNameTitle: bullionNameTitle,
             selectedVaultId: vaultId,
             selectedVaultName: null,
             amount: null,
@@ -148,12 +148,12 @@ function BullionsPage() {
         });
     };
 
-    const handleOpenDelete = (categoryId, categoryName, vaultId, vaultName, bullionId) => {
+    const handleOpenDelete = (bullionNameId, bullionNameTitle, vaultId, vaultName, bullionId) => {
         setTransactionModal({
             isOpen: true,
             type: 'delete',
-            categoryId: categoryId,
-            categoryName: categoryName,
+            bullionNameId: bullionNameId,
+            bullionNameTitle: bullionNameTitle,
             selectedVaultId: vaultId,
             selectedVaultName: vaultName,
             amount: null,
@@ -167,7 +167,7 @@ function BullionsPage() {
     const handleRefill = async (amount, description, vaultId, dateOperation) => {
         try {
             await api.post('/bullions/refill', {
-                categoryId: transactionModal.categoryId,
+                bullionNameId: transactionModal.bullionNameId,
                 vaultId: vaultId,
                 amount: amount,
                 description: description,
@@ -183,7 +183,7 @@ function BullionsPage() {
     const handleWithdraw = async (amount, description, vaultId, dateOperation) => {
         try {
             await api.post('/bullions/withdraw', {
-                categoryId: transactionModal.categoryId,
+                bullionNameId: transactionModal.bullionNameId,
                 vaultId: vaultId,
                 amount: amount,
                 description: description,
@@ -203,7 +203,7 @@ function BullionsPage() {
                 fromVaultId: transactionModal.fromVaultId,
                 toVaultId: targetVaultId,
                 toLiquidityVault: toLiquidityVault,
-                categoryId: transactionModal.categoryId,
+                bullionNameId: transactionModal.bullionNameId,
                 description: description,
                 dateOperation: dateOperation
             });
@@ -214,15 +214,15 @@ function BullionsPage() {
         }
     };
 
-    const handleSaveBullion = async (categoryId, vaultId, amount, description, dateOperation) => {
+    const handleSaveBullion = async (bullionNameId, vaultId, amount, description, dateOperation) => {
         try {
             if (editingBullion) {
                 await api.put(`/bullions/${editingBullion.id}`, {
-                    categoryId, vaultId, amount, description, dateOperation
+                    bullionNameId, vaultId, amount, description, dateOperation
                 });
             } else {
                 await api.post('/bullions', {
-                    categoryId, vaultId, amount, description, dateOperation
+                    bullionNameId, vaultId, amount, description, dateOperation
                 });
             }
             setModalOpen(false);
@@ -247,8 +247,8 @@ function BullionsPage() {
         setTransactionModal({
             isOpen: false,
             type: null,
-            categoryId: null,
-            categoryName: null,
+            bullionNameId: null,
+            bullionNameTitle: null,
             selectedVaultId: null,
             selectedVaultName: null,
             amount: null,
@@ -262,12 +262,12 @@ function BullionsPage() {
     const totalAmount = groupedData?.totalAmount || 0;
     const averageRate = groupedData?.averageRate || 0;
 
-    // Получение хранилищ для категории с фильтрацией по типу операции
-    const getVaultsForCategory = (categoryId, operationType = null) => {
-        const category = categoryBullions.find(c => c.categoryId === categoryId);
-        if (!category) return [];
+    // Получение хранилищ для наименования с фильтрацией по типу операции
+    const getVaultsForBullionName = (bullionNameId, operationType = null) => {
+        const bullionName = bullionNameBullions.find(c => c.bullionNameId === bullionNameId);
+        if (!bullionName) return [];
 
-        let vaults = category.vaults || [];
+        let vaults = bullionName.vaults || [];
 
         // Фильтруем по типу операции - исключаем срочные хранилища
         if (operationType === 'refill') {
@@ -287,7 +287,7 @@ function BullionsPage() {
 
     const transactionConfig = {
         refill: {
-            title: `Пополнение слитка "${transactionModal.categoryName}"`,
+            title: `Пополнение слитка "${transactionModal.bullionNameTitle}"`,
             buttonText: 'Внести',
             buttonClass: 'refill-btn',
             handler: handleRefill,
@@ -298,10 +298,10 @@ function BullionsPage() {
             descriptionLabel: "📝 Комментарий",
             descriptionPlaceholder: "Комментарий к пополнению (необязательно)...",
             type: 'refill',
-            vaults: getVaultsForCategory(transactionModal.categoryId, 'refill')
+            vaults: getVaultsForBullionName(transactionModal.bullionNameId, 'refill')
         },
         withdraw: {
-            title: `Списание со слитка "${transactionModal.categoryName}"`,
+            title: `Списание со слитка "${transactionModal.bullionNameTitle}"`,
             buttonText: 'Снять',
             buttonClass: 'withdraw-btn',
             handler: handleWithdraw,
@@ -312,10 +312,10 @@ function BullionsPage() {
             descriptionLabel: "📝 Комментарий",
             descriptionPlaceholder: "Комментарий к списанию (необязательно)...",
             type: 'withdraw',
-            vaults: getVaultsForCategory(transactionModal.categoryId, 'withdraw')
+            vaults: getVaultsForBullionName(transactionModal.bullionNameId, 'withdraw')
         },
         delete: {
-            title: `Удаление слитка "${transactionModal.categoryName}"`,
+            title: `Удаление слитка "${transactionModal.bullionNameTitle}"`,
             buttonText: 'Удалить и перенести',
             buttonClass: 'delete-btn',
             handler: handleDeleteWithTransfer,
@@ -334,18 +334,18 @@ function BullionsPage() {
 
     const [transferModal, setTransferModal] = useState({
         isOpen: false,
-        fromCategoryId: null,
-        fromCategoryName: null,
+        fromBullionNameId: null,
+        fromBullionNameTitle: null,
         fromVaultId: null,
         fromBullionId: null,
         fromAmount: 0
     });
 
-    const handleOpenTransfer = (categoryId, categoryName) => {
+    const handleOpenTransfer = (bullionNameId, bullionNameTitle) => {
         setTransferModal({
             isOpen: true,
-            fromCategoryId: categoryId,
-            fromCategoryName: categoryName,
+            fromBullionNameId: bullionNameId,
+            fromBullionNameTitle: bullionNameTitle,
             fromVaultId: null,
             fromBullionId: null,
             fromAmount: 0
@@ -355,8 +355,8 @@ function BullionsPage() {
     const closeTransferModal = () => {
         setTransferModal({
             isOpen: false,
-            fromCategoryId: null,
-            fromCategoryName: null,
+            fromBullionNameId: null,
+            fromBullionNameTitle: null,
             fromVaultId: null,
             fromBullionId: null,
             fromAmount: 0
@@ -383,13 +383,13 @@ function BullionsPage() {
     const getTransferTargets = () => {
         const targets = [];
 
-        categoryBullions.forEach(category => {
-            category.vaults?.forEach(vault => {
+        bullionNameBullions.forEach(bullionName => {
+            bullionName.vaults?.forEach(vault => {
                 // Проверяем allowedTransfer - если false, то не показываем
                 if (vault.id !== transferModal.fromBullionId && vault.allowedTransfer !== false) {
                     targets.push({
                         id: vault.bullionId,
-                        categoryName: category.categoryName,
+                        bullionNameTitle: bullionName.bullionNameTitle,
                         vaultName: vault.name,
                         amount: vault.amount,
                         allowedTransfer: vault.allowedTransfer,
@@ -404,14 +404,14 @@ function BullionsPage() {
 
     const getFromBullions = () => {
         const targets = [];
-        categoryBullions.forEach(category => {
-            if (category.categoryId === transferModal.fromCategoryId) {
-                category.vaults?.forEach(vault => {
+        bullionNameBullions.forEach(bullionName => {
+            if (bullionName.bullionNameId === transferModal.fromBullionNameId) {
+                bullionName.vaults?.forEach(vault => {
                     // Исключаем срочные хранилища
                     if (vault.allowedTransfer !== false) {
                         targets.push({
                             id: vault.bullionId,
-                            categoryName: category.categoryName,
+                            bullionNameTitle: bullionName.bullionNameTitle,
                             vaultName: vault.name,
                             amount: vault.amount,
                             allowedTransfer: vault.allowedTransfer,
@@ -468,16 +468,16 @@ function BullionsPage() {
                     </div>
                     <div className="sort-buttons">
                         <button
-                            className={`sort-btn ${sortField === 'categoryAmount' ? 'active' : ''}`}
-                            onClick={() => toggleSort('categoryAmount')}
+                            className={`sort-btn ${sortField === 'bullionNameAmount' ? 'active' : ''}`}
+                            onClick={() => toggleSort('bullionNameAmount')}
                         >
-                            По сумме {sortField === 'categoryAmount' && (sortOrder === 'asc' ? '↑' : '↓')}
+                            По сумме {sortField === 'bullionNameAmount' && (sortOrder === 'asc' ? '↑' : '↓')}
                         </button>
                         <button
-                            className={`sort-btn ${sortField === 'categoryName' ? 'active' : ''}`}
-                            onClick={() => toggleSort('categoryName')}
+                            className={`sort-btn ${sortField === 'bullionNameTitle' ? 'active' : ''}`}
+                            onClick={() => toggleSort('bullionNameTitle')}
                         >
-                            По названию {sortField === 'categoryName' && (sortOrder === 'asc' ? '↑' : '↓')}
+                            По названию {sortField === 'bullionNameTitle' && (sortOrder === 'asc' ? '↑' : '↓')}
                         </button>
                     </div>
                 </div>
@@ -490,16 +490,16 @@ function BullionsPage() {
                             {searchTerm ? 'Ничего не найдено' : 'Нет слитков. Добавьте первый!'}
                         </div>
                     ) : (
-                        getFilteredAndSorted.map((category) => (
-                            <div key={category.categoryId} className="bullion-card">
+                        getFilteredAndSorted.map((bullionName) => (
+                            <div key={bullionName.bullionNameId} className="bullion-card">
                                 <div className="card-header">
-                                    <h3>📁 {category.categoryName}</h3>
+                                    <h3>📁 {bullionName.bullionNameTitle}</h3>
                                 </div>
                                 <div className="card-body">
                                     <div className="vaults-list">
                                         <span className="vaults-label">🏦 Хранилища:</span>
                                         <div className="vaults-tags">
-                                            {category.vaults?.map((vault) => (
+                                            {bullionName.vaults?.map((vault) => (
                                                 <Link
                                                     key={vault.id}
                                                     to={`/vaults/${vault.id}`}
@@ -514,11 +514,11 @@ function BullionsPage() {
                                     <div className="card-stats">
                                         <div className="stat">
                                             <span className="stat-name">💰 Общая сумма:</span>
-                                            <span className="stat-value">{formatAmount(category.categoryAmount)} ₽</span>
+                                            <span className="stat-value">{formatAmount(bullionName.bullionNameAmount)} ₽</span>
                                         </div>
                                         <div className="stat">
                                             <span className="stat-name">📈 Средняя ставка:</span>
-                                            <span className="stat-value">{category.categoryAverageRate?.toFixed(2) || 0}%</span>
+                                            <span className="stat-value">{bullionName.bullionNameAverageRate?.toFixed(2) || 0}%</span>
                                         </div>
                                     </div>
                                 </div>
@@ -527,9 +527,9 @@ function BullionsPage() {
                                     <button
                                         className="refill-btn"
                                         onClick={() => {
-                                            const firstVault = category.vaults?.[0];
+                                            const firstVault = bullionName.vaults?.[0];
                                             if (firstVault) {
-                                                handleOpenRefill(category.categoryId, category.categoryName, firstVault.id);
+                                                handleOpenRefill(bullionName.bullionNameId, bullionName.bullionNameTitle, firstVault.id);
                                             }
                                         }}
                                     >
@@ -538,9 +538,9 @@ function BullionsPage() {
                                     <button
                                         className="withdraw-btn"
                                         onClick={() => {
-                                            const firstVault = category.vaults?.[0];
+                                            const firstVault = bullionName.vaults?.[0];
                                             if (firstVault) {
-                                                handleOpenWithdraw(category.categoryId, category.categoryName, firstVault.id);
+                                                handleOpenWithdraw(bullionName.bullionNameId, bullionName.bullionNameTitle, firstVault.id);
                                             }
                                         }}
                                     >
@@ -549,7 +549,7 @@ function BullionsPage() {
                                     <button
                                         className="transfer-btn"
                                         onClick={() => {
-                                            handleOpenTransfer(category.categoryId, category.categoryName);
+                                            handleOpenTransfer(bullionName.bullionNameId, bullionName.bullionNameTitle);
                                         }}
                                     >
                                         🔄 Перевод
@@ -557,11 +557,11 @@ function BullionsPage() {
                                     <button
                                         className="delete-vault-btn"
                                         onClick={() => {
-                                            const firstVault = category.vaults?.[0];
+                                            const firstVault = bullionName.vaults?.[0];
                                             if (firstVault) {
                                                 handleOpenDelete(
-                                                    category.categoryId,
-                                                    category.categoryName,
+                                                    bullionName.bullionNameId,
+                                                    bullionName.bullionNameTitle,
                                                     firstVault.id,
                                                     firstVault.name,
                                                     firstVault.id
@@ -584,8 +584,8 @@ function BullionsPage() {
                         setEditingBullion(null);
                     }}
                     onSave={handleSaveBullion}
-                    initialCategoryId={editingBullion?.categoryId}
-                    initialCategoryName={editingBullion?.categoryName}
+                    initialBullionNameId={editingBullion?.bullionNameId}
+                    initialBullionNameTitle={editingBullion?.bullionNameTitle}
                     initialVaultId={editingBullion?.vaultId}
                     initialAmount={editingBullion?.amount}
                     initialDescription={editingBullion?.description}
@@ -602,7 +602,7 @@ function BullionsPage() {
                         buttonText={currentTransaction.buttonText}
                         buttonClass={currentTransaction.buttonClass}
                         showVaultSelector={currentTransaction.showVaultSelector}
-                        vaults={currentTransaction.vaults || getVaultsForCategory(transactionModal.categoryId)}
+                        vaults={currentTransaction.vaults || getVaultsForBullionName(transactionModal.bullionNameId)}
                         initialVaultId={currentTransaction.initialVaultId || transactionModal.selectedVaultId}
                         initialAmount={currentTransaction.initialAmount}
                         initialDescription={currentTransaction.initialDescription}
@@ -610,7 +610,7 @@ function BullionsPage() {
                         showDescription={currentTransaction.showDescription}
                         isConfirm={currentTransaction.isConfirm || false}
                         confirmMessage={currentTransaction.confirmMessage}
-                        bullionName={transactionModal.categoryName}
+                        bullionName={transactionModal.bullionNameTitle}
                         descriptionPlaceholder={currentTransaction.descriptionPlaceholder}
                         descriptionLabel={currentTransaction.descriptionLabel}
                         vaultSelectorLabel={currentTransaction.vaultSelectorLabel}
@@ -636,10 +636,10 @@ function BullionsPage() {
                         isOpen={transferModal.isOpen}
                         onClose={closeTransferModal}
                         onSave={handleTransfer}
-                        title={`Перевод из категории "${transferModal.fromCategoryName}"`}
+                        title={`Перевод из наименования "${transferModal.fromBullionNameTitle}"`}
                         buttonText="Перевести"
                         buttonClass="transfer-btn"
-                        bullionName={transferModal.fromCategoryName}
+                        bullionName={transferModal.fromBullionNameTitle}
                         type="transfer"
                         maxTransferAmount={transferModal.fromAmount}
                         transferTargets={getTransferTargets()}

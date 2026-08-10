@@ -11,12 +11,12 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import ru.money.goldentaurusbank.www.backend.infrastructure.exception.ApplicationException;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
-import ru.money.goldentaurusbank.www.backend.model.dto.request.CategoryRequest;
-import ru.money.goldentaurusbank.www.backend.model.dto.response.CategoryImportResult;
-import ru.money.goldentaurusbank.www.backend.model.dto.response.CategoryResponse;
+import ru.money.goldentaurusbank.www.backend.model.dto.request.BullionNameRequest;
+import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionNameImportResult;
+import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionNameResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.SuccessResponse;
 import ru.money.goldentaurusbank.www.backend.repository.UserRepository;
-import ru.money.goldentaurusbank.www.backend.service.CategoryService;
+import ru.money.goldentaurusbank.www.backend.service.BullionNameService;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -27,11 +27,11 @@ import java.util.List;
 import static ru.money.goldentaurusbank.www.backend.model.dto.enums.ResponseCodes.USER_NOT_FOUND;
 
 @RestController
-@RequestMapping("/api/categories")
+@RequestMapping("/api/bullion-names")
 @RequiredArgsConstructor
-public class CategoryController {
+public class BullionNameController {
 
-    private final CategoryService categoryService;
+    private final BullionNameService bullionNameService;
     private final UserRepository userRepository;
 
 
@@ -41,75 +41,75 @@ public class CategoryController {
             @AuthenticationPrincipal UserDetails userDetails) {
 
         User user = getUserFromUserDetails(userDetails);
-        List<String> availableColors = categoryService.getAvailableColors(user);
+        List<String> availableColors = bullionNameService.getAvailableColors(user);
 
         return ResponseEntity.ok(new SuccessResponse<>(availableColors));
     }
 
-    // Добавление категории
+    // Добавление наименования слитка
     @PostMapping
-    public ResponseEntity<SuccessResponse<CategoryResponse>> createCategory(
+    public ResponseEntity<SuccessResponse<BullionNameResponse>> createBullionName(
             @AuthenticationPrincipal UserDetails userDetails,
-            @Valid @RequestBody CategoryRequest request) {
-        
+            @Valid @RequestBody BullionNameRequest request) {
+
         User user = getUserFromUserDetails(userDetails);
-        CategoryResponse response = categoryService.createCategory(user, request);
-        
+        BullionNameResponse response = bullionNameService.createBullionName(user, request);
+
         return ResponseEntity.ok(new SuccessResponse<>(
                 0,
-                "Категория успешно добавлена",
+                "Наименование слитка успешно добавлено",
                 response
         ));
     }
 
-    // Получение всех категорий пользователя
+    // Получение всех наименований слитков пользователя
     @GetMapping
-    public ResponseEntity<SuccessResponse<List<CategoryResponse>>> getAllCategories(
+    public ResponseEntity<SuccessResponse<List<BullionNameResponse>>> getAllBullionNames(
             @AuthenticationPrincipal UserDetails userDetails) {
         
         User user = getUserFromUserDetails(userDetails);
-        List<CategoryResponse> categories = categoryService.getAllCategories(user);
+        List<BullionNameResponse> bullionNames = bullionNameService.getAllBullionNames(user);
         
-        return ResponseEntity.ok(new SuccessResponse<>(categories));
+        return ResponseEntity.ok(new SuccessResponse<>(bullionNames));
     }
 
-    // Обновление категории
-    @PutMapping("/{categoryId}")
-    public ResponseEntity<SuccessResponse<CategoryResponse>> updateCategory(
+    // Обновление наименования слитка
+    @PutMapping("/{bullionNameId}")
+    public ResponseEntity<SuccessResponse<BullionNameResponse>> updateBullionName(
             @AuthenticationPrincipal UserDetails userDetails,
-            @PathVariable Long categoryId,
-            @Valid @RequestBody CategoryRequest request) {
-        
+            @PathVariable Long bullionNameId,
+            @Valid @RequestBody BullionNameRequest request) {
+
         User user = getUserFromUserDetails(userDetails);
-        CategoryResponse response = categoryService.updateCategory(user, categoryId, request);
-        
+        BullionNameResponse response = bullionNameService.updateBullionName(user, bullionNameId, request);
+
         return ResponseEntity.ok(new SuccessResponse<>(
                 0,
-                "Категория успешно обновлена",
+                "Наименование слитка успешно обновлено",
                 response
         ));
     }
 
-    // Удаление категории
-    @DeleteMapping("/{categoryId}")
-    public ResponseEntity<SuccessResponse<Void>> deleteCategory(
+    // Удаление наименования слитка
+    @DeleteMapping("/{bullionNameId}")
+    public ResponseEntity<SuccessResponse<Void>> deleteBullionName(
             @AuthenticationPrincipal UserDetails userDetails,
-            @PathVariable Long categoryId) {
-        
+            @PathVariable Long bullionNameId) {
+
         User user = getUserFromUserDetails(userDetails);
-        categoryService.deleteCategory(user, categoryId);
-        
-        return ResponseEntity.ok(new SuccessResponse<>("Категория успешно удалена"));
+        bullionNameService.deleteBullionName(user, bullionNameId);
+
+        return ResponseEntity.ok(new SuccessResponse<>("Наименование слитка успешно удалено"));
     }
 
     @GetMapping("/export")
-    public ResponseEntity<byte[]> exportCategories(
+    public ResponseEntity<byte[]> exportBullionNames(
             @AuthenticationPrincipal UserDetails userDetails) throws IOException {
 
         User user = getUserFromUserDetails(userDetails);
-        byte[] excelData = categoryService.exportCategoriesToExcel(user);
+        byte[] excelData = bullionNameService.exportBullionNamesToExcel(user);
 
-        String filename = URLEncoder.encode("categories.xlsx", StandardCharsets.UTF_8);
+        String filename = URLEncoder.encode("bullion-names.xlsx", StandardCharsets.UTF_8);
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
@@ -117,14 +117,14 @@ public class CategoryController {
                 .body(excelData);
     }
 
-    // Импорт категорий из Excel
+    // Импорт наименований слитков из Excel
     @PostMapping("/import")
-    public ResponseEntity<SuccessResponse<CategoryImportResult>> importCategories(
+    public ResponseEntity<SuccessResponse<BullionNameImportResult>> importBullionNames(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam("file") MultipartFile file) throws IOException {
 
         User user = getUserFromUserDetails(userDetails);
-        CategoryImportResult result = categoryService.importCategoriesFromExcel(user, file);
+        BullionNameImportResult result = bullionNameService.importBullionNamesFromExcel(user, file);
 
         String message = String.format("Импорт завершен. Добавлено: %d, Пропущено (дубликаты): %d",
                 result.getAdded(), result.getSkipped());

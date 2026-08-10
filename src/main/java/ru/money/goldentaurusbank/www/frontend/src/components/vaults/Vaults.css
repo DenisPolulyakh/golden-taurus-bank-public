@@ -521,61 +521,6 @@
 
 
 
-.import-vault-btn {
-    background: #ed8936;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    padding: 10px 20px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.import-vault-btn:hover:not(:disabled) {
-    background: #dd6b20;
-    transform: translateY(-1px);
-}
-
-.import-vault-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.import-progress {
-    background: #fef5e7;
-    border: 1px solid #ed8936;
-    padding: 12px 20px;
-    border-radius: 12px;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    color: #4a5568;
-}
-
-.spinner {
-    width: 20px;
-    height: 20px;
-    border: 3px solid #ed8936;
-    border-top-color: transparent;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-@media (max-width: 768px) {
-    .import-vault-btn {
-        width: 100%;
-    }
-}
-
 .vault-total {
     font-weight: 600;
     color: #2d3748;

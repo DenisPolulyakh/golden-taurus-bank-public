@@ -4,7 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import ru.money.goldentaurusbank.www.backend.model.domain.Bullion;
-import ru.money.goldentaurusbank.www.backend.model.domain.Category;
+import ru.money.goldentaurusbank.www.backend.model.domain.BullionName;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.domain.Vault;
 
@@ -14,29 +14,32 @@ import java.util.Optional;
 
 public interface BullionRepository extends JpaRepository<Bullion, Long> {
 
-    List<Bullion> findByUserOrderByCreatedAtDesc(User user);
+    /*
+     * Выборки «что у пользователя есть сейчас» исключают архивные слитки.
+     * Точечный поиск по id и по ключу (наименование + хранилище) их, наоборот,
+     * находит: истории нужно описание слитка, а созданию — реактивация вместо
+     * нарушения уникальности uk_bullions_user_bullion_name_vault.
+     */
+
+    List<Bullion> findByUserAndArchivedFalseOrderByCreatedAtDesc(User user);
 
     Optional<Bullion> findByIdAndUser(Long id, User user);
 
-    boolean existsByIdAndUser(Long id, User user);
+    Optional<Bullion> findByUserAndBullionNameIdAndVaultId(User user, Long bullionNameId, Long vaultId);
 
-    void deleteByIdAndUser(Long id, User user);
+    Optional<Bullion> findByVaultAndBullionName(Vault vault, BullionName bullionName);
 
+    List<Bullion> findAllByVault(Vault vault);
 
-    Optional<Bullion> findByUserAndCategoryIdAndVaultId(User user, Long categoryId, Long vaultId);
+    boolean existsByBullionNameIdAndUserId(Long bullionNameId, Long userId);
 
-
-    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user = :user")
+    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user = :user AND b.archived = false")
     BigDecimal getTotalAmountByUser(@Param("user") User user);
 
-
-    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user = :user and b.category = :category")
-    BigDecimal getTotalAmountByUserAndCategory(@Param("user") User user, @Param("category") Category category);
-
-    Optional<Bullion> findByVaultAndCategory(Vault vault, Category category);
-
-
-    boolean existsByCategoryIdAndUserId(Long categoryId, Long userId);
-    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user.id = :userId")
+    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user.id = :userId AND b.archived = false")
     BigDecimal getTotalAmountByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b "
+            + "WHERE b.user = :user AND b.bullionName = :bullionName AND b.archived = false")
+    BigDecimal getTotalAmountByUserAndBullionName(@Param("user") User user, @Param("bullionName") BullionName bullionName);
 }

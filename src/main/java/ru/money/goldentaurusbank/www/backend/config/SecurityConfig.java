@@ -52,7 +52,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/categories/**").authenticated()
+                .requestMatchers("/api/bullion-names/**").authenticated()
                 .requestMatchers("/api/banks/export", "/api/banks/import").authenticated()
                 .anyRequest().authenticated()
             )

@@ -19,6 +19,9 @@ const formatAmount = (amount) => {
     return formattedInteger;
 };
 
+// Кнопки быстрого ввода: прибавляются к текущей сумме
+const QUICK_AMOUNTS = [100, 500, 1000, 2000, 3000, 5000, 10000];
+
 function BullionTransactionModal({
                                      isOpen,
                                      onClose,
@@ -47,6 +50,7 @@ function BullionTransactionModal({
                                      onSelectFromBullion = null,
                                      selectedFromBullionId = null,
                                      initialDateOperation = null,
+                                     availableAmount = null,
                                  }) {
     const [amount, setAmount] = useState('');
     const [amountDisplay, setAmountDisplay] = useState('');
@@ -72,7 +76,7 @@ function BullionTransactionModal({
         })
         .map(target => ({
             value: target.id,
-            label: `${target.categoryName} | ${target.vaultName} | ${formatAmount(target.amount)} ₽`,
+            label: `${target.bullionNameTitle} | ${target.vaultName} | ${formatAmount(target.amount)} ₽`,
             data: target
         }));
 
@@ -80,7 +84,7 @@ function BullionTransactionModal({
         .filter(b => b.allowedTransfer !== false)
         .map(b => ({
             value: b.id,
-            label: `${b.categoryName} | ${b.vaultName} | ${formatAmount(b.amount)} ₽`,
+            label: `${b.bullionNameTitle} | ${b.vaultName} | ${formatAmount(b.amount)} ₽`,
             data: b
         }));
 
@@ -272,6 +276,67 @@ function BullionTransactionModal({
         setSelectedVaultId(option?.value || '');
     };
 
+    // Остаток, который подставляет кнопка "Всё":
+    // при переводе - остаток слитка-отправителя, при снятии - остаток текущего слитка.
+    const getAvailableBalance = () => {
+        if (isTransferModal) return maxTransferAmount || 0;
+        if (type !== 'withdraw') return 0;
+        if (availableAmount !== null && availableAmount !== undefined) {
+            const num = typeof availableAmount === 'string' ? parseFloat(availableAmount) : availableAmount;
+            return isNaN(num) ? 0 : num;
+        }
+        const vault = getAvailableVaults().find(v => v.id === parseInt(selectedVaultId));
+        return vault?.amount || 0;
+    };
+
+    // В пополнении кнопки "Всё" нет
+    const showAllButton = (isTransferModal || type === 'withdraw') && getAvailableBalance() > 0;
+
+    // Пока не выбран слиток-отправитель, поле суммы перевода заблокировано
+    const quickAmountsDisabled = isTransferModal && !selectedFromOption;
+
+    const applyAmount = (value) => {
+        const rounded = Math.round(value * 100) / 100;
+        setAmountDisplay(rounded.toLocaleString('ru-RU', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2
+        }));
+        setAmount(rounded.toString());
+        validateAmount(rounded);
+        setError('');
+    };
+
+    const handleQuickAdd = (value) => {
+        const current = parseFloat(amount);
+        applyAmount((isNaN(current) ? 0 : current) + value);
+    };
+
+    const renderQuickAmounts = () => (
+        <div className="quick-amount-row">
+            {QUICK_AMOUNTS.map(preset => (
+                <button
+                    key={preset}
+                    type="button"
+                    className="quick-amount-btn"
+                    onClick={() => handleQuickAdd(preset)}
+                    disabled={quickAmountsDisabled}
+                >
+                    {formatAmount(preset)}
+                </button>
+            ))}
+            {showAllButton && (
+                <button
+                    type="button"
+                    className="quick-amount-btn quick-amount-btn-all"
+                    onClick={() => applyAmount(getAvailableBalance())}
+                    disabled={quickAmountsDisabled}
+                >
+                    Всё
+                </button>
+            )}
+        </div>
+    );
+
     const isSubmitDisabled = () => {
         if (saving) return true;
         if (isTransferModal) {
@@ -431,7 +496,7 @@ function BullionTransactionModal({
                         {isTransferModal && selectedFromOption && (
                             <div className="transaction-bullion-info">
                                 <span className="info-label">📤 Откуда:</span>
-                                <span className="info-value">{selectedFromOption.data?.categoryName} | {selectedFromOption.data?.vaultName}</span>
+                                <span className="info-value">{selectedFromOption.data?.bullionNameTitle} | {selectedFromOption.data?.vaultName}</span>
                                 <span className="info-label" style={{ marginLeft: '16px' }}>
                                     Доступно: {formatAmount(maxTransferAmount)} ₽
                                 </span>
@@ -455,12 +520,12 @@ function BullionTransactionModal({
                                             onChange={handleFromSelect}
                                             placeholder="Выберите слиток-отправитель..."
                                             isClearable
-                                            noOptionsMessage={() => "Нет доступных слитков в этой категории"}
+                                            noOptionsMessage={() => "Нет доступных слитков в этом наименовании"}
                                             className="react-select-container"
                                             classNamePrefix="react-select"
                                             formatOptionLabel={(option) => (
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                    <span>{option.data?.categoryName}</span>
+                                                    <span>{option.data?.bullionNameTitle}</span>
                                                     <span style={{ color: '#718096', fontSize: '13px' }}>
                                                         {option.data?.vaultName}
                                                     </span>
@@ -491,6 +556,7 @@ function BullionTransactionModal({
                                         className={!isAmountValid && amountError ? 'input-error' : ''}
                                         disabled={!selectedFromOption}
                                     />
+                                    {renderQuickAmounts()}
                                     {amountError && (
                                         <div className="amount-warning">
                                             ⚠️ {amountError}
@@ -514,7 +580,7 @@ function BullionTransactionModal({
                                         classNamePrefix="react-select"
                                         formatOptionLabel={(option) => (
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <span>{option.data?.categoryName}</span>
+                                                <span>{option.data?.bullionNameTitle}</span>
                                                 <span style={{ color: '#718096', fontSize: '13px' }}>
                                                     {option.data?.vaultName}
                                                 </span>
@@ -534,8 +600,8 @@ function BullionTransactionModal({
                                         <div className="target-info-title">📥 Выбран получатель:</div>
                                         <div className="target-info-details">
                                             <div className="target-info-row">
-                                                <span className="target-info-label">Категория:</span>
-                                                <span className="target-info-value">{selectedTargetOption.data?.categoryName}</span>
+                                                <span className="target-info-label">Наименование:</span>
+                                                <span className="target-info-value">{selectedTargetOption.data?.bullionNameTitle}</span>
                                             </div>
                                             <div className="target-info-row">
                                                 <span className="target-info-label">Хранилище:</span>
@@ -654,6 +720,7 @@ function BullionTransactionModal({
                                     inputMode="decimal"
                                     autoFocus
                                 />
+                                {renderQuickAmounts()}
                                 <small className="input-hint">
                                     Используйте точку или запятую для копеек
                                 </small>
