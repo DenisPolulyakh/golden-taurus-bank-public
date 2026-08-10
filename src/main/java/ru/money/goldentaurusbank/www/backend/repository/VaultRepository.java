@@ -29,19 +29,13 @@ public interface VaultRepository extends JpaRepository<Vault, Long> {
 
 
 
-    @Query("SELECT v FROM Vault v WHERE v.user = :user AND LOWER(v.name) = LOWER(:name) AND v.bank.id = :bankId")
-    Optional<Vault> findByUserAndNameIgnoreCaseAndBank(
+    @Query("SELECT v FROM Vault v LEFT JOIN v.bank b WHERE v.user = :user AND LOWER(v.name) = LOWER(:name) "
+            + "AND ((:bankId IS NULL AND b IS NULL) OR b.id = :bankId)")
+    List<Vault> findByUserAndNameIgnoreCaseAndBankId(
             @Param("user") User user,
             @Param("name") String name,
             @Param("bankId") Long bankId
     );
-
-    @Query("SELECT v FROM Vault v WHERE v.user = :user AND LOWER(v.name) = LOWER(:name)")
-    Optional<Vault> findByUserAndNameIgnoreCase(
-            @Param("user") User user,
-            @Param("name") String name
-    );
-
 
 
     @EntityGraph(attributePaths = {"bullions"})

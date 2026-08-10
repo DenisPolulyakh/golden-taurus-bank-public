@@ -51,13 +51,11 @@ public class VaultService {
     public Vault createVault(User user, VaultRequest request) {
         String name = request.getName().trim();
 
-        Optional<Vault> existingVault = vaultRepository.findByUserAndNameIgnoreCase(user, name);
-        if (existingVault.isPresent()) {
-           /* throw new ApplicationException(
+        if (!vaultRepository.findByUserAndNameIgnoreCaseAndBankId(user, name, request.getBankId()).isEmpty()) {
+            throw new ApplicationException(
                     VAULT_ALREADY_EXISTS.getCode(),
                     "Хранилище с названием \"" + name + "\" уже существует"
-            );*/
-            return existingVault.get();
+            );
         }
 
         Vault.VaultBuilder builder = Vault.builder()
@@ -109,8 +107,10 @@ public class VaultService {
 
         String newName = request.getName().trim();
 
-        Optional<Vault> existingVault = vaultRepository.findByUserAndNameIgnoreCaseAndBank(user, newName, request.getBankId());
-        if (existingVault.isPresent() && !existingVault.get().getId().equals(vaultId)) {
+        boolean duplicate = vaultRepository.findByUserAndNameIgnoreCaseAndBankId(user, newName, request.getBankId())
+                .stream()
+                .anyMatch(existing -> !existing.getId().equals(vaultId));
+        if (duplicate) {
             throw new ApplicationException(
                     VAULT_ALREADY_EXISTS.getCode(),
                     "Хранилище с названием \"" + newName + "\" уже существует"
@@ -276,7 +276,7 @@ public class VaultService {
                         .amount(b.getAmount())
                         .description(b.getDescription())
                         .build())
-                .sorted(((a, b) -> b.getAmount().compareTo(totalAmount)))
+                .sorted((a, b) -> b.getAmount().compareTo(a.getAmount()))
                 .toList();
 
 
@@ -299,11 +299,15 @@ public class VaultService {
             return existingVault.get();
         }
         log.info("[VaultService.getLiquidityReserve] liquidity reserve not found. It will be create");
-        VaultRequest vaultRequest = new VaultRequest();
-        vaultRequest.setName(NAME_LIQUIDITY_RESERVE);
-        vaultRequest.setDescription(DESCRIPTION_LIQUIDITY_RESERVE);
-        vaultRequest.setInterestRate(BigDecimal.ZERO);
-        vaultRequest.setVaultType(VaultType.LIQUIDITY_BUFFER);
-        return this.createVault(user, vaultRequest);
+        Vault liquidityReserve = Vault.builder()
+                .name(NAME_LIQUIDITY_RESERVE)
+                .description(DESCRIPTION_LIQUIDITY_RESERVE)
+                .interestRate(BigDecimal.ZERO)
+                .vaultType(VaultType.LIQUIDITY_BUFFER)
+                .accountType(AccountType.SAVINGS)
+                .user(user)
+                .build();
+        vaultRepository.save(liquidityReserve);
+        return liquidityReserve;
     }
 }
