@@ -28,7 +28,7 @@ public class Bullion {
     private BullionName bullionName;
     
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "vault_id", nullable = false)
+    @JoinColumn(name = "vault_id")
     private Vault vault;
     
     @Column(nullable = false, precision = 19, scale = 2)

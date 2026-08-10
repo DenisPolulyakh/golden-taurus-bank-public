@@ -45,6 +45,7 @@ public enum ResponseCodes {
     COLOR_ALREADY_USE(4011,"Этот цвет уже используется в другом наименовании", HttpStatus.BAD_REQUEST),
     BULLION_NAME_LINKED(4012, "Наименование привязано к слитку, сначала удалите слиток",HttpStatus.BAD_REQUEST),
     TRANSACTION_ALREADY_REVERSED(4013, "Транзакция уже откачена", HttpStatus.BAD_REQUEST),
+    LIQUIDITY_RESERVE_NOT_EMPTY(4014, "В ликвидном хранилище есть слитки с остатком. Сначала перенесите их в другое хранилище", HttpStatus.BAD_REQUEST),
 
 
     // Системные ошибки (5xxx)

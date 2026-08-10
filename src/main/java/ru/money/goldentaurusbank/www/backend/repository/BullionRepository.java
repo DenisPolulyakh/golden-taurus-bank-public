@@ -29,6 +29,8 @@ public interface BullionRepository extends JpaRepository<Bullion, Long> {
 
     Optional<Bullion> findByVaultAndBullionName(Vault vault, BullionName bullionName);
 
+    List<Bullion> findAllByVault(Vault vault);
+
     boolean existsByBullionNameIdAndUserId(Long bullionNameId, Long userId);
 
     @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user = :user AND b.archived = false")

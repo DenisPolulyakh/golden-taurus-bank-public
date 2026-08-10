@@ -133,6 +133,7 @@ function VaultsPage() {
             setVaults(prev => prev.filter(vault => vault.id !== id));
 
             try {
+                setError('');
                 await api.delete(`/vaults/${id}`);
                 if (vaults.length === 1 && currentPage > 1) {
                     setCurrentPage(currentPage - 1);
@@ -140,6 +141,7 @@ function VaultsPage() {
             } catch (err) {
                 console.error('Ошибка удаления хранилища:', err);
                 setVaults(oldVaults);
+                setError(err.response?.data?.message || 'Не удалось удалить хранилище');
             }
         }
     };

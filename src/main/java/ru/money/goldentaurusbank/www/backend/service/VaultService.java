@@ -21,6 +21,7 @@ import ru.money.goldentaurusbank.www.backend.model.dto.response.VaultResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.VaultSummaryResponse;
 import ru.money.goldentaurusbank.www.backend.model.mapper.VaultMapper;
 import ru.money.goldentaurusbank.www.backend.repository.BankRepository;
+import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
 
 import java.math.BigDecimal;
@@ -42,6 +43,7 @@ public class VaultService {
 
     private final VaultRepository vaultRepository;
     private final BankRepository bankRepository;
+    private final BullionRepository bullionRepository;
     private final VaultMapper vaultMapper;
     private final TransactionService transactionService;
 
@@ -141,24 +143,45 @@ public class VaultService {
 
     @Transactional
     public void deleteVault(User user, Long vaultId) {
-        Optional<Vault> existingVault = vaultRepository.findByIdAndUser(vaultId, user);
+        Vault vault = vaultRepository.findByIdAndUser(vaultId, user)
+                .orElseThrow(() -> new ApplicationException(
+                        VAULT_NOT_FOUND.getCode(),
+                        VAULT_NOT_FOUND.getMessage()
+                ));
 
-        if (existingVault.isEmpty()) {
+        List<Bullion> activeBullions = List.copyOf(vault.getBullions());
+        long fundedCount = activeBullions.stream().filter(this::hasAmount).count();
+        boolean hasFunded = fundedCount > 0;
+
+        if (vault.getVaultType() == VaultType.LIQUIDITY_BUFFER && hasFunded) {
             throw new ApplicationException(
-                    VAULT_NOT_FOUND.getCode(),
-                    VAULT_NOT_FOUND.getMessage()
+                    LIQUIDITY_RESERVE_NOT_EMPTY.getCode(),
+                    LIQUIDITY_RESERVE_NOT_EMPTY.getMessage()
             );
         }
-        List<Bullion> bullions = existingVault.get().getBullions();
-        if (!bullions.isEmpty()) {
-            Vault liquidityReserve = getLiquidityReserve(user);
-            Long batchId = transactionService.createBatchId();
-            for (Bullion bullion : bullions) {
+
+        Vault liquidityReserve = hasFunded ? getLiquidityReserve(user) : null;
+        Long batchId = hasFunded ? transactionService.createBatchId() : null;
+
+        for (Bullion bullion : activeBullions) {
+            if (hasAmount(bullion)) {
                 transactionService.transferBullion(bullion.getId(), liquidityReserve.getId(), user, batchId, LocalDateTime.now());
+            } else {
+                transactionService.archive(bullion);
             }
-            log.info("To Reserve Vault move {} bullion", bullions.size());
         }
-        vaultRepository.deleteByIdAndUser(vaultId, user);
+
+        for (Bullion bullion : bullionRepository.findAllByVault(vault)) {
+            bullion.setVault(null);
+            bullionRepository.save(bullion);
+        }
+
+        vaultRepository.delete(vault);
+        log.info("[VaultService.deleteVault] vault id = {} deleted, bullions moved to reserve = {}", vaultId, fundedCount);
+    }
+
+    private boolean hasAmount(Bullion bullion) {
+        return bullion.getAmount() != null && bullion.getAmount().compareTo(BigDecimal.ZERO) > 0;
     }
 
     @Transactional(readOnly = true)

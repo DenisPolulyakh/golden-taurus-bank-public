@@ -4,7 +4,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import ru.money.goldentaurusbank.www.backend.model.domain.BankDictionary;
@@ -49,10 +48,5 @@ public interface VaultRepository extends JpaRepository<Vault, Long> {
     List<Vault> findByUser(User user);
 
     Optional<Vault> findVaultByUserAndVaultType(User user, VaultType vaultType);
-    
-    @Modifying
-    @Query("DELETE FROM Vault v WHERE v.id = :id AND v.user = :user")
-    void deleteByIdAndUser(@Param("id") Long id, @Param("user") User user);
-
 
 }
