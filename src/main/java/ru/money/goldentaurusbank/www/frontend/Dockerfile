@@ -9,14 +9,12 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# ===== Stage 2: nginx раздаёт статику и проксирует /api =====
-FROM nginx:1.27-alpine AS run
+# ===== Stage 2: Caddy раздаёт статику, проксирует /api и держит TLS =====
+FROM caddy:2-alpine AS run
 
-# Наш конфиг вместо дефолтного
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY Caddyfile /etc/caddy/Caddyfile
 
 # Собранная статика
-COPY --from=build /app/dist /usr/share/nginx/html
+COPY --from=build /app/dist /usr/share/caddy
 
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+EXPOSE 80 443

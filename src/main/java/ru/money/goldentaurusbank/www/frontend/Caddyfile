@@ -1,0 +1,17 @@
+{$APP_DOMAIN:localhost} {
+	encode gzip
+
+	request_body {
+		max_size 25MB
+	}
+
+	handle /api/* {
+		reverse_proxy app:8081
+	}
+
+	handle {
+		root * /usr/share/caddy
+		try_files {path} /index.html
+		file_server
+	}
+}

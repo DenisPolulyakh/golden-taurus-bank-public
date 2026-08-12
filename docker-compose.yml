@@ -43,16 +43,24 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
-    # Порт 8081 наружу не публикуем — доступ только через nginx
+    # Порт 8081 наружу не публикуем — доступ только через Caddy
 
-  nginx:
+  web:
     build: ./src/main/java/ru/money/goldentaurusbank/www/frontend
-    container_name: golden_taurus_nginx
+    container_name: golden_taurus_web
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
     ports:
-      - "${APP_HTTP_PORT:-80}:80"
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Выпущенные сертификаты. Без тома Let's Encrypt перевыпустит их
+      # на каждый перезапуск и упрётся в недельный лимит.
+      - caddy_data:/data
     depends_on:
       - app
     restart: unless-stopped
 
 volumes:
   postgres_data:
+  caddy_data:
