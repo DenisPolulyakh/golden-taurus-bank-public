@@ -129,8 +129,10 @@ public class AuthService {
     public JwtResponse refreshToken(HttpServletRequest request, HttpServletResponse response) {
         String refreshToken = extractRefreshTokenFromCookies(request);
 
+        // Отсутствие или протухание куки — не ошибка сервера, а обычное «сессии нет»:
+        // отдаём 401, чтобы фронт мог штатно отправить пользователя на логин
         if (refreshToken == null || !tokenProvider.validateToken(refreshToken)) {
-            throw new RuntimeException("Невалидный refresh token");
+            throw new ApplicationException(UNAUTHORIZED.getCode(), UNAUTHORIZED.getMessage());
         }
 
         String email = tokenProvider.getEmailFromToken(refreshToken);
