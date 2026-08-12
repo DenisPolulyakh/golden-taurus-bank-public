@@ -5,15 +5,15 @@ services:
     image: postgres:16-alpine
     container_name: golden_taurus_db
     environment:
-      POSTGRES_DB: golden_taurus_db
-      POSTGRES_USER: taurus
+      POSTGRES_DB: taurus_db
+      POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "5485:5432"
+      - "3245:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U taurus -d golden_taurus_db"]
+      test: ["CMD-SHELL", "pg_isready -U taurus -d taurus_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,8 +25,8 @@ services:
     env_file:
       - .env
     environment:
-      DB_URL: jdbc:postgresql://postgres:5432/golden_taurus_db
-      DB_USERNAME: taurus
+      DB_URL: jdbc:postgresql://postgres:3245/taurus_db
+      DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       SERVER_ADDRESS: 0.0.0.0
