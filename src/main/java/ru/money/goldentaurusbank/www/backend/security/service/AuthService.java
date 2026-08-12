@@ -4,6 +4,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -36,6 +37,9 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+
+    @Value("${app.cookie.secure}")
+    private boolean cookieSecure;
 
     @Transactional
     public void register(RegisterRequest request) {
@@ -104,7 +108,7 @@ public class AuthService {
 
         Cookie refreshTokenCookie = new Cookie("refresh_token", refreshToken);
         refreshTokenCookie.setHttpOnly(true);
-        refreshTokenCookie.setSecure(false);
+        refreshTokenCookie.setSecure(cookieSecure);
         refreshTokenCookie.setPath("/api/auth");
         refreshTokenCookie.setMaxAge((int) (tokenProvider.getRefreshExpirationMs() / 1000));
         response.addCookie(refreshTokenCookie);
@@ -146,7 +150,7 @@ public class AuthService {
 
         Cookie refreshTokenCookie = new Cookie("refresh_token", newRefreshToken);
         refreshTokenCookie.setHttpOnly(true);
-        refreshTokenCookie.setSecure(false);
+        refreshTokenCookie.setSecure(cookieSecure);
         refreshTokenCookie.setPath("/api/auth");
         refreshTokenCookie.setMaxAge((int) (tokenProvider.getRefreshExpirationMs() / 1000));
         response.addCookie(refreshTokenCookie);
@@ -164,7 +168,7 @@ public class AuthService {
     public void logout(HttpServletResponse response) {
         Cookie refreshTokenCookie = new Cookie("refresh_token", null);
         refreshTokenCookie.setHttpOnly(true);
-        refreshTokenCookie.setSecure(true);
+        refreshTokenCookie.setSecure(cookieSecure);
         refreshTokenCookie.setPath("/api/auth");
         refreshTokenCookie.setMaxAge(0);
         response.addCookie(refreshTokenCookie);

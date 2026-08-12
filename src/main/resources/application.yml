@@ -47,6 +47,8 @@ server:
 app:
   frontend:
     url: ${FRONTEND_URL:http://localhost:3000}
+  cookie:
+    secure: ${COOKIE_SECURE:false}
   jwt:
     secret: ${JWT_SECRET:}
     access-expiration: ${JWT_ACCESS_EXPIRATION:900000}
