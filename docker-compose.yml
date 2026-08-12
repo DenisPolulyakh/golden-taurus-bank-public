@@ -49,13 +49,12 @@ services:
     build: ./src/main/java/ru/money/goldentaurusbank/www/frontend
     container_name: golden_taurus_web
     environment:
-      APP_DOMAIN: ${APP_DOMAIN}
+      # TLS терминирует системный Caddy, внутренний слушает голый HTTP
+      APP_DOMAIN: ":80"
     ports:
-      - "80:80"
-      - "443:443"
+      # Наружу не светим: только системный Caddy ходит на 127.0.0.1:8080
+      - "127.0.0.1:8080:80"
     volumes:
-      # Выпущенные сертификаты. Без тома Let's Encrypt перевыпустит их
-      # на каждый перезапуск и упрётся в недельный лимит.
       - caddy_data:/data
     depends_on:
       - app
