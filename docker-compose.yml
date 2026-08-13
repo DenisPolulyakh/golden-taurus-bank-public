@@ -1,19 +1,17 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
     container_name: golden_taurus_db
     environment:
-      POSTGRES_DB: golden_taurus_db
-      POSTGRES_USER: taurus
+      POSTGRES_DB: taurus_db
+      POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "5485:5432"
+      - "127.0.0.1:3245:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U taurus -d golden_taurus_db"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,12 +23,15 @@ services:
     env_file:
       - .env
     environment:
-      DB_URL: jdbc:postgresql://postgres:5432/golden_taurus_db
-      DB_USERNAME: taurus
+      DB_URL: jdbc:postgresql://postgres:5432/taurus_db
+      DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+      DB_SCHEMA: ${DB_SCHEMA:-taurus}
       JWT_SECRET: ${JWT_SECRET}
       SERVER_ADDRESS: 0.0.0.0
       SERVER_PORT: 8081
+      FRONTEND_URL: ${FRONTEND_URL}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       # Почта (необязательно — оставьте пустым, если не нужна)
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
@@ -42,16 +43,23 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
-    # Порт 8081 наружу не публикуем — доступ только через nginx
+    # Порт 8081 наружу не публикуем — доступ только через Caddy
 
-  nginx:
+  web:
     build: ./src/main/java/ru/money/goldentaurusbank/www/frontend
-    container_name: golden_taurus_nginx
+    container_name: golden_taurus_web
+    environment:
+      # TLS терминирует системный Caddy, внутренний слушает голый HTTP
+      APP_DOMAIN: ":80"
     ports:
-      - "${APP_HTTP_PORT:-80}:80"
+      # Наружу не светим: только системный Caddy ходит на 127.0.0.1:8080
+      - "127.0.0.1:8080:80"
+    volumes:
+      - caddy_data:/data
     depends_on:
       - app
     restart: unless-stopped
 
 volumes:
   postgres_data:
+  caddy_data:

@@ -2,6 +2,8 @@ package ru.money.goldentaurusbank.www.backend.infrastructure.exception;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -63,6 +65,41 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(
                         e.getCode(),
                         e.getMessage()
+                ));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException e) {
+        log.warn("Некорректное тело запроса: {}", e.getMessage());
+        return ResponseEntity
+                .status(ResponseCodes.VALIDATION_ERROR.getHttpStatus())
+                .body(new ErrorResponse(
+                        ResponseCodes.VALIDATION_ERROR.getCode(),
+                        ResponseCodes.VALIDATION_ERROR.getMessage()
+                ));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException e) {
+        log.warn("AccessDeniedException: {}", e.getMessage());
+        return ResponseEntity
+                .status(ResponseCodes.ACCESS_DENIED.getHttpStatus())
+                .body(new ErrorResponse(
+                        ResponseCodes.ACCESS_DENIED.getCode(),
+                        ResponseCodes.ACCESS_DENIED.getMessage()
+                ));
+    }
+
+    // Последний рубеж: без него необработанное исключение уходит на /error,
+    // а тот закрыт авторизацией — клиент получает пустой 403 вместо текста ошибки
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ErrorResponse> handleUnexpected(RuntimeException e) {
+        log.error("Необработанное исключение", e);
+        return ResponseEntity
+                .status(ResponseCodes.INTERNAL_ERROR.getHttpStatus())
+                .body(new ErrorResponse(
+                        ResponseCodes.INTERNAL_ERROR.getCode(),
+                        ResponseCodes.INTERNAL_ERROR.getMessage()
                 ));
     }
 }

@@ -6,6 +6,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+import ru.money.goldentaurusbank.www.backend.infrastructure.exception.ApplicationException;
+
+import static ru.money.goldentaurusbank.www.backend.model.dto.enums.ResponseCodes.EMAIL_SEND_ERROR;
 
 @Slf4j
 @Service
@@ -43,7 +46,8 @@ public class EmailService {
             log.info("Verification email sent to: {}", to);
         } catch (Exception e) {
             log.error("Failed to send verification email to: {}", to, e);
-            throw new RuntimeException("Не удалось отправить письмо подтверждения", e);
+            throw new ApplicationException(EMAIL_SEND_ERROR.getCode(),
+                    "Не удалось отправить письмо подтверждения");
         }
     }
 
@@ -70,7 +74,8 @@ public class EmailService {
             log.info("Password reset email sent to: {}", to);
         } catch (Exception e) {
             log.error("Failed to send password reset email to: {}", to, e);
-            throw new RuntimeException("Не удалось отправить письмо для сброса пароля", e);
+            throw new ApplicationException(EMAIL_SEND_ERROR.getCode(),
+                    "Не удалось отправить письмо для сброса пароля");
         }
     }
 }

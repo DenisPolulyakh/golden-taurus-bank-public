@@ -27,7 +27,11 @@ function App() {
     const restoreSession = async () => {
         try {
             console.log('Attempting to restore session...');
-            const response = await api.post('/auth/refresh');
+            // Гость без куки — штатная ситуация: не показываем тост и не уходим в перевыпуск токена
+            const response = await api.post('/auth/refresh', null, {
+                _skipAuthRefresh: true,
+                _skipErrorToast: true,
+            });
 
             console.log('Refresh response:', response.data);
 

@@ -52,6 +52,8 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
+                // Иначе ответ об ошибке подменяется пустым 403 при форварде на /error
+                .requestMatchers("/error").permitAll()
                 .requestMatchers("/api/bullion-names/**").authenticated()
                 .requestMatchers("/api/banks/export", "/api/banks/import").authenticated()
                 .anyRequest().authenticated()
