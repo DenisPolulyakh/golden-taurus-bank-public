@@ -43,6 +43,9 @@ spring:
 server:
   port: ${SERVER_PORT:8081}
   address: ${SERVER_ADDRESS:0.0.0.0}
+  # Приложение стоит за двумя Caddy: без этого оно считает свою схему http,
+  # не совпадает с Origin браузера (https) и режет собственный фронт как CORS
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:framework}
 
 app:
   frontend:

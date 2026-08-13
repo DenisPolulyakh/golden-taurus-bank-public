@@ -1,3 +1,11 @@
+# Системный Caddy — доверенный прокси: его X-Forwarded-Proto: https нужно
+# передать бэкенду как есть, иначе он подставит свою схему (http)
+{
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
 {$APP_DOMAIN:localhost} {
 	encode gzip
 
