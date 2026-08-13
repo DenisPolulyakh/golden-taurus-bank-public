@@ -61,3 +61,16 @@ logging:
   level:
     liquibase: ${LOG_LEVEL_LIQUIBASE:DEBUG}
     org.hibernate.SQL: ${LOG_LEVEL_SQL:DEBUG}
+
+# Наружу не смотрит: порт 8081 не публикуется, Caddy проксирует только /api/*
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      # Даёт /actuator/health/readiness и /liveness — по ним ждёт healthcheck
+      probes:
+        enabled: true
+      show-details: never

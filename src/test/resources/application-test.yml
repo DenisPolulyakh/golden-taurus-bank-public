@@ -1,0 +1,17 @@
+# Профиль тестов (@ActiveProfiles("test")).
+# Подключение к БД, почте и JWT задаётся в @DynamicPropertySource самих тестов —
+# здесь только то, что делает лог прогона читаемым: без этого файла тесты
+# наследуют дефолтный DEBUG и печатают каждый SQL дважды (2.3 МБ за прогон).
+
+spring:
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: WARN
+    liquibase: WARN
+    # Testcontainers и docker-java иначе сыплют подробностями старта контейнера
+    org.testcontainers: WARN
+    com.github.dockerjava: WARN

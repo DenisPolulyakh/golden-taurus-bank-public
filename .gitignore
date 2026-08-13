@@ -109,6 +109,8 @@ secrets.yml
 # Application specific
 application-*.yml
 !application-example.yml
+# Профиль тестов нужен в репозитории — без него CI печатает 2.3 МБ SQL за прогон
+!application-test.yml
 
 # Local config
 config.local.yml

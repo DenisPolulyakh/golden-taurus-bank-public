@@ -1,3 +1,8 @@
+# Имя проекта фиксируем явно. Значение обязано совпадать с прежним (оно бралось
+# из имени каталога), иначе compose начнёт искать тома goldentaurus_postgres_data
+# вместо существующих golden-taurus-bank_postgres_data — то есть с пустой БД.
+name: golden-taurus-bank
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -19,6 +24,9 @@ services:
 
   app:
     build: .
+    # Тег на каждую выкладку: APP_TAG=$GITHUB_SHA docker compose up -d --build,
+    # откат — APP_TAG=<прежний sha> docker compose up -d (образ уже собран)
+    image: goldentaurus/app:${APP_TAG:-latest}
     container_name: golden_taurus_app
     env_file:
       - .env
@@ -42,11 +50,20 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      # curl есть в eclipse-temurin:21-jre, отдельно ставить не нужно
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health/readiness || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      # Старт Spring + миграции Liquibase: до этого провалы не считаются
+      start_period: 90s
     restart: unless-stopped
     # Порт 8081 наружу не публикуем — доступ только через Caddy
 
   web:
     build: ./src/main/java/ru/money/goldentaurusbank/www/frontend
+    image: goldentaurus/web:${APP_TAG:-latest}
     container_name: golden_taurus_web
     environment:
       # TLS терминирует системный Caddy, внутренний слушает голый HTTP
@@ -57,7 +74,8 @@ services:
     volumes:
       - caddy_data:/data
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

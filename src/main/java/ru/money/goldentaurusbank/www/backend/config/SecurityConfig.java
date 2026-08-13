@@ -54,6 +54,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 // Иначе ответ об ошибке подменяется пустым 403 при форварде на /error
                 .requestMatchers("/error").permitAll()
+                // healthcheck контейнера ходит без токена; наружу порт 8081 не
+                // публикуется, а Caddy проксирует только /api/*
+                .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers("/api/bullion-names/**").authenticated()
                 .requestMatchers("/api/banks/export", "/api/banks/import").authenticated()
                 .anyRequest().authenticated()
