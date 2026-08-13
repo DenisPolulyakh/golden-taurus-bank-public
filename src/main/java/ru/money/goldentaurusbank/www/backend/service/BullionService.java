@@ -246,6 +246,11 @@ public class BullionService {
                             .allowedDelete(allowed)
                             .allowedExpense(allowed)
                             .allowedTransfer(allowed)
+                            // Срочное хранилище: сумму менять нельзя, а
+                            // редактировать само хранилище — можно.
+                            // Те же правила, что в VaultMapper.enrichVaultResponse
+                            .allowedChangeAmount(allowed)
+                            .allowedEdit(true)
                             .build();})
                     .collect(Collectors.toList());
 

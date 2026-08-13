@@ -45,12 +45,21 @@ public class GroupedBullionResponse {
             private BigDecimal amount;
             private String accountType;
             private LocalDate closeDate;
+            // Без @Builder.Default билдер игнорирует "= true", и поле уходит
+            // во фронт как null. JSON-дефолт (allowedEdit = true) при
+            // деструктуризации от null не спасает — он ловит только undefined.
+            @Builder.Default
             private Boolean allowedIncome = true;
+            @Builder.Default
             private Boolean allowedExpense = true;
+            @Builder.Default
             private Boolean allowedDelete = true;
+            @Builder.Default
             private Boolean allowedTransfer = true;
+            @Builder.Default
             private Boolean allowedEdit = true;
-            private Boolean allowedChangeAmount= true;
+            @Builder.Default
+            private Boolean allowedChangeAmount = true;
         }
 
     }

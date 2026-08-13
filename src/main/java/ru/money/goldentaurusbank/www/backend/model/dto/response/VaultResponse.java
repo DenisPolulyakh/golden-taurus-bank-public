@@ -30,11 +30,20 @@ public class VaultResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private String displayName;
+    // @Builder.Default обязателен: без него билдер молча игнорирует "= true"
+    // и поле уезжает как false. Здесь значения всё равно перетирает
+    // VaultMapper.enrichVaultResponse, но объявление должно быть честным.
+    @Builder.Default
     private boolean allowedIncome = true;
+    @Builder.Default
     private boolean allowedExpense = true;
+    @Builder.Default
     private boolean allowedDelete = true;
+    @Builder.Default
     private boolean allowedTransfer = true;
+    @Builder.Default
     private boolean allowedEdit = true;
+    @Builder.Default
     private boolean allowedChangeAmount = true;
 
     public String getDisplayName() {

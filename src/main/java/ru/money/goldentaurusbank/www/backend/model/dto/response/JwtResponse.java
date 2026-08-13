@@ -11,6 +11,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class JwtResponse {
     private String token;
+    // Оба вызова билдера в AuthService выставляют type явно, но без
+    // @Builder.Default объявленное значение всё равно не работало бы
+    @Builder.Default
     private String type = "Bearer";
     private Long id;
     private String email;
