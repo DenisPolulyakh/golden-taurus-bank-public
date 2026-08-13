@@ -1,0 +1,75 @@
+name: CI
+
+# Тесты и сборка идут на раннерах GitHub, не на VPS: на 2 vCPU и 3.7 ГБ
+# компиляция рядом с боевой БД упирается в память (см. planCICD.md, п. 12).
+on:
+  push:
+    branches: [main]      # прямые пуши в main + слияния PR
+  pull_request:           # всё остальное проверяется через PR
+  workflow_dispatch:      # кнопка «Run workflow» — прогнать ветку без PR
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # stdout/stderr обязательны: с Java 19 одного file.encoding мало,
+      # иначе @DisplayName на русском выводится вопросами
+      MAVEN_OPTS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+      FRONTEND_DIR: src/main/java/ru/money/goldentaurusbank/www/frontend
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Иначе раннер сложит свой токен в .git/config открытым текстом
+          persist-credentials: false
+
+      - name: Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Бэкенд — тесты (Testcontainers сам поднимет и удалит postgres)
+        run: ./mvnw -B -ntp verify
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: src/main/java/ru/money/goldentaurusbank/www/frontend/package-lock.json
+
+      - name: Фронт — зависимости
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm ci --no-audit --no-fund
+
+      # Пока не блокирует: в коде 52 ошибки eslint (react-hooks/*, no-unused-vars).
+      # Когда разгребём — убрать continue-on-error, и линтер станет гейтом.
+      - name: Фронт — линтер (пока не блокирует)
+        continue-on-error: true
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm run lint
+
+      - name: Фронт — сборка
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm run build
+
+      - name: Отдать артефакты деплою
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          retention-days: 1     # квота хранилища на Free — 500 МБ
+          if-no-files-found: error
+          path: |
+            target/*.jar
+            src/main/java/ru/money/goldentaurusbank/www/frontend/dist
