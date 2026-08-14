@@ -41,7 +41,8 @@ public class BullionService {
     private static final BigDecimal ONE_HUNDRED = new BigDecimal(100);
     private static final String CREATE_FIRST_BULLION_COMMENT = "Первоначальное создание слитка";
     private static final String REFILL_EXISTS_BULLION_COMMENT = "Пополнение существующего слитка";
-    private static final String UPDATE_AMOUNT_COMMENT = "Ручная корректировка остатка слитка";
+    private static final String DEPOSIT_AMOUNT_COMMENT = "Пополнение при корректировке суммы слитка";
+    private static final String WITHDRAWAL_AMOUNT_COMMENT = "Снятие при корректировке суммы слитка";
     private static final String DELETE_BULLION_COMMENT = "Удаление слитка";
     private static final Logger log = LoggerFactory.getLogger(BullionService.class);
 
@@ -114,7 +115,7 @@ public class BullionService {
         // показал бы доход на всю сумму уже накопленного.
         if (request.getAmount() != null && request.getAmount().compareTo(BigDecimal.ZERO) > 0) {
             transactionService.openingBalance(bullion.getId(), request.getAmount(), user,
-                    CREATE_FIRST_BULLION_COMMENT, atStartOfDay(request.getDateOperation()));
+                    CREATE_FIRST_BULLION_COMMENT, request.getDateOperation());
         }
 
         return bullionMapper.toResponse(bullion);
@@ -148,9 +149,9 @@ public class BullionService {
         if (request.getAmount() != null) {
             BigDecimal delta = request.getAmount().subtract(bullion.getAmount());
             if (delta.compareTo(BigDecimal.ZERO) > 0) {
-                transactionService.deposit(bullionId, delta, user, UPDATE_AMOUNT_COMMENT, null, null);
+                transactionService.deposit(bullionId, delta, user, DEPOSIT_AMOUNT_COMMENT, request.getDateOperation(), null);
             } else if (delta.compareTo(BigDecimal.ZERO) < 0) {
-                transactionService.withdraw(bullionId, delta.negate(), user, UPDATE_AMOUNT_COMMENT, null, null);
+                transactionService.withdraw(bullionId, delta.negate(), user, WITHDRAWAL_AMOUNT_COMMENT, request.getDateOperation(), null);
             }
         }
 

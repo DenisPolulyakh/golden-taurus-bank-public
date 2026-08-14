@@ -28,6 +28,7 @@ import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.repository.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -444,7 +445,7 @@ class TransactionIntegrationTest {
                     "bullionNameId": %d,
                     "vaultId": %d,
                     "amount": %s,
-                    "dateOperation": "2026-07-20"
+                    "dateOperation": "2026-07-20T11:59:00"
                 }
                 """.formatted(bullionNameId, vaultId, amount.toPlainString());
 

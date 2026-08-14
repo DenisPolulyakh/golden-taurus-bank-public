@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+    import java.time.LocalDateTime;
 
 @Data
 public class BullionRequest {
@@ -24,5 +24,8 @@ public class BullionRequest {
     @Size(max = 500, message = "Описание не должно превышать 500 символов")
     private String description;
 
-    private LocalDate dateOperation;
+    private LocalDateTime dateOperation;
+
+    @Size(max = 500, message = "Комментарий не должен превышать 500 символов")
+    private String userComment;
 }
