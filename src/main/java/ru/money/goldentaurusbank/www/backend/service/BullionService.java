@@ -1,6 +1,7 @@
 package ru.money.goldentaurusbank.www.backend.service;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -16,8 +17,8 @@ import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.GroupedBullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.mapper.BullionMapper;
 import ru.money.goldentaurusbank.www.backend.model.mapper.BullionRequestMapper;
-import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
 import ru.money.goldentaurusbank.www.backend.repository.BullionNameRepository;
+import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
 import ru.money.goldentaurusbank.www.backend.util.math.FinancialCalculator;
 
@@ -95,7 +96,7 @@ public class BullionService {
                 user, request.getBullionNameId(), request.getVaultId());
 
         if (existingBullion.isPresent() && !existingBullion.get().isArchived()) {
-            RefillBullionRequest refillBullionRequest = bullionRequestMapper.toRefillBullionRequest(request, REFILL_EXISTS_BULLION_COMMENT);
+            RefillBullionRequest refillBullionRequest = bullionRequestMapper.toRefillBullionRequest(request, determineComment(request.getUserComment(), REFILL_EXISTS_BULLION_COMMENT));
             return refillBullion(user, refillBullionRequest);
         }
 
@@ -115,7 +116,7 @@ public class BullionService {
         // показал бы доход на всю сумму уже накопленного.
         if (request.getAmount() != null && request.getAmount().compareTo(BigDecimal.ZERO) > 0) {
             transactionService.openingBalance(bullion.getId(), request.getAmount(), user,
-                    CREATE_FIRST_BULLION_COMMENT, request.getDateOperation());
+                    determineComment(request.getUserComment(), CREATE_FIRST_BULLION_COMMENT), request.getDateOperation());
         }
 
         return bullionMapper.toResponse(bullion);
@@ -144,14 +145,13 @@ public class BullionService {
                         BULLION_NOT_FOUND.getMessage()
                 ));
 
-        // Ручная правка суммы оформляется корректирующей транзакцией на дельту:
-        // иначе остаток разъезжается с графиком, который считается по операциям.
+
         if (request.getAmount() != null) {
             BigDecimal delta = request.getAmount().subtract(bullion.getAmount());
             if (delta.compareTo(BigDecimal.ZERO) > 0) {
-                transactionService.deposit(bullionId, delta, user, DEPOSIT_AMOUNT_COMMENT, request.getDateOperation(), null);
+                transactionService.deposit(bullionId, delta, user, determineComment(request.getUserComment(), DEPOSIT_AMOUNT_COMMENT), request.getDateOperation(), null);
             } else if (delta.compareTo(BigDecimal.ZERO) < 0) {
-                transactionService.withdraw(bullionId, delta.negate(), user, WITHDRAWAL_AMOUNT_COMMENT, request.getDateOperation(), null);
+                transactionService.withdraw(bullionId, delta.negate(), user, determineComment(request.getUserComment(), WITHDRAWAL_AMOUNT_COMMENT), request.getDateOperation(), null);
             }
         }
 
@@ -229,8 +229,6 @@ public class BullionService {
             averageDataBullionName = calculateWeightedAverageRateWithDecimal(bullionNameBullions, Bullion::getAmount, b -> b.getVault().getInterestRate());
 
 
-
-
             List<GroupedBullionResponse.BullionNameBullion.VaultInfo> vaultInfos = bullionNameBullions.stream()
                     .map(b -> {
 
@@ -238,21 +236,22 @@ public class BullionService {
                         boolean allowed = calculateAllowed(vault);
 
                         return GroupedBullionResponse.BullionNameBullion.VaultInfo.builder()
-                            .id(b.getVault().getId())
-                            .name(b.getVault().getName())
-                            .amount(b.getAmount())
-                            .accountType(vault.getAccountType().name())
-                            .closeDate(vault.getCloseDate())
-                            .allowedIncome(allowed)
-                            .allowedDelete(allowed)
-                            .allowedExpense(allowed)
-                            .allowedTransfer(allowed)
-                            // Срочное хранилище: сумму менять нельзя, а
-                            // редактировать само хранилище — можно.
-                            // Те же правила, что в VaultMapper.enrichVaultResponse
-                            .allowedChangeAmount(allowed)
-                            .allowedEdit(true)
-                            .build();})
+                                .id(b.getVault().getId())
+                                .name(b.getVault().getName())
+                                .amount(b.getAmount())
+                                .accountType(vault.getAccountType().name())
+                                .closeDate(vault.getCloseDate())
+                                .allowedIncome(allowed)
+                                .allowedDelete(allowed)
+                                .allowedExpense(allowed)
+                                .allowedTransfer(allowed)
+                                // Срочное хранилище: сумму менять нельзя, а
+                                // редактировать само хранилище — можно.
+                                // Те же правила, что в VaultMapper.enrichVaultResponse
+                                .allowedChangeAmount(allowed)
+                                .allowedEdit(true)
+                                .build();
+                    })
                     .collect(Collectors.toList());
 
 
@@ -277,8 +276,6 @@ public class BullionService {
 
         return response;
     }
-
-
 
 
     @Transactional(readOnly = true)
@@ -352,5 +349,10 @@ public class BullionService {
         LocalDate today = LocalDate.now();
         LocalDate closeDate = vault.getCloseDate();
         return today.isEqual(closeDate) || today.isAfter(closeDate);
+    }
+
+
+    private String determineComment(String userComment, String defaultComment) {
+        return StringUtils.isNotBlank(userComment) ? userComment : defaultComment;
     }
 }
