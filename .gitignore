@@ -114,3 +114,8 @@ application-*.yml
 
 # Local config
 config.local.yml
+
+# Распакованный артефакт выкладки (jar + собранная статика), создаётся workflow'ом
+# deploy.yml на VPS. Обязан быть в .gitignore: иначе шаг «спрятать ручные правки»
+# сметал бы его в stash перед каждой следующей выкладкой.
+.deploy/
