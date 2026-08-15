@@ -145,7 +145,8 @@ public class BullionService {
                         BULLION_NOT_FOUND.getMessage()
                 ));
 
-
+        // Ручная правка суммы оформляется корректирующей транзакцией на дельту:
+        // иначе остаток разъезжается с графиком, который считается по операциям.
         if (request.getAmount() != null) {
             BigDecimal delta = request.getAmount().subtract(bullion.getAmount());
             if (delta.compareTo(BigDecimal.ZERO) > 0) {
@@ -353,6 +354,6 @@ public class BullionService {
 
 
     private String determineComment(String userComment, String defaultComment) {
-        return StringUtils.isNotBlank(userComment) ? userComment : defaultComment;
+        return StringUtils.isNotBlank(userComment) ? userComment.trim() : defaultComment;
     }
 }

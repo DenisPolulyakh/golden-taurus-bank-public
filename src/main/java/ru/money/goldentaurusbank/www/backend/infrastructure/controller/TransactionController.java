@@ -1,7 +1,6 @@
 
 package ru.money.goldentaurusbank.www.backend.infrastructure.controller;
 
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -14,8 +13,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import ru.money.goldentaurusbank.www.backend.infrastructure.exception.ApplicationException;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
-import ru.money.goldentaurusbank.www.backend.model.dto.request.TransferRequest;
-import ru.money.goldentaurusbank.www.backend.model.dto.response.SuccessResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.DashboardDailyStatisticsDto;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.DashboardStatisticsDto;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.TransactionDto;
@@ -48,7 +45,7 @@ public class TransactionController {
 
         User user = getUserFromUserDetails(userDetails);  // Добавить
         log.info("Get dashboard statistics for user: {}, year: {}", user.getId(), year);
-        if(year == null) {
+        if (year == null) {
             year = LocalDateTime.now().getYear();
         }
         DashboardStatisticsDto statistics = transactionService.getDashboardStatistics(user.getId(), year);

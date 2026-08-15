@@ -7,6 +7,7 @@ import com.icegreen.greenmail.configuration.GreenMailConfiguration;
 import com.icegreen.greenmail.junit5.GreenMailExtension;
 import com.icegreen.greenmail.util.ServerSetupTest;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,12 +34,16 @@ import ru.money.goldentaurusbank.www.backend.repository.UserRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static ru.money.goldentaurusbank.www.backend.model.dto.enums.TransactionKind.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
@@ -47,6 +52,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 @DisplayName("Интеграционные тесты слитков")
 class BullionNameBullionIntegrationTest {
+
+
+    private static final String DEPOSIT_AMOUNT_COMMENT = "Пополнение при корректировке суммы слитка";
+    private static final String WITHDRAWAL_AMOUNT_COMMENT = "Снятие при корректировке суммы слитка";
 
     @Autowired
     private MockMvc mockMvc;
@@ -576,6 +585,200 @@ class BullionNameBullionIntegrationTest {
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.amount").value(150000))
                 .andExpect(jsonPath("$.data.description").value("Новое описание"));
+    }
+
+    @Test
+    @DisplayName("Проверка операций DEPOSIT при увеличении суммы слитка")
+    void updateAmountUp() throws Exception {
+        String createRequest = """
+                {
+                    "bullionNameId": %d,
+                    "vaultId": %d,
+                    "amount": 100000,
+                    "dateOperation": "2026-07-20T12:00:00"
+                }
+                """.formatted(bullionNameId1, vaultId1);
+
+        MvcResult createResult = mockMvc.perform(post("/api/bullions")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequest))
+                .andReturn();
+
+        Long bullionId = objectMapper.readTree(createResult.getResponse().getContentAsString())
+                .get("data").get("id").asLong();
+
+        String request = """
+                {
+                    "bullionNameId": %d,
+                    "vaultId": %d,
+                    "amount": %d,
+                    "dateOperation": "2026-07-20T12:00:00"
+                }
+                """.formatted(bullionNameId1, vaultId1, 150000);
+
+        MvcResult result = mockMvc.perform(put("/api/bullions/{bullionId}", bullionId)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        BigDecimal amount = objectMapper.readTree(result.getResponse().getContentAsString())
+                .get("data").get("amount").decimalValue();
+
+
+        Assertions.assertEquals(new BigDecimal(150000).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros(), amount.setScale(2, RoundingMode.HALF_UP).stripTrailingZeros());
+
+
+        MvcResult history = mockMvc.perform(get("/api/transactions/history")
+                        .param("page", "0")
+                        .param("size", "1")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andReturn();
+
+
+        String comment = objectMapper.readTree(history.getResponse().getContentAsString())
+                .get("content").get(0).get("comment").asText();
+
+        String kind = objectMapper.readTree(history.getResponse().getContentAsString())
+                .get("content").get(0).get("kind").asText();
+
+        Assertions.assertEquals(DEPOSIT_AMOUNT_COMMENT, comment);
+        Assertions.assertEquals(DEPOSIT.name(), kind);
+
+    }
+
+
+
+    @Test
+    @DisplayName("Проверка операций WITHDRAWAL при уменьшении суммы слитка")
+    void updateAmountDown() throws Exception {
+        String createRequest = """
+                {
+                    "bullionNameId": %d,
+                    "vaultId": %d,
+                    "amount": 100000,
+                    "dateOperation": "2026-07-20T12:00:00"
+                }
+                """.formatted(bullionNameId1, vaultId1);
+
+        MvcResult createResult = mockMvc.perform(post("/api/bullions")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequest))
+                .andReturn();
+
+        Long bullionId = objectMapper.readTree(createResult.getResponse().getContentAsString())
+                .get("data").get("id").asLong();
+
+        String request = """
+                {
+                    "bullionNameId": %d,
+                    "vaultId": %d,
+                    "amount": %d,
+                    "dateOperation": "2026-07-20T12:00:00"
+                }
+                """.formatted(bullionNameId1, vaultId1, 40000);
+
+        MvcResult result = mockMvc.perform(put("/api/bullions/{bullionId}", bullionId)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        BigDecimal amount = objectMapper.readTree(result.getResponse().getContentAsString())
+                .get("data").get("amount").decimalValue();
+
+
+        Assertions.assertEquals(new BigDecimal(40000).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros(), amount.setScale(2, RoundingMode.HALF_UP).stripTrailingZeros());
+
+
+        MvcResult history = mockMvc.perform(get("/api/transactions/history")
+                        .param("page", "0")
+                        .param("size", "1")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andReturn();
+
+
+        String comment = objectMapper.readTree(history.getResponse().getContentAsString())
+                .get("content").get(0).get("comment").asText();
+
+        String kind = objectMapper.readTree(history.getResponse().getContentAsString())
+                .get("content").get(0).get("kind").asText();
+
+        Assertions.assertEquals(WITHDRAWAL_AMOUNT_COMMENT, comment);
+        Assertions.assertEquals(WITHDRAWAL.name(), kind);
+
+    }
+
+
+    @Test
+    @DisplayName("Проверка отсутствие операций при изменении описания слитка")
+    void updateDescription() throws Exception {
+        String createRequest = """
+                {
+                    "bullionNameId": %d,
+                    "vaultId": %d,
+                    "amount": 100000,
+                    "dateOperation": "2026-07-20T12:00:00"
+                }
+                """.formatted(bullionNameId1, vaultId1);
+
+        MvcResult createResult = mockMvc.perform(post("/api/bullions")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequest))
+                .andReturn();
+
+        Long bullionId = objectMapper.readTree(createResult.getResponse().getContentAsString())
+                .get("data").get("id").asLong();
+
+        String request = """
+                {
+                    "bullionNameId": %d,
+                    "vaultId": %d,
+                    "description": "%s",
+                    "amount": 100000,
+                    "dateOperation": "2026-07-20T12:00:00"
+                }
+                """.formatted(bullionNameId1, vaultId1, "Новое описание");
+
+        MvcResult result = mockMvc.perform(put("/api/bullions/{bullionId}", bullionId)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        BigDecimal amount = objectMapper.readTree(result.getResponse().getContentAsString())
+                .get("data").get("amount").decimalValue();
+
+        String description = objectMapper.readTree(result.getResponse().getContentAsString())
+                .get("data").get("description").asText();
+
+
+        Assertions.assertEquals(new BigDecimal(100000).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros(), amount.setScale(2, RoundingMode.HALF_UP).stripTrailingZeros());
+
+        Assertions.assertEquals("Новое описание", description);
+
+        MvcResult history = mockMvc.perform(get("/api/transactions/history")
+                        .param("page", "0")
+                        .param("size", "1")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andReturn();
+
+
+        String comment = objectMapper.readTree(history.getResponse().getContentAsString())
+                .get("content").get(0).get("comment").asText();
+
+        String kind = objectMapper.readTree(history.getResponse().getContentAsString())
+                .get("content").get(0).get("kind").asText();
+
+        Assertions.assertEquals("Первоначальное создание слитка", comment);
+        Assertions.assertEquals(OPENING_BALANCE.name(), kind);
+
     }
 
     @Test
