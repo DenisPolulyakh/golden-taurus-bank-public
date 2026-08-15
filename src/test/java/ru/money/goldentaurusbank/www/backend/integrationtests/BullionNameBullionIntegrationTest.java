@@ -7,7 +7,6 @@ import com.icegreen.greenmail.configuration.GreenMailConfiguration;
 import com.icegreen.greenmail.junit5.GreenMailExtension;
 import com.icegreen.greenmail.util.ServerSetupTest;
 import jakarta.persistence.EntityManager;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,16 +33,18 @@ import ru.money.goldentaurusbank.www.backend.repository.UserRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static ru.money.goldentaurusbank.www.backend.model.dto.enums.TransactionKind.*;
+import static ru.money.goldentaurusbank.www.backend.service.BullionService.DEPOSIT_AMOUNT_COMMENT;
+import static ru.money.goldentaurusbank.www.backend.service.BullionService.WITHDRAWAL_AMOUNT_COMMENT;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
@@ -52,10 +53,6 @@ import static ru.money.goldentaurusbank.www.backend.model.dto.enums.TransactionK
 @Transactional
 @DisplayName("Интеграционные тесты слитков")
 class BullionNameBullionIntegrationTest {
-
-
-    private static final String DEPOSIT_AMOUNT_COMMENT = "Пополнение при корректировке суммы слитка";
-    private static final String WITHDRAWAL_AMOUNT_COMMENT = "Снятие при корректировке суммы слитка";
 
     @Autowired
     private MockMvc mockMvc;
@@ -590,150 +587,42 @@ class BullionNameBullionIntegrationTest {
     @Test
     @DisplayName("Проверка операций DEPOSIT при увеличении суммы слитка")
     void updateAmountUp() throws Exception {
-        String createRequest = """
-                {
-                    "bullionNameId": %d,
-                    "vaultId": %d,
-                    "amount": 100000,
-                    "dateOperation": "2026-07-20T12:00:00"
-                }
-                """.formatted(bullionNameId1, vaultId1);
+        Long bullionId = createBullion(100000);
 
-        MvcResult createResult = mockMvc.perform(post("/api/bullions")
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(createRequest))
-                .andReturn();
-
-        Long bullionId = objectMapper.readTree(createResult.getResponse().getContentAsString())
-                .get("data").get("id").asLong();
-
-        String request = """
-                {
-                    "bullionNameId": %d,
-                    "vaultId": %d,
-                    "amount": %d,
-                    "dateOperation": "2026-07-20T12:00:00"
-                }
-                """.formatted(bullionNameId1, vaultId1, 150000);
-
-        MvcResult result = mockMvc.perform(put("/api/bullions/{bullionId}", bullionId)
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(request))
-                .andExpect(status().isOk())
-                .andReturn();
+        MvcResult result = updateBullionAmount(bullionId, "150000", null, null);
 
         BigDecimal amount = objectMapper.readTree(result.getResponse().getContentAsString())
                 .get("data").get("amount").decimalValue();
+        assertThat(amount).isEqualByComparingTo("150000");
 
-
-        Assertions.assertEquals(new BigDecimal(150000).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros(), amount.setScale(2, RoundingMode.HALF_UP).stripTrailingZeros());
-
-
-        MvcResult history = mockMvc.perform(get("/api/transactions/history")
-                        .param("page", "0")
-                        .param("size", "1")
-                        .header("Authorization", "Bearer " + accessToken))
-                .andReturn();
-
-
-        String comment = objectMapper.readTree(history.getResponse().getContentAsString())
-                .get("content").get(0).get("comment").asText();
-
-        String kind = objectMapper.readTree(history.getResponse().getContentAsString())
-                .get("content").get(0).get("kind").asText();
-
-        Assertions.assertEquals(DEPOSIT_AMOUNT_COMMENT, comment);
-        Assertions.assertEquals(DEPOSIT.name(), kind);
-
+        JsonNode operation = lastTransaction();
+        assertThat(operation.get("kind").asText()).isEqualTo(DEPOSIT.name());
+        assertThat(operation.get("amount").decimalValue()).isEqualByComparingTo("50000");
+        assertThat(operation.get("comment").asText()).isEqualTo(DEPOSIT_AMOUNT_COMMENT);
     }
-
-
 
     @Test
     @DisplayName("Проверка операций WITHDRAWAL при уменьшении суммы слитка")
     void updateAmountDown() throws Exception {
-        String createRequest = """
-                {
-                    "bullionNameId": %d,
-                    "vaultId": %d,
-                    "amount": 100000,
-                    "dateOperation": "2026-07-20T12:00:00"
-                }
-                """.formatted(bullionNameId1, vaultId1);
+        Long bullionId = createBullion(100000);
 
-        MvcResult createResult = mockMvc.perform(post("/api/bullions")
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(createRequest))
-                .andReturn();
-
-        Long bullionId = objectMapper.readTree(createResult.getResponse().getContentAsString())
-                .get("data").get("id").asLong();
-
-        String request = """
-                {
-                    "bullionNameId": %d,
-                    "vaultId": %d,
-                    "amount": %d,
-                    "dateOperation": "2026-07-20T12:00:00"
-                }
-                """.formatted(bullionNameId1, vaultId1, 40000);
-
-        MvcResult result = mockMvc.perform(put("/api/bullions/{bullionId}", bullionId)
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(request))
-                .andExpect(status().isOk())
-                .andReturn();
+        MvcResult result = updateBullionAmount(bullionId, "40000", null, null);
 
         BigDecimal amount = objectMapper.readTree(result.getResponse().getContentAsString())
                 .get("data").get("amount").decimalValue();
+        assertThat(amount).isEqualByComparingTo("40000");
 
-
-        Assertions.assertEquals(new BigDecimal(40000).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros(), amount.setScale(2, RoundingMode.HALF_UP).stripTrailingZeros());
-
-
-        MvcResult history = mockMvc.perform(get("/api/transactions/history")
-                        .param("page", "0")
-                        .param("size", "1")
-                        .header("Authorization", "Bearer " + accessToken))
-                .andReturn();
-
-
-        String comment = objectMapper.readTree(history.getResponse().getContentAsString())
-                .get("content").get(0).get("comment").asText();
-
-        String kind = objectMapper.readTree(history.getResponse().getContentAsString())
-                .get("content").get(0).get("kind").asText();
-
-        Assertions.assertEquals(WITHDRAWAL_AMOUNT_COMMENT, comment);
-        Assertions.assertEquals(WITHDRAWAL.name(), kind);
-
+        JsonNode operation = lastTransaction();
+        assertThat(operation.get("kind").asText()).isEqualTo(WITHDRAWAL.name());
+        assertThat(operation.get("amount").decimalValue()).isEqualByComparingTo("60000");
+        assertThat(operation.get("comment").asText()).isEqualTo(WITHDRAWAL_AMOUNT_COMMENT);
     }
-
 
     @Test
     @DisplayName("Проверка отсутствие операций при изменении описания слитка")
     void updateDescription() throws Exception {
-        String createRequest = """
-                {
-                    "bullionNameId": %d,
-                    "vaultId": %d,
-                    "amount": 100000,
-                    "dateOperation": "2026-07-20T12:00:00"
-                }
-                """.formatted(bullionNameId1, vaultId1);
-
-        MvcResult createResult = mockMvc.perform(post("/api/bullions")
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(createRequest))
-                .andReturn();
-
-        Long bullionId = objectMapper.readTree(createResult.getResponse().getContentAsString())
-                .get("data").get("id").asLong();
+        Long bullionId = createBullion(100000);
+        long operationsBefore = transactionCount();
 
         String request = """
                 {
@@ -752,33 +641,56 @@ class BullionNameBullionIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        BigDecimal amount = objectMapper.readTree(result.getResponse().getContentAsString())
-                .get("data").get("amount").decimalValue();
+        JsonNode data = objectMapper.readTree(result.getResponse().getContentAsString()).get("data");
+        assertThat(data.get("amount").decimalValue()).isEqualByComparingTo("100000");
+        assertThat(data.get("description").asText()).isEqualTo("Новое описание");
 
-        String description = objectMapper.readTree(result.getResponse().getContentAsString())
-                .get("data").get("description").asText();
+        // Сумма не изменилась — новых операций быть не должно, последней остаётся создание слитка
+        assertThat(transactionCount()).isEqualTo(operationsBefore);
+        assertThat(lastTransaction().get("kind").asText()).isEqualTo(OPENING_BALANCE.name());
+    }
 
+    @Test
+    @DisplayName("Комментарий пользователя становится комментарием корректирующей операции")
+    void updateAmountUsesUserComment() throws Exception {
+        Long bullionId = createBullion(100000);
 
-        Assertions.assertEquals(new BigDecimal(100000).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros(), amount.setScale(2, RoundingMode.HALF_UP).stripTrailingZeros());
+        // По краям пробелы — determineComment их срезает
+        updateBullionAmount(bullionId, "150000", "  докупил  ", null);
 
-        Assertions.assertEquals("Новое описание", description);
+        assertThat(lastTransaction().get("comment").asText()).isEqualTo("докупил");
+    }
 
-        MvcResult history = mockMvc.perform(get("/api/transactions/history")
-                        .param("page", "0")
-                        .param("size", "1")
-                        .header("Authorization", "Bearer " + accessToken))
-                .andReturn();
+    @Test
+    @DisplayName("Комментарий из пробелов заменяется константой пополнения")
+    void updateAmountBlankUserCommentFallsBackToDepositComment() throws Exception {
+        Long bullionId = createBullion(100000);
 
+        updateBullionAmount(bullionId, "150000", "   ", null);
 
-        String comment = objectMapper.readTree(history.getResponse().getContentAsString())
-                .get("content").get(0).get("comment").asText();
+        assertThat(lastTransaction().get("comment").asText()).isEqualTo(DEPOSIT_AMOUNT_COMMENT);
+    }
 
-        String kind = objectMapper.readTree(history.getResponse().getContentAsString())
-                .get("content").get(0).get("kind").asText();
+    @Test
+    @DisplayName("Пустой комментарий заменяется константой снятия")
+    void updateAmountEmptyUserCommentFallsBackToWithdrawalComment() throws Exception {
+        Long bullionId = createBullion(100000);
 
-        Assertions.assertEquals("Первоначальное создание слитка", comment);
-        Assertions.assertEquals(OPENING_BALANCE.name(), kind);
+        updateBullionAmount(bullionId, "40000", "", null);
 
+        assertThat(lastTransaction().get("comment").asText()).isEqualTo(WITHDRAWAL_AMOUNT_COMMENT);
+    }
+
+    @Test
+    @DisplayName("Дата из запроса доезжает до корректирующей операции")
+    void updateAmountKeepsDateOperation() throws Exception {
+        Long bullionId = createBullion(100000);
+
+        // Дата правки отличается и от даты создания слитка, и от текущей — обе подмены поймаются
+        updateBullionAmount(bullionId, "150000", null, "2026-08-10T14:30:00");
+
+        LocalDateTime dateOperation = LocalDateTime.parse(lastTransaction().get("dateOperation").asText());
+        assertThat(dateOperation).isEqualTo(LocalDateTime.of(2026, 8, 10, 14, 30));
     }
 
     @Test
@@ -1024,5 +936,66 @@ class BullionNameBullionIntegrationTest {
         assertThat(summary.getBullions()).hasSize(2);
         assertThat(summary.getBullions()).extracting(VaultSummaryResponse.BullionByBullionNameResponse::getBullionNameTitle)
                 .containsExactlyInAnyOrder("Финансовая подушка", "Накопления");
+    }
+
+    private Long createBullion(long amount) throws Exception {
+        String request = """
+                {
+                    "bullionNameId": %d,
+                    "vaultId": %d,
+                    "amount": %d,
+                    "dateOperation": "2026-07-20T12:00:00"
+                }
+                """.formatted(bullionNameId1, vaultId1, amount);
+
+        MvcResult result = mockMvc.perform(post("/api/bullions")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        return objectMapper.readTree(result.getResponse().getContentAsString())
+                .get("data").get("id").asLong();
+    }
+
+    /** userComment передаётся только когда задан — иначе поля в теле нет вовсе, как у старого фронта. */
+    private MvcResult updateBullionAmount(Long bullionId, String amount, String userComment, String dateOperation)
+            throws Exception {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("bullionNameId", bullionNameId1);
+        request.put("vaultId", vaultId1);
+        request.put("amount", new BigDecimal(amount));
+        if (userComment != null) {
+            request.put("userComment", userComment);
+        }
+        request.put("dateOperation", dateOperation != null ? dateOperation : "2026-07-20T12:00:00");
+
+        return mockMvc.perform(put("/api/bullions/{bullionId}", bullionId)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andReturn();
+    }
+
+    /** Последняя операция в общей истории: она отсортирована от свежих к старым. */
+    private JsonNode lastTransaction() throws Exception {
+        return transactionHistory().get("content").get(0);
+    }
+
+    private long transactionCount() throws Exception {
+        return transactionHistory().get("totalElements").asLong();
+    }
+
+    private JsonNode transactionHistory() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/transactions/history")
+                        .param("page", "0")
+                        .param("size", "1")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        return objectMapper.readTree(result.getResponse().getContentAsString());
     }
 }

@@ -42,8 +42,9 @@ public class BullionService {
     private static final BigDecimal ONE_HUNDRED = new BigDecimal(100);
     private static final String CREATE_FIRST_BULLION_COMMENT = "Первоначальное создание слитка";
     private static final String REFILL_EXISTS_BULLION_COMMENT = "Пополнение существующего слитка";
-    private static final String DEPOSIT_AMOUNT_COMMENT = "Пополнение при корректировке суммы слитка";
-    private static final String WITHDRAWAL_AMOUNT_COMMENT = "Снятие при корректировке суммы слитка";
+    // public — на эти тексты смотрят тесты корректировки суммы
+    public static final String DEPOSIT_AMOUNT_COMMENT = "Пополнение при корректировке суммы слитка";
+    public static final String WITHDRAWAL_AMOUNT_COMMENT = "Снятие при корректировке суммы слитка";
     private static final String DELETE_BULLION_COMMENT = "Удаление слитка";
     private static final Logger log = LoggerFactory.getLogger(BullionService.class);
 
