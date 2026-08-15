@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import api from '../../api/axios';
 import BullionModal from './BullionModal';
 import BullionTransactionModal from './BullionTransactionModal';
+import { notifyAmountChange } from './bullionAmount';
 import './Bullions.css';
 
 const formatAmount = (amount) => {
@@ -356,17 +357,21 @@ function VaultBullionsPage() {
         }
     };
 
-    const handleUpdateBullion = async (bullionId, bullionNameId, vaultIdParam, amount, description, dateOperation) => {
+    const handleUpdateBullion = async (bullionId, bullionNameId, vaultIdParam, amount, description, dateOperation, userComment) => {
         setActionLoading(true);
+        // Сумму до правки знает только страница: ответ PUT про проведённую операцию молчит
+        const previousAmount = editingBullion?.amount;
         try {
             await api.put(`/bullions/${bullionId}`, {
                 bullionNameId,
                 vaultId: vaultIdParam,
                 amount,
                 description,
-                dateOperation: dateOperation ? dateOperation : null
+                dateOperation: dateOperation ? dateOperation : null,
+                userComment: userComment ?? null
             });
             closeModal();
+            notifyAmountChange(previousAmount, amount);
             await refreshData();
         } catch (err) {
             console.error('Ошибка обновления слитка:', err);
@@ -589,8 +594,8 @@ function VaultBullionsPage() {
                     isOpen={modalOpen}
                     onClose={closeModal}
                     onSave={editingBullion
-                        ? (bullionNameId, vaultIdParam, amount, description, dateOperation) =>
-                            handleUpdateBullion(editingBullion.id, bullionNameId, vaultIdParam, amount, description, dateOperation)
+                        ? (bullionNameId, vaultIdParam, amount, description, dateOperation, userComment) =>
+                            handleUpdateBullion(editingBullion.id, bullionNameId, vaultIdParam, amount, description, dateOperation, userComment)
                         : (bullionNameId, vaultIdParam, amount, description, dateOperation) =>
                             handleSaveBullion(bullionNameId, vaultIdParam, amount, description, dateOperation)
                     }

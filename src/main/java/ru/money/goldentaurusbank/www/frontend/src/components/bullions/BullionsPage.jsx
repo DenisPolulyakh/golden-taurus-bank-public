@@ -3,6 +3,7 @@ import {Link, useNavigate} from 'react-router-dom';
 import api from '../../api/axios';
 import BullionModal from './BullionModal';
 import BullionTransactionModal from './BullionTransactionModal';
+import { notifyAmountChange } from './bullionAmount';
 import './Bullions.css';
 
 const formatAmount = (amount) => {
@@ -214,12 +215,16 @@ function BullionsPage() {
         }
     };
 
-    const handleSaveBullion = async (bullionNameId, vaultId, amount, description, dateOperation) => {
+    const handleSaveBullion = async (bullionNameId, vaultId, amount, description, dateOperation, userComment) => {
+        // Сумму до правки знает только страница: ответ PUT про проведённую операцию молчит
+        const previousAmount = editingBullion?.amount;
         try {
             if (editingBullion) {
                 await api.put(`/bullions/${editingBullion.id}`, {
-                    bullionNameId, vaultId, amount, description, dateOperation
+                    bullionNameId, vaultId, amount, description, dateOperation,
+                    userComment: userComment ?? null
                 });
+                notifyAmountChange(previousAmount, amount);
             } else {
                 await api.post('/bullions', {
                     bullionNameId, vaultId, amount, description, dateOperation

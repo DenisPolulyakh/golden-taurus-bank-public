@@ -497,6 +497,19 @@
     margin-top: 5px;
 }
 
+/* Предпросмотр операции под полем суммы при редактировании слитка */
+.amount-delta {
+    font-weight: 600;
+}
+
+.amount-delta-deposit {
+    color: #38a169;
+}
+
+.amount-delta-withdrawal {
+    color: #e53e3e;
+}
+
 /* ========== БЫСТРЫЙ ВВОД СУММЫ ========== */
 .quick-amount-row {
     display: flex;

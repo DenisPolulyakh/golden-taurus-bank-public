@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../api/axios';
+import { formatAmount, toCents } from './bullionAmount';
 import './Bullions.css';
 
 function BullionModal({
@@ -22,9 +23,26 @@ function BullionModal({
     const [amount, setAmount] = useState('');
     const [amountDisplay, setAmountDisplay] = useState('');
     const [description, setDescription] = useState('');
+    const [userComment, setUserComment] = useState('');
     const [dateOperation, setDateOperation] = useState('');
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
+
+    // Введённая сумма живёт в двух состояниях: amount — чистое число, amountDisplay —
+    // то же с разделителями разрядов, пока поле не в фокусе.
+    const enteredCents = () => {
+        if (amount) return toCents(amount);
+        if (amountDisplay) return toCents(amountDisplay.replace(/\s/g, '').replace(',', '.'));
+        return 0;
+    };
+
+    // Пока поле пустое, предпросмотр молчит: иначе на стёртой сумме он обещал бы
+    // снятие на весь остаток.
+    const amountIsEmpty = !amount && !amountDisplay;
+
+    // Разницу считаем на клиенте: старую сумму слитка знает страница, а ответ PUT
+    // о проведённой операции пока не рассказывает.
+    const deltaCents = isEditing && !amountIsEmpty ? enteredCents() - toCents(initialAmount) : 0;
 
     const handleAmountChange = (e) => {
         let value = e.target.value;
@@ -150,6 +168,7 @@ function BullionModal({
             }
 
             setDescription(initialDescription || '');
+            setUserComment('');
             setError('');
         }
     }, [isOpen, initialBullionNameId, initialVaultId, initialAmount, initialDescription, isEditing, initialDateOperation]);
@@ -212,7 +231,9 @@ function BullionModal({
                 isEditing ? parseInt(initialVaultId) : parseInt(vaultId),
                 amountNum,
                 description.trim() || null,
-                dateOperation ? dateOperation : null
+                dateOperation ? dateOperation : null,
+                // Без дельты операции не будет, комментарию некуда попасть
+                deltaCents !== 0 ? (userComment.trim() || null) : null
             );
             onClose();
         } catch (err) {
@@ -313,12 +334,37 @@ function BullionModal({
                                     ⚠️ Изменение суммы запрещено для этого хранилища
                                 </small>
                             )}
-                            {allowedChangeAmount && (
+                            {allowedChangeAmount && !isEditing && (
                                 <small className="input-hint">
                                     Используйте точку или запятую для копеек
                                 </small>
                             )}
+                            {allowedChangeAmount && isEditing && !amountIsEmpty && (
+                                <small className={`input-hint amount-delta${
+                                    deltaCents > 0 ? ' amount-delta-deposit' : deltaCents < 0 ? ' amount-delta-withdrawal' : ''
+                                }`}>
+                                    {deltaCents > 0 && `Будет проведено пополнение на ${formatAmount(deltaCents / 100)} ₽`}
+                                    {deltaCents < 0 && `Будет проведено снятие на ${formatAmount(-deltaCents / 100)} ₽`}
+                                    {deltaCents === 0 && 'Сумма не изменится — операция не создаётся'}
+                                </small>
+                            )}
                         </div>
+
+                        {isEditing && deltaCents !== 0 && (
+                            <div className="form-group">
+                                <label>Комментарий к операции</label>
+                                <input
+                                    type="text"
+                                    value={userComment}
+                                    onChange={(e) => setUserComment(e.target.value)}
+                                    placeholder={deltaCents > 0 ? 'Например: докупил' : 'Например: снял на ремонт'}
+                                    maxLength={500}
+                                />
+                                <small className="input-hint">
+                                    Попадёт в историю операций. Если оставить пустым — подставится стандартный текст
+                                </small>
+                            </div>
+                        )}
 
                         <div className="form-group">
                             <label>Дата и время операции *</label>
