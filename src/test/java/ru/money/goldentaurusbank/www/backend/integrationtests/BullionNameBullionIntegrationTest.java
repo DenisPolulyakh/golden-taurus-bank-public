@@ -3,27 +3,18 @@ package ru.money.goldentaurusbank.www.backend.integrationtests;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.icegreen.greenmail.configuration.GreenMailConfiguration;
-import com.icegreen.greenmail.junit5.GreenMailExtension;
-import com.icegreen.greenmail.util.ServerSetupTest;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.GroupedBullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.VaultSummaryResponse;
@@ -49,10 +40,9 @@ import static ru.money.goldentaurusbank.www.backend.service.BullionService.WITHD
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Testcontainers
 @Transactional
 @DisplayName("Интеграционные тесты слитков")
-class BullionNameBullionIntegrationTest {
+class BullionNameBullionIntegrationTest extends IntegrationTestBase {
 
     @Autowired
     private MockMvc mockMvc;
@@ -72,42 +62,8 @@ class BullionNameBullionIntegrationTest {
     @Autowired
     private BullionRepository bullionRepository;
 
-
     @Autowired
     private EntityManager entityManager;
-
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
-            .withDatabaseName("testdb")
-            .withUsername("test")
-            .withPassword("test");
-
-    @RegisterExtension
-    static GreenMailExtension greenMail = new GreenMailExtension(ServerSetupTest.SMTP)
-            .withConfiguration(GreenMailConfiguration.aConfig()
-                    .withUser("test@greenmail.com", "test"))
-            .withPerMethodLifecycle(false);
-
-    @DynamicPropertySource
-    static void properties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
-        registry.add("spring.liquibase.enabled", () -> "true");
-        registry.add("spring.liquibase.default-schema", () -> "taurus");
-        registry.add("spring.mail.host", () -> "localhost");
-        registry.add("spring.mail.port", () -> greenMail.getSmtp().getPort());
-        registry.add("spring.mail.username", () -> "test@greenmail.com");
-        registry.add("spring.mail.password", () -> "test");
-        registry.add("spring.mail.protocol", () -> "smtp");
-        registry.add("spring.mail.properties.mail.smtp.auth", () -> "true");
-        registry.add("spring.mail.properties.mail.smtp.starttls.enable", () -> "false");
-        registry.add("spring.mail.properties.mail.smtp.ssl.enable", () -> "false");
-        registry.add("app.jwt.secret", () -> "testSecretKeyForJWTTokenGeneration2026");
-        registry.add("app.jwt.access-expiration", () -> "3600000");
-        registry.add("app.jwt.refresh-expiration", () -> "604800000");
-    }
 
     private String accessToken;
     private Long userId;
@@ -331,7 +287,6 @@ class BullionNameBullionIntegrationTest {
                 .andExpect(jsonPath("$.data.bullionNameBullionList.length()").value(2))
                 .andReturn();
 
-
         String responseBody = result.getResponse().getContentAsString();
         JsonNode jsonNode = objectMapper.readTree(responseBody);
 
@@ -393,7 +348,6 @@ class BullionNameBullionIntegrationTest {
                 .orElse(null);
         assertThat(vaultInGroup2).isNotNull();
         assertThat(vaultInGroup2.getAmount()).isEqualByComparingTo(new BigDecimal("75000"));
-
 
     }
 
