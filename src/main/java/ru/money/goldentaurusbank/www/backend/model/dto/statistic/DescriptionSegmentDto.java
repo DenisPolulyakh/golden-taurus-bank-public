@@ -18,4 +18,6 @@ import lombok.NoArgsConstructor;
 public class DescriptionSegmentDto {
     private String text;
     private String color;
+    /** Хранилище удалено пользователем — фронт рисует такой сегмент приглушённым. */
+    private boolean archived;
 }

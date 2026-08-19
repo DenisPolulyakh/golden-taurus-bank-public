@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static ru.money.goldentaurusbank.www.backend.model.dto.enums.ResponseCodes.BANK_LINKED;
 import static ru.money.goldentaurusbank.www.backend.model.dto.enums.ResponseCodes.BANK_NOT_FOUND;
 
 @Slf4j
@@ -166,10 +167,17 @@ public class BankService {
 
     @Transactional
     public void deleteBank(User user, Long bankId) {
-        if (!bankRepository.existsByIdAndUser(bankId, user)) {
+        BankDictionary bank = bankRepository.findByIdAndUser(bankId, user)
+                .orElseThrow(() -> new ApplicationException(
+                        BANK_NOT_FOUND.getCode(),
+                        BANK_NOT_FOUND.getMessage()
+                ));
+
+        // Банк держат и архивные хранилища: без него история потеряет своё название банка.
+        if (vaultRepository.existsByBank(bank)) {
             throw new ApplicationException(
-                    BANK_NOT_FOUND.getCode(),
-                    BANK_NOT_FOUND.getMessage()
+                    BANK_LINKED.getCode(),
+                    BANK_LINKED.getMessage()
             );
         }
         bankRepository.deleteByIdAndUser(bankId, user);

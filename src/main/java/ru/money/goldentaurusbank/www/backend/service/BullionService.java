@@ -88,7 +88,7 @@ public class BullionService {
                         BULLION_NAME_NOT_FOUND.getMessage()
                 ));
 
-        Vault vault = vaultRepository.findByIdAndUser(request.getVaultId(), user)
+        Vault vault = vaultRepository.findByIdAndUserAndArchivedFalse(request.getVaultId(), user)
                 .orElseThrow(() -> new ApplicationException(
                         VAULT_NOT_FOUND.getCode(),
                         VAULT_NOT_FOUND.getMessage()
@@ -174,7 +174,7 @@ public class BullionService {
         }
 
         if (request.getVaultId() != null && !bullion.getVault().getId().equals(request.getVaultId())) {
-            Vault vault = vaultRepository.findByIdAndUser(request.getVaultId(), user)
+            Vault vault = vaultRepository.findByIdAndUserAndArchivedFalse(request.getVaultId(), user)
                     .orElseThrow(() -> new ApplicationException(
                             VAULT_NOT_FOUND.getCode(),
                             VAULT_NOT_FOUND.getMessage()
@@ -211,7 +211,7 @@ public class BullionService {
         Map<Long, List<Bullion>> groupedByBullionName = bullions.stream()
                 .collect(Collectors.groupingBy(b -> b.getBullionName().getId()));
 
-        List<Vault> vaults = vaultRepository.findByUser(user);
+        List<Vault> vaults = vaultRepository.findByUserAndArchivedFalse(user);
 
         // Слитки, в которые вообще можно перевести: их наличие решает,
         // живая ли кнопка «Перевод» на сгруппированной карточке
@@ -370,7 +370,7 @@ public class BullionService {
      * галочки у всех хранилищ.
      */
     private void requireVaultAcceptsRemains(User user, Long toVaultId) {
-        Vault toVault = vaultRepository.findByIdAndUser(toVaultId, user)
+        Vault toVault = vaultRepository.findByIdAndUserAndArchivedFalse(toVaultId, user)
                 .orElseThrow(() -> new ApplicationException(VAULT_NOT_FOUND.getCode(), "Целевое хранилище не найдено"));
 
         if (toVault.getVaultType() == VaultType.LIQUIDITY_BUFFER) {

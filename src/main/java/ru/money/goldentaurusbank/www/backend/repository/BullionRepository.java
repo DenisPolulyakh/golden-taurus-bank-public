@@ -29,7 +29,6 @@ public interface BullionRepository extends JpaRepository<Bullion, Long> {
 
     Optional<Bullion> findByVaultAndBullionName(Vault vault, BullionName bullionName);
 
-    List<Bullion> findAllByVault(Vault vault);
 
     boolean existsByBullionNameIdAndUserId(Long bullionNameId, Long userId);
 

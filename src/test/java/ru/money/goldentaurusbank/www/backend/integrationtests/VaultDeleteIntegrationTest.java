@@ -103,7 +103,7 @@ class VaultDeleteIntegrationTest extends IntegrationTestBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0));
 
-        assertThat(vaultExists(vaultId)).isFalse();
+        assertThat(vaultArchived(vaultId)).isTrue();
 
         Long reserveId = liquidityReserveId();
         assertThat(reserveId).isNotNull();
@@ -111,7 +111,8 @@ class VaultDeleteIntegrationTest extends IntegrationTestBase {
 
         Map<String, Object> source = bullionRow(bullionId);
         assertThat(source.get("archived")).isEqualTo(true);
-        assertThat(source.get("vault_id")).isNull();
+        // Архивный слиток остаётся в архивном хранилище — иначе история потеряет его название
+        assertThat(source.get("vault_id")).isEqualTo(vaultId);
         assertThat((BigDecimal) source.get("amount")).isEqualByComparingTo("0.00");
     }
 
@@ -126,13 +127,13 @@ class VaultDeleteIntegrationTest extends IntegrationTestBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0));
 
-        assertThat(vaultExists(vaultId)).isFalse();
+        assertThat(vaultArchived(vaultId)).isTrue();
         assertThat(liquidityReserveId()).isNull();
 
         for (Long bullionId : List.of(bullionId1, bullionId2)) {
             Map<String, Object> row = bullionRow(bullionId);
             assertThat(row.get("archived")).isEqualTo(true);
-            assertThat(row.get("vault_id")).isNull();
+            assertThat(row.get("vault_id")).isEqualTo(vaultId);
         }
 
         assertThat(transactionCount()).isZero();
@@ -148,7 +149,7 @@ class VaultDeleteIntegrationTest extends IntegrationTestBase {
         deleteVault(vaultId)
                 .andExpect(status().isOk());
 
-        assertThat(vaultExists(vaultId)).isFalse();
+        assertThat(vaultArchived(vaultId)).isTrue();
 
         Long reserveId = liquidityReserveId();
         assertThat(reserveId).isNotNull();
@@ -156,9 +157,9 @@ class VaultDeleteIntegrationTest extends IntegrationTestBase {
         assertThat(activeBullionCount(reserveId)).isEqualTo(1);
 
         assertThat(bullionRow(fundedId).get("archived")).isEqualTo(true);
-        assertThat(bullionRow(fundedId).get("vault_id")).isNull();
+        assertThat(bullionRow(fundedId).get("vault_id")).isEqualTo(vaultId);
         assertThat(bullionRow(emptyId).get("archived")).isEqualTo(true);
-        assertThat(bullionRow(emptyId).get("vault_id")).isNull();
+        assertThat(bullionRow(emptyId).get("vault_id")).isEqualTo(vaultId);
     }
 
     @Test
@@ -173,7 +174,7 @@ class VaultDeleteIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.message")
                         .value("В ликвидном хранилище есть слитки с остатком. Сначала перенесите их в другое хранилище"));
 
-        assertThat(vaultExists(reserveId)).isTrue();
+        assertThat(vaultArchived(reserveId)).isFalse();
 
         Map<String, Object> row = bullionRow(bullionId);
         assertThat(row.get("archived")).isEqualTo(false);
@@ -190,9 +191,9 @@ class VaultDeleteIntegrationTest extends IntegrationTestBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0));
 
-        assertThat(vaultExists(reserveId)).isFalse();
+        assertThat(vaultArchived(reserveId)).isTrue();
         assertThat(bullionRow(bullionId).get("archived")).isEqualTo(true);
-        assertThat(bullionRow(bullionId).get("vault_id")).isNull();
+        assertThat(bullionRow(bullionId).get("vault_id")).isEqualTo(reserveId);
     }
 
     @Test
@@ -210,8 +211,8 @@ class VaultDeleteIntegrationTest extends IntegrationTestBase {
         deleteVault(vaultId)
                 .andExpect(status().isOk());
 
-        assertThat(vaultExists(vaultId)).isFalse();
-        assertThat(bullionRow(bullionId).get("vault_id")).isNull();
+        assertThat(vaultArchived(vaultId)).isTrue();
+        assertThat(bullionRow(bullionId).get("vault_id")).isEqualTo(vaultId);
     }
 
     @Test
@@ -222,7 +223,7 @@ class VaultDeleteIntegrationTest extends IntegrationTestBase {
         deleteVault(vaultId)
                 .andExpect(status().isOk());
 
-        assertThat(vaultExists(vaultId)).isFalse();
+        assertThat(vaultArchived(vaultId)).isTrue();
         assertThat(liquidityReserveId()).isNull();
     }
 
@@ -304,10 +305,15 @@ class VaultDeleteIntegrationTest extends IntegrationTestBase {
         return json.get("data").get("id").asLong();
     }
 
-    private boolean vaultExists(Long vaultId) {
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM taurus.vaults WHERE id = ?", Integer.class, vaultId);
-        return count != null && count > 0;
+    /**
+     * Хранилище не удаляется физически, а архивируется: строка остаётся ради
+     * истории операций, но для пользователя хранилища больше нет.
+     */
+    private boolean vaultArchived(Long vaultId) {
+        List<Boolean> flags = jdbcTemplate.queryForList(
+                "SELECT archived FROM taurus.vaults WHERE id = ?", Boolean.class, vaultId);
+        assertThat(flags).as("строка хранилища должна остаться в БД").hasSize(1);
+        return Boolean.TRUE.equals(flags.get(0));
     }
 
     private Long liquidityReserveId() {
