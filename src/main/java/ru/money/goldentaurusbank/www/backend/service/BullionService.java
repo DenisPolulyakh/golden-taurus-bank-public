@@ -11,7 +11,7 @@ import ru.money.goldentaurusbank.www.backend.model.domain.Bullion;
 import ru.money.goldentaurusbank.www.backend.model.domain.BullionName;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.domain.Vault;
-import ru.money.goldentaurusbank.www.backend.model.dto.enums.AccountType;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.VaultType;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.*;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.GroupedBullionResponse;
@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static ru.money.goldentaurusbank.www.backend.model.dto.enums.ResponseCodes.*;
@@ -148,11 +149,15 @@ public class BullionService {
 
         // Ручная правка суммы оформляется корректирующей транзакцией на дельту:
         // иначе остаток разъезжается с графиком, который считается по операциям.
+        // Раз это операция, её тоже решают галочки: правка вверх — внесение,
+        // вниз — снятие. Иначе запрет снятия обходился бы через карандаш.
         if (request.getAmount() != null) {
             BigDecimal delta = request.getAmount().subtract(bullion.getAmount());
             if (delta.compareTo(BigDecimal.ZERO) > 0) {
+                transactionService.requireIncomeAllowed(bullion);
                 transactionService.deposit(bullionId, delta, user, determineComment(request.getUserComment(), DEPOSIT_AMOUNT_COMMENT), request.getDateOperation(), null);
             } else if (delta.compareTo(BigDecimal.ZERO) < 0) {
+                transactionService.requireExpenseAllowed(bullion);
                 transactionService.withdraw(bullionId, delta.negate(), user, determineComment(request.getUserComment(), WITHDRAWAL_AMOUNT_COMMENT), request.getDateOperation(), null);
             }
         }
@@ -208,6 +213,15 @@ public class BullionService {
 
         List<Vault> vaults = vaultRepository.findByUser(user);
 
+        // Слитки, в которые вообще можно перевести: их наличие решает,
+        // живая ли кнопка «Перевод» на сгруппированной карточке
+        Set<Long> transferInBullionIds = bullions.stream()
+                .filter(b -> b.getVault() != null
+                        && b.getVault().isAllowedTransfer()
+                        && b.getVault().isAllowedIncome())
+                .map(Bullion::getId)
+                .collect(Collectors.toSet());
+
 
         FinancialCalculator.AverageData averageDataVault = new FinancialCalculator.AverageData(BigDecimal.ZERO, BigDecimal.ZERO);
         FinancialCalculator.AverageData averageDataBullionName = new FinancialCalculator.AverageData(BigDecimal.ZERO, BigDecimal.ZERO);
@@ -235,27 +249,37 @@ public class BullionService {
                     .map(b -> {
 
                         Vault vault = b.getVault();
-                        boolean allowed = calculateAllowed(vault);
 
                         return GroupedBullionResponse.BullionNameBullion.VaultInfo.builder()
                                 .id(b.getVault().getId())
+                                .bullionId(b.getId())
                                 .name(b.getVault().getName())
                                 .amount(b.getAmount())
                                 .accountType(vault.getAccountType().name())
                                 .closeDate(vault.getCloseDate())
-                                .allowedIncome(allowed)
-                                .allowedDelete(allowed)
-                                .allowedExpense(allowed)
-                                .allowedTransfer(allowed)
-                                // Срочное хранилище: сумму менять нельзя, а
-                                // редактировать само хранилище — можно.
-                                // Те же правила, что в VaultMapper.enrichVaultResponse
-                                .allowedChangeAmount(allowed)
-                                .allowedEdit(true)
+                                // Операции разрешают только галочки хранилища,
+                                // те же правила, что в VaultMapper.enrichVaultResponse
+                                .allowedIncome(vault.isAllowedIncome())
+                                .allowedExpense(vault.isAllowedExpense())
+                                .allowedTransfer(vault.isAllowedTransfer())
+                                // Перевести из хранилища = снять оттуда, перевести в него = внести,
+                                // поправить сумму = внести или снять смотря куда правим
+                                .allowedTransferOut(vault.isAllowedTransfer() && vault.isAllowedExpense())
+                                .allowedTransferIn(vault.isAllowedTransfer() && vault.isAllowedIncome())
+                                .allowedChangeAmount(vault.isAllowedIncome() || vault.isAllowedExpense())
                                 .build();
                     })
                     .collect(Collectors.toList());
 
+
+            // Кнопка на карточке живая, если операцию разрешает хоть одно хранилище
+            // наименования. У перевода дополнительное условие: нужен получатель —
+            // слиток в хранилище, куда переводить можно, и не сам отправитель.
+            boolean groupAllowedIncome = vaultInfos.stream().anyMatch(GroupedBullionResponse.BullionNameBullion.VaultInfo::getAllowedIncome);
+            boolean groupAllowedExpense = vaultInfos.stream().anyMatch(GroupedBullionResponse.BullionNameBullion.VaultInfo::getAllowedExpense);
+            boolean groupAllowedTransfer = vaultInfos.stream()
+                    .filter(GroupedBullionResponse.BullionNameBullion.VaultInfo::getAllowedTransferOut)
+                    .anyMatch(from -> transferInBullionIds.stream().anyMatch(to -> !to.equals(from.getBullionId())));
 
             bullionsList.add(GroupedBullionResponse.BullionNameBullion.builder()
                     .bullionNameId(bullionNameId)
@@ -264,6 +288,9 @@ public class BullionService {
                     .bullionNameAmount(averageDataBullionName.totalAmount())
                     .bullionNameAverageRate(averageDataBullionName.avgRate())
                     .vaults(vaultInfos)
+                    .allowedIncome(groupAllowedIncome)
+                    .allowedExpense(groupAllowedExpense)
+                    .allowedTransfer(groupAllowedTransfer)
                     .build());
         }
 
@@ -329,30 +356,35 @@ public class BullionService {
                 ? vaultService.getLiquidityReserve(user).getId()
                 : request.getToVaultId();
 
+        requireVaultAcceptsRemains(user, toVaultId);
+
         // transferBullion сам архивирует исходный слиток после перевода остатка.
         transactionService.transferBullion(bullion.getId(), toVaultId, user, null, atStartOfDay(request.getDateOperation()));
         log.info("Bullion {} transferred to vault id = {} and archived", bullion.getBullionName().getTitle(), toVaultId);
     }
 
+    /**
+     * Перенос остатка при удалении слитка — это внесение в целевое хранилище,
+     * поэтому оно должно разрешать пополнение. Исключение одно: ликвидный резерв
+     * принимает всегда, иначе слиток можно было бы сделать неудаляемым, сняв
+     * галочки у всех хранилищ.
+     */
+    private void requireVaultAcceptsRemains(User user, Long toVaultId) {
+        Vault toVault = vaultRepository.findByIdAndUser(toVaultId, user)
+                .orElseThrow(() -> new ApplicationException(VAULT_NOT_FOUND.getCode(), "Целевое хранилище не найдено"));
+
+        if (toVault.getVaultType() == VaultType.LIQUIDITY_BUFFER) {
+            return;
+        }
+        if (!toVault.isAllowedIncome()) {
+            throw new ApplicationException(VAULT_INCOME_NOT_ALLOWED.getCode(),
+                    "В хранилище " + toVault.getName() + " вносить нельзя: снята галочка «Можно вносить»");
+        }
+    }
+
     private static LocalDateTime atStartOfDay(LocalDate date) {
         return date == null ? null : date.atStartOfDay();
     }
-
-    private boolean calculateAllowed(Vault vault) {
-        if (vault == null) {
-            return true;
-        }
-        if (vault.getAccountType() == null || !AccountType.TERM.equals(vault.getAccountType())) {
-            return true;
-        }
-        if (vault.getCloseDate() == null) {
-            return true;
-        }
-        LocalDate today = LocalDate.now();
-        LocalDate closeDate = vault.getCloseDate();
-        return today.isEqual(closeDate) || today.isAfter(closeDate);
-    }
-
 
     private String determineComment(String userComment, String defaultComment) {
         return StringUtils.isNotBlank(userComment) ? userComment.trim() : defaultComment;

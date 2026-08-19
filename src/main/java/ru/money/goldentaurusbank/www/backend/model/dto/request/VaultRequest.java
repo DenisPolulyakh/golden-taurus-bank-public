@@ -32,4 +32,11 @@ public class VaultRequest {
     private AccountType accountType;
 
     private LocalDate closeDate;
+
+    private Boolean allowedIncome;
+
+    private Boolean allowedExpense;
+
+    private Boolean allowedTransfer;
+
 }

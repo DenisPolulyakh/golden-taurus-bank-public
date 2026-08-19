@@ -111,15 +111,15 @@ function VaultBullionsPage() {
         const targets = [];
         const fromBullionId = transferModal.fromBullionId;
         allBullions.forEach(bullion => {
-            // Проверяем флаг allowedTransfer у хранилища
-            const isAllowed = bullion.vault?.allowedTransfer !== false;
+            // Получатель должен разрешать и перевод, и внесение
+            const isAllowed = bullion.vault?.allowedTransferIn !== false;
             if (bullion.id !== fromBullionId && isAllowed) {
                 targets.push({
                     id: bullion.id,
                     bullionNameTitle: bullion.bullionName?.title || 'Без наименования',
                     vaultName: bullion.vault?.name || 'Без хранилища',
                     amount: bullion.amount || 0,
-                    allowedTransfer: bullion.vault?.allowedTransfer
+                    allowedTransferIn: bullion.vault?.allowedTransferIn
                 });
             }
         });
@@ -133,7 +133,7 @@ function VaultBullionsPage() {
             bullionNameTitle: bullion.bullionNameTitle,
             vaultName: vault?.name || 'Текущее хранилище',
             amount: bullion.amount || 0,
-            allowedTransfer: vault?.allowedTransfer
+            allowedTransferOut: vault?.allowedTransferOut
         }));
     }, [vaultSummary, vault]);
 
@@ -414,8 +414,10 @@ function VaultBullionsPage() {
         });
     };
 
+    // Перенос остатка - это внесение, поэтому только хранилища с «Можно вносить».
+    // Ликвидный резерв доступен всегда - он отдельным переключателем в модалке
     const getAvailableVaultsForDelete = useCallback(() => {
-        return allVaults.filter(vault => vault.id !== parseInt(vaultId));
+        return allVaults.filter(vault => vault.id !== parseInt(vaultId) && vault.allowedIncome !== false);
     }, [allVaults, vaultId]);
 
     if (loading) {
@@ -446,9 +448,7 @@ function VaultBullionsPage() {
     const {
         allowedIncome = true,
         allowedExpense = true,
-        allowedDelete = true,
-        allowedTransfer = true,
-        allowedEdit = true,
+        allowedTransferOut = true,
         allowedChangeAmount = true
     } = vault;
 
@@ -580,10 +580,7 @@ function VaultBullionsPage() {
                                 vaultFlags={{
                                     allowedIncome,
                                     allowedExpense,
-                                    allowedDelete,
-                                    allowedTransfer,
-                                    allowedEdit,
-                                    allowedChangeAmount
+                                    allowedTransferOut
                                 }}
                             />
                         ))
@@ -607,6 +604,8 @@ function VaultBullionsPage() {
                     initialDateOperation={editingBullion?.dateOperation}
                     isEditing={!!editingBullion}
                     allowedChangeAmount={allowedChangeAmount}
+                    allowedIncome={allowedIncome}
+                    allowedExpense={allowedExpense}
                 />
 
                 {currentTransaction && transactionModal.bullion && (
@@ -700,12 +699,11 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
     const {
         allowedIncome = true,
         allowedExpense = true,
-        allowedDelete = true,
-        allowedTransfer = true,
-        allowedEdit = true
+        allowedTransferOut = true
     } = vaultFlags || {};
 
-    // Кнопки всегда видны, но disabled если флаг false или общий disabled
+    // Кнопки всегда видны, но disabled если флаг false или общий disabled.
+    // Правка и удаление слитка галочками не ограничены: галочки про движение денег
     const isDisabled = (flag) => disabled || !flag;
 
     return (
@@ -759,21 +757,22 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
                 <button
                     className="edit-vault-btn"
                     onClick={onEdit}
-                    disabled={isDisabled(allowedEdit)}
+                    disabled={disabled}
                 >
                     ✏️ Редактировать
                 </button>
+                {/* Перевод отсюда - это снятие: нет галочки «Можно снимать», нет и перевода */}
                 <button
                     className="transfer-btn"
                     onClick={onTransfer}
-                    disabled={isDisabled(allowedTransfer)}
+                    disabled={isDisabled(allowedTransferOut)}
                 >
                     🔄 Перевод
                 </button>
                 <button
                     className="delete-vault-btn"
                     onClick={onDelete}
-                    disabled={isDisabled(allowedDelete)}
+                    disabled={disabled}
                 >
                     🗑️ Удалить
                 </button>

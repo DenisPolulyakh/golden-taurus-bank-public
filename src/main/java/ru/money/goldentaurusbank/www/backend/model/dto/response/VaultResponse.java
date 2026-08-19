@@ -38,13 +38,30 @@ public class VaultResponse {
     @Builder.Default
     private boolean allowedExpense = true;
     @Builder.Default
-    private boolean allowedDelete = true;
-    @Builder.Default
     private boolean allowedTransfer = true;
-    @Builder.Default
-    private boolean allowedEdit = true;
+    // Производный: правка суммы вверх - внесение, вниз - снятие.
+    // Своей галочки нет, значение ставит VaultMapper.enrichVaultResponse
     @Builder.Default
     private boolean allowedChangeAmount = true;
+    // Перевести из хранилища = снять оттуда, перевести в него = внести туда.
+    // Заполняет VaultMapper.enrichVaultResponse
+    @Builder.Default
+    private boolean allowedTransferOut = true;
+    @Builder.Default
+    private boolean allowedTransferIn = true;
+
+    private Settings settings;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Settings {
+        private boolean allowedIncome;
+        private boolean allowedExpense;
+        private boolean allowedTransfer;
+    }
+
 
     public String getDisplayName() {
         if (bankName != null) {

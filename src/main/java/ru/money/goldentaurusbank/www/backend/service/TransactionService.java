@@ -142,6 +142,7 @@ public class TransactionService {
     @Transactional
     public Bullion refillBullion(RefillBullionRequest request, User user, Long batchId) {
         Bullion bullion = resolveBullion(user, request.getBullionNameId(), request.getVaultId());
+        requireIncomeAllowed(bullion);
         deposit(bullion.getId(), request.getAmount(), user, request.getUserComment(), request.getDateOperation(), batchId);
         return bullion;
     }
@@ -149,6 +150,7 @@ public class TransactionService {
     @Transactional
     public Bullion withdrawBullion(WithdrawBullionRequest request, User user, Long batchId) {
         Bullion bullion = resolveBullion(user, request.getBullionNameId(), request.getVaultId());
+        requireExpenseAllowed(bullion);
         withdraw(bullion.getId(), request.getAmount(), user, request.getUserComment(), request.getDateOperation(), batchId);
         return bullion;
     }
@@ -160,9 +162,56 @@ public class TransactionService {
      */
     @Transactional
     public Bullion transferAmount(TransferRequest request, User user) {
+        requireTransferAllowed(loadBullion(request.getFromBullionId(), user),
+                loadBullion(request.getToBullionId(), user));
         Transaction transaction = transfer(request.getFromBullionId(), request.getToBullionId(),
                 request.getAmount(), user, request.getComment(), request.getDateOperation(), null);
         return loadBullion(transaction.getSourceBullionId(), user);
+    }
+
+    // ------------------------------------------------------------------
+    // Галочки хранилища. Гашение кнопок на фронте — подсказка, запрет здесь:
+    // запрос в обход интерфейса должен падать, а не двигать деньги.
+    // Проверки стоят на том, что пользователь жмёт кнопкой; правку суммы слитка
+    // проверяет BullionService.updateBullion по направлению дельты, поэтому
+    // методы публичные. Стартовый остаток нового слитка, архивация и импорт
+    // не проверяются: это регистрация уже накопленного, а не операция.
+    // ------------------------------------------------------------------
+
+    public void requireIncomeAllowed(Bullion bullion) {
+        Vault vault = bullion.getVault();
+        if (vault != null && !vault.isAllowedIncome()) {
+            throw new ApplicationException(VAULT_INCOME_NOT_ALLOWED.getCode(),
+                    "В хранилище " + describeVault(vault) + " вносить нельзя: снята галочка «Можно вносить»");
+        }
+    }
+
+    public void requireExpenseAllowed(Bullion bullion) {
+        Vault vault = bullion.getVault();
+        if (vault != null && !vault.isAllowedExpense()) {
+            throw new ApplicationException(VAULT_EXPENSE_NOT_ALLOWED.getCode(),
+                    "Из хранилища " + describeVault(vault) + " снимать нельзя: снята галочка «Можно снимать»");
+        }
+    }
+
+    /**
+     * Перевод — это снятие с одной стороны и внесение с другой, поэтому мало
+     * галочки «Можно переводить»: у отправителя нужна ещё «Можно снимать»,
+     * у получателя — «Можно вносить».
+     */
+    private void requireTransferAllowed(Bullion from, Bullion to) {
+        Vault fromVault = from.getVault();
+        Vault toVault = to.getVault();
+        if (fromVault != null && !fromVault.isAllowedTransfer()) {
+            throw new ApplicationException(VAULT_TRANSFER_NOT_ALLOWED.getCode(),
+                    "Из хранилища " + describeVault(fromVault) + " переводить нельзя: снята галочка «Можно переводить»");
+        }
+        if (toVault != null && !toVault.isAllowedTransfer()) {
+            throw new ApplicationException(VAULT_TRANSFER_NOT_ALLOWED.getCode(),
+                    "В хранилище " + describeVault(toVault) + " переводить нельзя: снята галочка «Можно переводить»");
+        }
+        requireExpenseAllowed(from);
+        requireIncomeAllowed(to);
     }
 
     private Bullion resolveBullion(User user, Long bullionNameId, Long vaultId) {

@@ -8,10 +8,7 @@ import ru.money.goldentaurusbank.www.backend.model.dto.request.VaultRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.VaultResponse;
 
-import java.time.LocalDate;
 import java.util.List;
-
-import static ru.money.goldentaurusbank.www.backend.model.dto.enums.AccountType.TERM;
 
 @Mapper(componentModel = "spring", uses = {BullionMapper.class})
 public interface VaultMapper {
@@ -25,35 +22,19 @@ public interface VaultMapper {
     VaultResponse toResponse(Vault vault);
 
 
+    // Разрешённость операций задают только галочки хранилища: верхние allowed*
+    // MapStruct переносит из сущности сам, здесь остаются сырые значения для формы правки
     @AfterMapping
     default void enrichVaultResponse (@MappingTarget VaultResponse response, Vault vault) {
         if (vault != null) {
-            // Проверяем, срочное ли хранилище
-            boolean isTerm = vault.getAccountType() != null &&
-                    TERM.name().equals(vault.getAccountType().name());
-            // Если срочное и дата закрытия ещё не наступила - блокируем операции
-            if (isTerm && vault.getCloseDate() != null) {
-                LocalDate today = LocalDate.now();
-                LocalDate closeDate = vault.getCloseDate();
-                boolean isClosed = today.isEqual(closeDate) || today.isAfter(closeDate);
-
-                // Если ещё не закрыто
-                if (!isClosed) {
-                    response.setAllowedIncome(false);
-                    response.setAllowedExpense(false);
-                    response.setAllowedChangeAmount(false);
-                    response.setAllowedEdit(true);
-                    response.setAllowedDelete(true);
-                    response.setAllowedTransfer(false);
-                    return;
-                }
-            }
-            response.setAllowedIncome(true);
-            response.setAllowedExpense(true);
-            response.setAllowedChangeAmount(true);
-            response.setAllowedEdit(true);
-            response.setAllowedDelete(true);
-            response.setAllowedTransfer(true);
+            response.setSettings(VaultResponse.Settings.builder()
+                    .allowedIncome(vault.isAllowedIncome())
+                    .allowedExpense(vault.isAllowedExpense())
+                    .allowedTransfer(vault.isAllowedTransfer())
+                    .build());
+            response.setAllowedTransferOut(vault.isAllowedTransfer() && vault.isAllowedExpense());
+            response.setAllowedTransferIn(vault.isAllowedTransfer() && vault.isAllowedIncome());
+            response.setAllowedChangeAmount(vault.isAllowedIncome() || vault.isAllowedExpense());
         }
 
     }

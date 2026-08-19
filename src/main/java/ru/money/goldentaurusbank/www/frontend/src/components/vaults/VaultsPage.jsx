@@ -92,17 +92,20 @@ function VaultsPage() {
         setModalOpen(true);
     };
 
-    const handleSaveVault = async (name, interestRate, description, bankId, accountType, closeDate) => {
+    const handleSaveVault = async (form) => {
         try {
             let savedVault;
 
             const requestData = {
-                name,
-                interestRate,
-                description,
-                bankId: bankId || null,
-                accountType: accountType || 'SAVINGS',
-                closeDate: closeDate || null
+                name: form.name,
+                interestRate: form.interestRate,
+                description: form.description,
+                bankId: form.bankId || null,
+                accountType: form.accountType || 'SAVINGS',
+                closeDate: form.closeDate || null,
+                allowedIncome: form.allowedIncome,
+                allowedExpense: form.allowedExpense,
+                allowedTransfer: form.allowedTransfer
             };
 
             if (editingVault) {
@@ -365,6 +368,9 @@ function VaultsPage() {
                     initialBankId={editingVault?.bankId || ''}
                     initialAccountType={editingVault?.accountType || 'SAVINGS'}
                     initialCloseDate={editingVault?.closeDate || ''}
+                    initialAllowedIncome={editingVault?.settings?.allowedIncome !== false}
+                    initialAllowedExpense={editingVault?.settings?.allowedExpense !== false}
+                    initialAllowedTransfer={editingVault?.settings?.allowedTransfer !== false}
                     isEditing={!!editingVault}
                 />
             </div>
