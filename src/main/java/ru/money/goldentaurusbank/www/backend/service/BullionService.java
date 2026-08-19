@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static ru.money.goldentaurusbank.www.backend.model.dto.enums.ResponseCodes.*;
@@ -207,6 +208,15 @@ public class BullionService {
 
         List<Vault> vaults = vaultRepository.findByUser(user);
 
+        // Слитки, в которые вообще можно перевести: их наличие решает,
+        // живая ли кнопка «Перевод» на сгруппированной карточке
+        Set<Long> transferInBullionIds = bullions.stream()
+                .filter(b -> b.getVault() != null
+                        && b.getVault().isAllowedTransfer()
+                        && b.getVault().isAllowedIncome())
+                .map(Bullion::getId)
+                .collect(Collectors.toSet());
+
 
         FinancialCalculator.AverageData averageDataVault = new FinancialCalculator.AverageData(BigDecimal.ZERO, BigDecimal.ZERO);
         FinancialCalculator.AverageData averageDataBullionName = new FinancialCalculator.AverageData(BigDecimal.ZERO, BigDecimal.ZERO);
@@ -237,6 +247,7 @@ public class BullionService {
 
                         return GroupedBullionResponse.BullionNameBullion.VaultInfo.builder()
                                 .id(b.getVault().getId())
+                                .bullionId(b.getId())
                                 .name(b.getVault().getName())
                                 .amount(b.getAmount())
                                 .accountType(vault.getAccountType().name())
@@ -249,10 +260,22 @@ public class BullionService {
                                 .allowedDelete(true)
                                 .allowedChangeAmount(true)
                                 .allowedEdit(true)
+                                // Перевести из хранилища = снять оттуда, перевести в него = внести
+                                .allowedTransferOut(vault.isAllowedTransfer() && vault.isAllowedExpense())
+                                .allowedTransferIn(vault.isAllowedTransfer() && vault.isAllowedIncome())
                                 .build();
                     })
                     .collect(Collectors.toList());
 
+
+            // Кнопка на карточке живая, если операцию разрешает хоть одно хранилище
+            // наименования. У перевода дополнительное условие: нужен получатель —
+            // слиток в хранилище, куда переводить можно, и не сам отправитель.
+            boolean groupAllowedIncome = vaultInfos.stream().anyMatch(GroupedBullionResponse.BullionNameBullion.VaultInfo::getAllowedIncome);
+            boolean groupAllowedExpense = vaultInfos.stream().anyMatch(GroupedBullionResponse.BullionNameBullion.VaultInfo::getAllowedExpense);
+            boolean groupAllowedTransfer = vaultInfos.stream()
+                    .filter(GroupedBullionResponse.BullionNameBullion.VaultInfo::getAllowedTransferOut)
+                    .anyMatch(from -> transferInBullionIds.stream().anyMatch(to -> !to.equals(from.getBullionId())));
 
             bullionsList.add(GroupedBullionResponse.BullionNameBullion.builder()
                     .bullionNameId(bullionNameId)
@@ -261,6 +284,9 @@ public class BullionService {
                     .bullionNameAmount(averageDataBullionName.totalAmount())
                     .bullionNameAverageRate(averageDataBullionName.avgRate())
                     .vaults(vaultInfos)
+                    .allowedIncome(groupAllowedIncome)
+                    .allowedExpense(groupAllowedExpense)
+                    .allowedTransfer(groupAllowedTransfer)
                     .build());
         }
 

@@ -117,6 +117,11 @@ function BullionsPage() {
         setModalOpen(true);
     };
 
+    // Модалка открывается на первом хранилище, где операция разрешена:
+    // vaults[0] может оказаться как раз закрытым, и селектор стартовал бы с недоступного
+    const firstAllowedVault = (bullionName, flag) =>
+        bullionName.vaults?.find(v => v[flag] !== false) || null;
+
     const handleOpenRefill = (bullionNameId, bullionNameTitle, vaultId) => {
         setTransactionModal({
             isOpen: true,
@@ -274,7 +279,7 @@ function BullionsPage() {
 
         let vaults = bullionName.vaults || [];
 
-        // Фильтруем по типу операции - исключаем срочные хранилища
+        // Показываем только те хранилища, где операция разрешена галочкой
         if (operationType === 'refill') {
             vaults = vaults.filter(v => v.allowedIncome !== false);
         } else if (operationType === 'withdraw') {
@@ -384,20 +389,20 @@ function BullionsPage() {
         }
     };
 
-    // Фильтрация по флагу allowedTransfer - исключаем срочные хранилища
+    // Куда переводить: хранилища с allowedTransferIn (переводить И вносить).
+    // Сравниваем именно bullionId - перевод адресуется слитку, а не хранилищу.
     const getTransferTargets = () => {
         const targets = [];
 
         bullionNameBullions.forEach(bullionName => {
             bullionName.vaults?.forEach(vault => {
-                // Проверяем allowedTransfer - если false, то не показываем
-                if (vault.id !== transferModal.fromBullionId && vault.allowedTransfer !== false) {
+                if (vault.bullionId !== transferModal.fromBullionId && vault.allowedTransferIn !== false) {
                     targets.push({
                         id: vault.bullionId,
                         bullionNameTitle: bullionName.bullionNameTitle,
                         vaultName: vault.name,
                         amount: vault.amount,
-                        allowedTransfer: vault.allowedTransfer,
+                        allowedTransferIn: vault.allowedTransferIn,
                         accountType: vault.accountType,
                         closeDate: vault.closeDate
                     });
@@ -407,19 +412,19 @@ function BullionsPage() {
         return targets;
     };
 
+    // Откуда переводить: хранилища с allowedTransferOut (переводить И снимать)
     const getFromBullions = () => {
         const targets = [];
         bullionNameBullions.forEach(bullionName => {
             if (bullionName.bullionNameId === transferModal.fromBullionNameId) {
                 bullionName.vaults?.forEach(vault => {
-                    // Исключаем срочные хранилища
-                    if (vault.allowedTransfer !== false) {
+                    if (vault.allowedTransferOut !== false) {
                         targets.push({
                             id: vault.bullionId,
                             bullionNameTitle: bullionName.bullionNameTitle,
                             vaultName: vault.name,
                             amount: vault.amount,
-                            allowedTransfer: vault.allowedTransfer,
+                            allowedTransferOut: vault.allowedTransferOut,
                             accountType: vault.accountType,
                             closeDate: vault.closeDate
                         });
@@ -528,13 +533,16 @@ function BullionsPage() {
                                     </div>
                                 </div>
                                 <div className="card-actions-horizontal">
-                                    {/* Кнопки всегда активны - disabled=false */}
+                                    {/* Кнопку гасят групповые флаги: операция доступна, пока её
+                                        разрешает хоть одно хранилище наименования. Считает их бэк. */}
                                     <button
                                         className="refill-btn"
+                                        disabled={bullionName.allowedIncome === false}
+                                        title={bullionName.allowedIncome === false ? 'Ни в одно хранилище этого слитка вносить нельзя' : ''}
                                         onClick={() => {
-                                            const firstVault = bullionName.vaults?.[0];
-                                            if (firstVault) {
-                                                handleOpenRefill(bullionName.bullionNameId, bullionName.bullionNameTitle, firstVault.id);
+                                            const vault = firstAllowedVault(bullionName, 'allowedIncome');
+                                            if (vault) {
+                                                handleOpenRefill(bullionName.bullionNameId, bullionName.bullionNameTitle, vault.id);
                                             }
                                         }}
                                     >
@@ -542,10 +550,12 @@ function BullionsPage() {
                                     </button>
                                     <button
                                         className="withdraw-btn"
+                                        disabled={bullionName.allowedExpense === false}
+                                        title={bullionName.allowedExpense === false ? 'Ни из одного хранилища этого слитка снимать нельзя' : ''}
                                         onClick={() => {
-                                            const firstVault = bullionName.vaults?.[0];
-                                            if (firstVault) {
-                                                handleOpenWithdraw(bullionName.bullionNameId, bullionName.bullionNameTitle, firstVault.id);
+                                            const vault = firstAllowedVault(bullionName, 'allowedExpense');
+                                            if (vault) {
+                                                handleOpenWithdraw(bullionName.bullionNameId, bullionName.bullionNameTitle, vault.id);
                                             }
                                         }}
                                     >
@@ -553,6 +563,8 @@ function BullionsPage() {
                                     </button>
                                     <button
                                         className="transfer-btn"
+                                        disabled={bullionName.allowedTransfer === false}
+                                        title={bullionName.allowedTransfer === false ? 'Переводить не из чего или некуда: проверьте галочки хранилищ' : ''}
                                         onClick={() => {
                                             handleOpenTransfer(bullionName.bullionNameId, bullionName.bullionNameTitle);
                                         }}

@@ -32,6 +32,15 @@ public class GroupedBullionResponse {
         private BigDecimal bullionNameAmount;
         private BigDecimal bullionNameAverageRate;
         private List<VaultInfo> vaults;
+        // Флаги сгруппированной карточки: операция доступна, если её разрешает
+        // хоть одно хранилище наименования. Считает бэк (BullionService),
+        // фронт только гасит по ним кнопки.
+        @Builder.Default
+        private Boolean allowedIncome = true;
+        @Builder.Default
+        private Boolean allowedExpense = true;
+        @Builder.Default
+        private Boolean allowedTransfer = true;
 
 
 
@@ -41,6 +50,8 @@ public class GroupedBullionResponse {
         @AllArgsConstructor
         public static class VaultInfo {
             private Long id;
+            // Id слитка в этом хранилище: перевод адресуется слитку, а не хранилищу
+            private Long bullionId;
             private String name;
             private BigDecimal amount;
             private String accountType;
@@ -60,6 +71,12 @@ public class GroupedBullionResponse {
             private Boolean allowedEdit = true;
             @Builder.Default
             private Boolean allowedChangeAmount = true;
+            // Производные флаги перевода: перевести из хранилища = снять оттуда,
+            // перевести в хранилище = внести туда. Правило домена, фронт его не считает.
+            @Builder.Default
+            private Boolean allowedTransferOut = true;
+            @Builder.Default
+            private Boolean allowedTransferIn = true;
         }
 
     }

@@ -1,9 +1,12 @@
 package ru.money.goldentaurusbank.www.backend.model.mapper;
 
+import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 import org.mapstruct.factory.Mappers;
 import ru.money.goldentaurusbank.www.backend.model.domain.Bullion;
+import ru.money.goldentaurusbank.www.backend.model.domain.Vault;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionResponse;
 
 import java.util.List;
@@ -28,5 +31,18 @@ public interface BullionMapper {
     BullionResponse toResponse(Bullion bullion);
 
     List<BullionResponse> toResponseList(List<Bullion> bullions);
+
+    // Производные флаги перевода: перевести из хранилища = снять оттуда,
+    // перевести в него = внести туда. Через expression не получается —
+    // вложенный vault MapStruct собирает отдельным методом, слитка там уже нет.
+    @AfterMapping
+    default void enrichTransferFlags(@MappingTarget BullionResponse response, Bullion bullion) {
+        if (response.getVault() == null || bullion.getVault() == null) {
+            return;
+        }
+        Vault vault = bullion.getVault();
+        response.getVault().setAllowedTransferOut(vault.isAllowedTransfer() && vault.isAllowedExpense());
+        response.getVault().setAllowedTransferIn(vault.isAllowedTransfer() && vault.isAllowedIncome());
+    }
 
 }

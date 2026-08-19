@@ -45,6 +45,12 @@ public class VaultResponse {
     private boolean allowedEdit = true;
     @Builder.Default
     private boolean allowedChangeAmount = true;
+    // Перевести из хранилища = снять оттуда, перевести в него = внести туда.
+    // Заполняет VaultMapper.enrichVaultResponse
+    @Builder.Default
+    private boolean allowedTransferOut = true;
+    @Builder.Default
+    private boolean allowedTransferIn = true;
 
     private Settings settings;
 

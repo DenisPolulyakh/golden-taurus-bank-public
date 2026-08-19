@@ -111,15 +111,15 @@ function VaultBullionsPage() {
         const targets = [];
         const fromBullionId = transferModal.fromBullionId;
         allBullions.forEach(bullion => {
-            // Проверяем флаг allowedTransfer у хранилища
-            const isAllowed = bullion.vault?.allowedTransfer !== false;
+            // Получатель должен разрешать и перевод, и внесение
+            const isAllowed = bullion.vault?.allowedTransferIn !== false;
             if (bullion.id !== fromBullionId && isAllowed) {
                 targets.push({
                     id: bullion.id,
                     bullionNameTitle: bullion.bullionName?.title || 'Без наименования',
                     vaultName: bullion.vault?.name || 'Без хранилища',
                     amount: bullion.amount || 0,
-                    allowedTransfer: bullion.vault?.allowedTransfer
+                    allowedTransferIn: bullion.vault?.allowedTransferIn
                 });
             }
         });
@@ -133,7 +133,7 @@ function VaultBullionsPage() {
             bullionNameTitle: bullion.bullionNameTitle,
             vaultName: vault?.name || 'Текущее хранилище',
             amount: bullion.amount || 0,
-            allowedTransfer: vault?.allowedTransfer
+            allowedTransferOut: vault?.allowedTransferOut
         }));
     }, [vaultSummary, vault]);
 
@@ -447,7 +447,7 @@ function VaultBullionsPage() {
         allowedIncome = true,
         allowedExpense = true,
         allowedDelete = true,
-        allowedTransfer = true,
+        allowedTransferOut = true,
         allowedEdit = true,
         allowedChangeAmount = true
     } = vault;
@@ -581,7 +581,7 @@ function VaultBullionsPage() {
                                     allowedIncome,
                                     allowedExpense,
                                     allowedDelete,
-                                    allowedTransfer,
+                                    allowedTransferOut,
                                     allowedEdit,
                                     allowedChangeAmount
                                 }}
@@ -701,7 +701,7 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
         allowedIncome = true,
         allowedExpense = true,
         allowedDelete = true,
-        allowedTransfer = true,
+        allowedTransferOut = true,
         allowedEdit = true
     } = vaultFlags || {};
 
@@ -763,10 +763,11 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
                 >
                     ✏️ Редактировать
                 </button>
+                {/* Перевод отсюда - это снятие: нет галочки «Можно снимать», нет и перевода */}
                 <button
                     className="transfer-btn"
                     onClick={onTransfer}
-                    disabled={isDisabled(allowedTransfer)}
+                    disabled={isDisabled(allowedTransferOut)}
                 >
                     🔄 Перевод
                 </button>

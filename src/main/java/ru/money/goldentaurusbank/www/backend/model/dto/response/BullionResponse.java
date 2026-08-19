@@ -48,6 +48,9 @@ public class BullionResponse {
         private Boolean allowedExpense;
         private Boolean allowedDelete;
         private boolean allowedChangeAmount;
+        // Перевести из хранилища = снять оттуда, перевести в него = внести туда
+        private Boolean allowedTransferOut;
+        private Boolean allowedTransferIn;
 
     }
 

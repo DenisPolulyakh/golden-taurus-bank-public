@@ -68,20 +68,18 @@ function BullionTransactionModal({
     const isDeleteModal = type === 'delete';
     const isTransferModal = type === 'transfer';
 
-    // Фильтруем по флагу allowedTransfer
+    // Получатель должен разрешать и перевод, и внесение - это один флаг с бэка
     const transferTargetOptions = transferTargets
-        .filter(target => {
-            if (target.allowedTransfer === false) return false;
-            return true;
-        })
+        .filter(target => target.allowedTransferIn !== false)
         .map(target => ({
             value: target.id,
             label: `${target.bullionNameTitle} | ${target.vaultName} | ${formatAmount(target.amount)} ₽`,
             data: target
         }));
 
+    // Отправитель - и перевод, и снятие: если снимать нельзя, то и переводить нельзя
     const fromBullionOptions = fromBullions
-        .filter(b => b.allowedTransfer !== false)
+        .filter(b => b.allowedTransferOut !== false)
         .map(b => ({
             value: b.id,
             label: `${b.bullionNameTitle} | ${b.vaultName} | ${formatAmount(b.amount)} ₽`,

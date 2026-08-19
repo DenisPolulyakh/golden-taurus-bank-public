@@ -46,6 +46,9 @@ public enum ResponseCodes {
     BULLION_NAME_LINKED(4012, "Наименование привязано к слитку, сначала удалите слиток",HttpStatus.BAD_REQUEST),
     TRANSACTION_ALREADY_REVERSED(4013, "Транзакция уже откачена", HttpStatus.BAD_REQUEST),
     LIQUIDITY_RESERVE_NOT_EMPTY(4014, "В ликвидном хранилище есть слитки с остатком. Сначала перенесите их в другое хранилище", HttpStatus.BAD_REQUEST),
+    VAULT_INCOME_NOT_ALLOWED(4015, "В это хранилище вносить нельзя: снята галочка «Можно вносить»", HttpStatus.BAD_REQUEST),
+    VAULT_EXPENSE_NOT_ALLOWED(4016, "Из этого хранилища снимать нельзя: снята галочка «Можно снимать»", HttpStatus.BAD_REQUEST),
+    VAULT_TRANSFER_NOT_ALLOWED(4017, "Это хранилище не участвует в переводах: снята галочка «Можно переводить»", HttpStatus.BAD_REQUEST),
 
 
     // Системные ошибки (5xxx)
