@@ -386,12 +386,19 @@
 .checkbox-label {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
     margin-bottom: 0;
     font-weight: 400;
     color: #2d3748;
     cursor: pointer;
     white-space: nowrap;
+}
+
+/* Текст в оптическом центре квадратика: своя line-height вместо наследуемой */
+.checkbox-text {
+    line-height: 1;
+    position: relative;
+    top: -1px;
 }
 
 /* Своя галочка: жирная зелёная. .modal-body input тянет ширину на 100% — чекбоксу это не нужно */

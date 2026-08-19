@@ -268,7 +268,7 @@ function VaultModal({
                             <label>Можно:</label>
                             <div className="checkbox-group">
                                 <label className="checkbox-label">
-                                    снять
+                                    <span className="checkbox-text">снять</span>
                                     <input
                                         type="checkbox"
                                         checked={allowedExpense}
@@ -276,7 +276,7 @@ function VaultModal({
                                     />
                                 </label>
                                 <label className="checkbox-label">
-                                    внести
+                                    <span className="checkbox-text">внести</span>
                                     <input
                                         type="checkbox"
                                         checked={allowedIncome}
@@ -284,7 +284,7 @@ function VaultModal({
                                     />
                                 </label>
                                 <label className="checkbox-label">
-                                    перевод
+                                    <span className="checkbox-text">перевод</span>
                                     <input
                                         type="checkbox"
                                         checked={allowedTransfer}
