@@ -2,7 +2,13 @@ import { useState, useEffect } from 'react';
 import api from '../../api/axios';
 import './Vaults.css';
 
-function VaultModal({ isOpen, onClose, onSave, initialName, initialInterestRate, initialDescription, initialBankId, initialAccountType, initialCloseDate, isEditing }) {
+function VaultModal({
+    isOpen, onClose, onSave,
+    initialName, initialInterestRate, initialDescription, initialBankId,
+    initialAccountType, initialCloseDate,
+    initialAllowedIncome = true, initialAllowedExpense = true, initialAllowedTransfer = true,
+    isEditing
+}) {
     const [name, setName] = useState('');
     const [interestRate, setInterestRate] = useState('');
     const [interestRateDisplay, setInterestRateDisplay] = useState('');
@@ -11,6 +17,11 @@ function VaultModal({ isOpen, onClose, onSave, initialName, initialInterestRate,
     const [bankId, setBankId] = useState('');
     const [accountType, setAccountType] = useState('SAVINGS');
     const [closeDate, setCloseDate] = useState('');
+    // Галочки разрешённых операций. Бэк хранит их в vaults.allowed_*,
+    // на кнопки идёт "галочка И правило срочного вклада" (см. plans/PLAN_VAULT_ALLOW.md).
+    const [allowedIncome, setAllowedIncome] = useState(true);
+    const [allowedExpense, setAllowedExpense] = useState(true);
+    const [allowedTransfer, setAllowedTransfer] = useState(true);
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
 
@@ -26,6 +37,9 @@ function VaultModal({ isOpen, onClose, onSave, initialName, initialInterestRate,
             setBankId(initialBankId || '');
             setAccountType(initialAccountType || 'SAVINGS');
             setCloseDate(initialCloseDate || '');
+            setAllowedIncome(initialAllowedIncome !== false);
+            setAllowedExpense(initialAllowedExpense !== false);
+            setAllowedTransfer(initialAllowedTransfer !== false);
 
             if (initialInterestRate !== undefined && initialInterestRate !== null && initialInterestRate !== '') {
                 const numRate = typeof initialInterestRate === 'string' ? parseFloat(initialInterestRate) : initialInterestRate;
@@ -45,7 +59,8 @@ function VaultModal({ isOpen, onClose, onSave, initialName, initialInterestRate,
             setDescription(initialDescription || '');
             setError('');
         }
-    }, [isOpen, initialName, initialInterestRate, initialDescription, initialBankId, initialAccountType, initialCloseDate]);
+    }, [isOpen, initialName, initialInterestRate, initialDescription, initialBankId, initialAccountType, initialCloseDate,
+        initialAllowedIncome, initialAllowedExpense, initialAllowedTransfer]);
 
     const fetchBanks = async () => {
         try {
@@ -160,7 +175,17 @@ function VaultModal({ isOpen, onClose, onSave, initialName, initialInterestRate,
         setError('');
 
         try {
-            await onSave(trimmedName, rateNum, description.trim() || null, bankId || null, accountType, closeDate || null);
+            await onSave({
+                name: trimmedName,
+                interestRate: rateNum,
+                description: description.trim() || null,
+                bankId: bankId || null,
+                accountType,
+                closeDate: closeDate || null,
+                allowedIncome,
+                allowedExpense,
+                allowedTransfer
+            });
             onClose();
         } catch (err) {
             setError(err.response?.data?.message || 'Ошибка сохранения хранилища');
@@ -238,6 +263,41 @@ function VaultModal({ isOpen, onClose, onSave, initialName, initialInterestRate,
                                 </small>
                             </div>
                         )}
+
+                        <div className="form-group">
+                            <label>Разрешённые операции</label>
+                            <div className="checkbox-group">
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={allowedIncome}
+                                        onChange={(e) => setAllowedIncome(e.target.checked)}
+                                    />
+                                    Можно вносить
+                                </label>
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={allowedExpense}
+                                        onChange={(e) => setAllowedExpense(e.target.checked)}
+                                    />
+                                    Можно снимать
+                                </label>
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={allowedTransfer}
+                                        onChange={(e) => setAllowedTransfer(e.target.checked)}
+                                    />
+                                    Можно переводить
+                                </label>
+                            </div>
+                            <small className="input-hint">
+                                {accountType === 'TERM'
+                                    ? 'Срочный вклад до даты закрытия закрыт независимо от галочек'
+                                    : 'Снятая галочка гасит кнопку на всех экранах слитков'}
+                            </small>
+                        </div>
 
                         <div className="form-group">
                             <label>Процентная ставка (%)</label>
