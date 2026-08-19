@@ -17,8 +17,8 @@ function VaultModal({
     const [bankId, setBankId] = useState('');
     const [accountType, setAccountType] = useState('SAVINGS');
     const [closeDate, setCloseDate] = useState('');
-    // Галочки разрешённых операций. Бэк хранит их в vaults.allowed_*,
-    // на кнопки идёт "галочка И правило срочного вклада" (см. plans/PLAN_VAULT_ALLOW.md).
+    // Галочки разрешённых операций: бэк хранит их в vaults.allowed_*,
+    // и только они решают, доступна ли операция (см. plans/PLAN_VAULT_ALLOW.md).
     const [allowedIncome, setAllowedIncome] = useState(true);
     const [allowedExpense, setAllowedExpense] = useState(true);
     const [allowedTransfer, setAllowedTransfer] = useState(true);
@@ -265,37 +265,35 @@ function VaultModal({
                         )}
 
                         <div className="form-group">
-                            <label>Разрешённые операции</label>
+                            <label>Можно:</label>
                             <div className="checkbox-group">
                                 <label className="checkbox-label">
-                                    <input
-                                        type="checkbox"
-                                        checked={allowedIncome}
-                                        onChange={(e) => setAllowedIncome(e.target.checked)}
-                                    />
-                                    Можно вносить
-                                </label>
-                                <label className="checkbox-label">
+                                    снять
                                     <input
                                         type="checkbox"
                                         checked={allowedExpense}
                                         onChange={(e) => setAllowedExpense(e.target.checked)}
                                     />
-                                    Можно снимать
                                 </label>
                                 <label className="checkbox-label">
+                                    внести
+                                    <input
+                                        type="checkbox"
+                                        checked={allowedIncome}
+                                        onChange={(e) => setAllowedIncome(e.target.checked)}
+                                    />
+                                </label>
+                                <label className="checkbox-label">
+                                    перевод
                                     <input
                                         type="checkbox"
                                         checked={allowedTransfer}
                                         onChange={(e) => setAllowedTransfer(e.target.checked)}
                                     />
-                                    Можно переводить
                                 </label>
                             </div>
                             <small className="input-hint">
-                                {accountType === 'TERM'
-                                    ? 'Срочный вклад до даты закрытия закрыт независимо от галочек'
-                                    : 'Снятая галочка гасит кнопку на всех экранах слитков'}
+                                Снятая галочка гасит кнопку на всех экранах слитков
                             </small>
                         </div>
 

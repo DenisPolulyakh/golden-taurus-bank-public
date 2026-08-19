@@ -280,6 +280,16 @@
     max-width: 500px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     animation: modalSlideIn 0.3s ease;
+    /* Модалка не вылезает за экран: шапка и футер на месте, скроллится тело */
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+}
+
+.modal-content form {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 
 @keyframes modalSlideIn {
@@ -326,6 +336,8 @@
 
 .modal-body {
     padding: 24px;
+    overflow-y: auto;
+    min-height: 0;
 }
 
 .modal-body .form-group {
@@ -362,32 +374,68 @@
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-/* Галочки разрешённых операций в модалке хранилища */
+/* Галочки разрешённых операций в модалке хранилища — в одну строку */
 .checkbox-group {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 20px;
 }
 
 .checkbox-label {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     margin-bottom: 0;
     font-weight: 400;
     color: #2d3748;
     cursor: pointer;
+    white-space: nowrap;
 }
 
-/* .modal-body input тянет ширину на 100% — чекбоксу это не нужно */
+/* Своя галочка: жирная зелёная. .modal-body input тянет ширину на 100% — чекбоксу это не нужно */
 .modal-body .checkbox-label input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    width: 22px;
+    height: 22px;
     padding: 0;
     margin: 0;
-    accent-color: #667eea;
-    cursor: pointer;
     flex: none;
+    border: 2px solid #cbd5e0;
+    border-radius: 6px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.modal-body .checkbox-label input[type="checkbox"]:hover {
+    border-color: #38a169;
+}
+
+.modal-body .checkbox-label input[type="checkbox"]:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(56, 161, 105, 0.25);
+}
+
+.modal-body .checkbox-label input[type="checkbox"]:checked {
+    border-color: #38a169;
+    background: #f0fff4;
+}
+
+.modal-body .checkbox-label input[type="checkbox"]:checked::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 1px;
+    width: 5px;
+    height: 11px;
+    border: solid #22883f;
+    border-width: 0 4px 4px 0;
+    border-radius: 1px;
+    transform: rotate(45deg);
 }
 
 .input-hint {
@@ -529,6 +577,7 @@
     .modal-content {
         width: 95%;
         margin: 10px;
+        max-height: 85vh;
     }
 
     .page-size-selector {
