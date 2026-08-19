@@ -414,8 +414,10 @@ function VaultBullionsPage() {
         });
     };
 
+    // Перенос остатка - это внесение, поэтому только хранилища с «Можно вносить».
+    // Ликвидный резерв доступен всегда - он отдельным переключателем в модалке
     const getAvailableVaultsForDelete = useCallback(() => {
-        return allVaults.filter(vault => vault.id !== parseInt(vaultId));
+        return allVaults.filter(vault => vault.id !== parseInt(vaultId) && vault.allowedIncome !== false);
     }, [allVaults, vaultId]);
 
     if (loading) {

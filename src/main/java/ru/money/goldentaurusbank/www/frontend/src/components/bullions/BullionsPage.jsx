@@ -204,14 +204,15 @@ function BullionsPage() {
 
     const handleDeleteWithTransfer = async (targetVaultId, toLiquidityVault, description, dateOperation) => {
         try {
-            await api.post('/bullions/delete-with-transfer', {
-                bullionId: transactionModal.bullionId,
-                fromVaultId: transactionModal.fromVaultId,
-                toVaultId: targetVaultId,
-                toLiquidityVault: toLiquidityVault,
-                bullionNameId: transactionModal.bullionNameId,
-                description: description,
-                dateOperation: dateOperation
+            // Эндпоинт один на оба экрана: DELETE /api/bullions/{id}/transfer.
+            // Раньше отсюда уходил POST на несуществующий /bullions/delete-with-transfer
+            await api.delete(`/bullions/${transactionModal.bullionId}/transfer`, {
+                data: {
+                    toVaultId: targetVaultId,
+                    toLiquidityVault: toLiquidityVault,
+                    description: description,
+                    dateOperation: dateOperation
+                }
             });
             await fetchGroupedBullions();
         } catch (err) {
@@ -289,8 +290,10 @@ function BullionsPage() {
         return vaults;
     };
 
+    // Перенос остатка - это внесение, поэтому только хранилища с «Можно вносить».
+    // Ликвидный резерв доступен всегда - он отдельным переключателем в модалке
     const getAvailableVaultsForDelete = (currentVaultId) => {
-        return allVaults.filter(vault => vault.id !== currentVaultId);
+        return allVaults.filter(vault => vault.id !== currentVaultId && vault.allowedIncome !== false);
     };
 
     const transactionConfig = {
@@ -574,12 +577,13 @@ function BullionsPage() {
                                         onClick={() => {
                                             const firstVault = bullionName.vaults?.[0];
                                             if (firstVault) {
+                                                // Пятым идёт id слитка, а не хранилища: удаляем слиток
                                                 handleOpenDelete(
                                                     bullionName.bullionNameId,
                                                     bullionName.bullionNameTitle,
                                                     firstVault.id,
                                                     firstVault.name,
-                                                    firstVault.id
+                                                    firstVault.bullionId
                                                 );
                                             }
                                         }}

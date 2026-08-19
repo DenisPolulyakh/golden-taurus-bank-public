@@ -20,6 +20,7 @@ import ru.money.goldentaurusbank.www.backend.repository.UserRepository;
 
 import java.time.LocalDate;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -369,7 +370,140 @@ class VaultAllowedFlagsIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.data.bullionNameBullionList[0].vaults[0].allowedChangeAmount").value(false));
     }
 
+    @Test
+    @DisplayName("Удаление слитка: перенос остатка в хранилище без пополнения отклоняется")
+    void deleteTransferRejectedWhenTargetForbidsIncome() throws Exception {
+        Long from = createVault("""
+                {
+                    "name": "Откуда"
+                }
+                """);
+        Long to = createVault("""
+                {
+                    "name": "Куда нельзя",
+                    "allowedIncome": false
+                }
+                """);
+        Long bullionId = createBullion(from);
+
+        deleteWithTransfer(bullionId, to, false)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(VAULT_INCOME_NOT_ALLOWED));
+    }
+
+    @Test
+    @DisplayName("Удаление слитка: в ликвидный резерв можно всегда, даже со снятой галочкой")
+    void deleteTransferToLiquidityAlwaysAllowed() throws Exception {
+        Long first = createVault("""
+                {
+                    "name": "Первое"
+                }
+                """);
+        deleteWithTransfer(createBullion(first), null, true).andExpect(status().isOk());
+
+        // Резерв создаётся при первом переносе - теперь снимаем у него галочку
+        Long liquidityId = liquidityReserveId();
+        mockMvc.perform(put("/api/vaults/{vaultId}", liquidityId)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "name": "Ликвидный резерв",
+                                    "allowedIncome": false
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        Long second = createVault("""
+                {
+                    "name": "Второе"
+                }
+                """);
+        deleteWithTransfer(createBullion(second), null, true).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Удаление слитка: в хранилище с таким же слитком суммы складываются")
+    void deleteTransferSumsIntoExistingBullion() throws Exception {
+        Long from = createVault("""
+                {
+                    "name": "Откуда"
+                }
+                """);
+        Long to = createVault("""
+                {
+                    "name": "Куда"
+                }
+                """);
+        Long bullionId = createBullion(from);
+        createBullion(to);
+
+        deleteWithTransfer(bullionId, to, false).andExpect(status().isOk());
+
+        // 100000 приехали к 100000 - и всё это одним слитком
+        mockMvc.perform(get("/api/bullions")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].vault.name").value("Куда"))
+                .andExpect(jsonPath("$.data[0].amount").value(200000.00));
+    }
+
+    @Test
+    @DisplayName("Удаление слитка: в пустое хранилище слиток переезжает с той же суммой")
+    void deleteTransferMovesBullionWhenTargetEmpty() throws Exception {
+        Long from = createVault("""
+                {
+                    "name": "Откуда"
+                }
+                """);
+        Long to = createVault("""
+                {
+                    "name": "Куда"
+                }
+                """);
+        Long bullionId = createBullion(from);
+
+        deleteWithTransfer(bullionId, to, false).andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/bullions")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].vault.name").value("Куда"))
+                .andExpect(jsonPath("$.data[0].amount").value(100000.00));
+    }
+
     // Вспомогательные методы
+    private ResultActions deleteWithTransfer(Long bullionId, Long toVaultId, boolean toLiquidityVault) throws Exception {
+        entityManager.flush();
+        entityManager.clear();
+        return mockMvc.perform(delete("/api/bullions/{bullionId}/transfer", bullionId)
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                            "toVaultId": %s,
+                            "toLiquidityVault": %b
+                        }
+                        """.formatted(toVaultId, toLiquidityVault)));
+    }
+
+    private Long liquidityReserveId() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/vaults")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .param("size", "100"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        for (JsonNode vault : json(result).get("data").get("content")) {
+            if ("LIQUIDITY_BUFFER".equals(vault.get("vaultType").asText())) {
+                return vault.get("id").asLong();
+            }
+        }
+        throw new AssertionError("Ликвидный резерв не найден");
+    }
+
     private ResultActions changeAmount(Long bullionId, Long vaultId, String amount) throws Exception {
         entityManager.flush();
         entityManager.clear();

@@ -11,6 +11,7 @@ import ru.money.goldentaurusbank.www.backend.model.domain.Bullion;
 import ru.money.goldentaurusbank.www.backend.model.domain.BullionName;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.domain.Vault;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.VaultType;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.*;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.GroupedBullionResponse;
@@ -355,9 +356,30 @@ public class BullionService {
                 ? vaultService.getLiquidityReserve(user).getId()
                 : request.getToVaultId();
 
+        requireVaultAcceptsRemains(user, toVaultId);
+
         // transferBullion сам архивирует исходный слиток после перевода остатка.
         transactionService.transferBullion(bullion.getId(), toVaultId, user, null, atStartOfDay(request.getDateOperation()));
         log.info("Bullion {} transferred to vault id = {} and archived", bullion.getBullionName().getTitle(), toVaultId);
+    }
+
+    /**
+     * Перенос остатка при удалении слитка — это внесение в целевое хранилище,
+     * поэтому оно должно разрешать пополнение. Исключение одно: ликвидный резерв
+     * принимает всегда, иначе слиток можно было бы сделать неудаляемым, сняв
+     * галочки у всех хранилищ.
+     */
+    private void requireVaultAcceptsRemains(User user, Long toVaultId) {
+        Vault toVault = vaultRepository.findByIdAndUser(toVaultId, user)
+                .orElseThrow(() -> new ApplicationException(VAULT_NOT_FOUND.getCode(), "Целевое хранилище не найдено"));
+
+        if (toVault.getVaultType() == VaultType.LIQUIDITY_BUFFER) {
+            return;
+        }
+        if (!toVault.isAllowedIncome()) {
+            throw new ApplicationException(VAULT_INCOME_NOT_ALLOWED.getCode(),
+                    "В хранилище " + toVault.getName() + " вносить нельзя: снята галочка «Можно вносить»");
+        }
     }
 
     private static LocalDateTime atStartOfDay(LocalDate date) {
