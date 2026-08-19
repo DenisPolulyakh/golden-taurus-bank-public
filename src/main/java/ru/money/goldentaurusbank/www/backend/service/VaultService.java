@@ -65,6 +65,9 @@ public class VaultService {
                 .vaultType(request.getVaultType() != null ? request.getVaultType() : VaultType.REGULAR)
                 .accountType(request.getAccountType() != null ? request.getAccountType() : AccountType.SAVINGS)
                 .closeDate(request.getCloseDate())
+                .allowedIncome(request.getAllowedIncome() == null || request.getAllowedIncome())
+                .allowedExpense(request.getAllowedExpense() == null || request.getAllowedExpense())
+                .allowedTransfer(request.getAllowedTransfer() == null || request.getAllowedTransfer())
                 .user(user);
 
         // Если указан bankId - привязываем банк
@@ -123,6 +126,10 @@ public class VaultService {
         vault.setVaultType(request.getVaultType() != null ? request.getVaultType() : vault.getVaultType());
         vault.setAccountType(request.getAccountType() != null ? request.getAccountType() : vault.getAccountType());
         vault.setCloseDate(request.getCloseDate());
+        vault.setAllowedIncome(request.getAllowedIncome() != null ? request.getAllowedIncome() : vault.isAllowedIncome());
+        vault.setAllowedExpense(request.getAllowedExpense() != null ? request.getAllowedExpense() : vault.isAllowedExpense());
+        vault.setAllowedTransfer(request.getAllowedTransfer() != null ? request.getAllowedTransfer() : vault.isAllowedTransfer());
+
 
         // Обновляем банк
         if (request.getBankId() != null) {
