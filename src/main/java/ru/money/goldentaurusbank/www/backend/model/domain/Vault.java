@@ -75,6 +75,19 @@ public class Vault {
     @Column(name = "close_date")
     private LocalDate closeDate;
 
+    @Column(name = "allowed_income", nullable = false)
+    @Builder.Default
+    private boolean allowedIncome = true;
+
+    @Column(name = "allowed_expense", nullable = false)
+    @Builder.Default
+    private boolean allowedExpense = true;
+
+    @Column(name = "allowed_transfer", nullable = false)
+    @Builder.Default
+    private boolean allowedTransfer = true;
+
+
     public BigDecimal getTotalAmount() {
         if (bullions == null || bullions.isEmpty()) {
             return BigDecimal.ZERO;
@@ -85,15 +98,4 @@ public class Vault {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    public Integer getBullionNamesCount() {
-        if (bullions == null || bullions.isEmpty()) {
-            return 0;
-        }
-        return (int) bullions.stream()
-                .map(Bullion::getBullionName)
-                .filter(Objects::nonNull)
-                .map(BullionName::getId)
-                .distinct()
-                .count();
-    }
 }
