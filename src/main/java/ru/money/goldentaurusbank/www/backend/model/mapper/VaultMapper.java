@@ -8,10 +8,7 @@ import ru.money.goldentaurusbank.www.backend.model.dto.request.VaultRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.VaultResponse;
 
-import java.time.LocalDate;
 import java.util.List;
-
-import static ru.money.goldentaurusbank.www.backend.model.dto.enums.AccountType.TERM;
 
 @Mapper(componentModel = "spring", uses = {BullionMapper.class})
 public interface VaultMapper {
@@ -25,6 +22,8 @@ public interface VaultMapper {
     VaultResponse toResponse(Vault vault);
 
 
+    // Разрешённость операций задают только галочки хранилища: верхние allowed*
+    // MapStruct переносит из сущности сам, здесь остаются сырые значения для формы правки
     @AfterMapping
     default void enrichVaultResponse (@MappingTarget VaultResponse response, Vault vault) {
         if (vault != null) {
@@ -33,22 +32,6 @@ public interface VaultMapper {
                     .allowedExpense(vault.isAllowedExpense())
                     .allowedTransfer(vault.isAllowedTransfer())
                     .build());
-
-            // Срочный вклад до даты закрытия операций не допускает
-            boolean isTerm = vault.getAccountType() != null &&
-                    TERM.name().equals(vault.getAccountType().name());
-            boolean open = !isTerm
-                    || vault.getCloseDate() == null
-                    || !LocalDate.now().isBefore(vault.getCloseDate());
-
-            // Итоговый флаг = галочка И правило срочного вклада
-            response.setAllowedIncome(open && vault.isAllowedIncome());
-            response.setAllowedExpense(open && vault.isAllowedExpense());
-            response.setAllowedTransfer(open && vault.isAllowedTransfer());
-
-            response.setAllowedChangeAmount(open);
-            response.setAllowedEdit(true);
-            response.setAllowedDelete(true);
         }
 
     }

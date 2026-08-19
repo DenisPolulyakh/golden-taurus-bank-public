@@ -11,7 +11,6 @@ import ru.money.goldentaurusbank.www.backend.model.domain.Bullion;
 import ru.money.goldentaurusbank.www.backend.model.domain.BullionName;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.domain.Vault;
-import ru.money.goldentaurusbank.www.backend.model.dto.enums.AccountType;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.*;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.GroupedBullionResponse;
@@ -235,7 +234,6 @@ public class BullionService {
                     .map(b -> {
 
                         Vault vault = b.getVault();
-                        boolean allowed = calculateAllowed(vault);
 
                         return GroupedBullionResponse.BullionNameBullion.VaultInfo.builder()
                                 .id(b.getVault().getId())
@@ -243,14 +241,13 @@ public class BullionService {
                                 .amount(b.getAmount())
                                 .accountType(vault.getAccountType().name())
                                 .closeDate(vault.getCloseDate())
-                                .allowedIncome(allowed)
-                                .allowedDelete(allowed)
-                                .allowedExpense(allowed)
-                                .allowedTransfer(allowed)
-                                // Срочное хранилище: сумму менять нельзя, а
-                                // редактировать само хранилище — можно.
-                                // Те же правила, что в VaultMapper.enrichVaultResponse
-                                .allowedChangeAmount(allowed)
+                                // Операции разрешают только галочки хранилища,
+                                // те же правила, что в VaultMapper.enrichVaultResponse
+                                .allowedIncome(vault.isAllowedIncome())
+                                .allowedExpense(vault.isAllowedExpense())
+                                .allowedTransfer(vault.isAllowedTransfer())
+                                .allowedDelete(true)
+                                .allowedChangeAmount(true)
                                 .allowedEdit(true)
                                 .build();
                     })
@@ -337,22 +334,6 @@ public class BullionService {
     private static LocalDateTime atStartOfDay(LocalDate date) {
         return date == null ? null : date.atStartOfDay();
     }
-
-    private boolean calculateAllowed(Vault vault) {
-        if (vault == null) {
-            return true;
-        }
-        if (vault.getAccountType() == null || !AccountType.TERM.equals(vault.getAccountType())) {
-            return true;
-        }
-        if (vault.getCloseDate() == null) {
-            return true;
-        }
-        LocalDate today = LocalDate.now();
-        LocalDate closeDate = vault.getCloseDate();
-        return today.isEqual(closeDate) || today.isAfter(closeDate);
-    }
-
 
     private String determineComment(String userComment, String defaultComment) {
         return StringUtils.isNotBlank(userComment) ? userComment.trim() : defaultComment;
