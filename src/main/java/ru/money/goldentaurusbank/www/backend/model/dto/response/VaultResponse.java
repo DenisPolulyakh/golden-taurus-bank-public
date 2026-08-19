@@ -46,6 +46,19 @@ public class VaultResponse {
     @Builder.Default
     private boolean allowedChangeAmount = true;
 
+    private Settings settings;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Settings {
+        private boolean allowedIncome;
+        private boolean allowedExpense;
+        private boolean allowedTransfer;
+    }
+
+
     public String getDisplayName() {
         if (bankName != null) {
             return bankName + "_" + name;

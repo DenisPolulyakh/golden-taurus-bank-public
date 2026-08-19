@@ -28,32 +28,27 @@ public interface VaultMapper {
     @AfterMapping
     default void enrichVaultResponse (@MappingTarget VaultResponse response, Vault vault) {
         if (vault != null) {
-            // Проверяем, срочное ли хранилище
+            response.setSettings(VaultResponse.Settings.builder()
+                    .allowedIncome(vault.isAllowedIncome())
+                    .allowedExpense(vault.isAllowedExpense())
+                    .allowedTransfer(vault.isAllowedTransfer())
+                    .build());
+
+            // Срочный вклад до даты закрытия операций не допускает
             boolean isTerm = vault.getAccountType() != null &&
                     TERM.name().equals(vault.getAccountType().name());
-            // Если срочное и дата закрытия ещё не наступила - блокируем операции
-            if (isTerm && vault.getCloseDate() != null) {
-                LocalDate today = LocalDate.now();
-                LocalDate closeDate = vault.getCloseDate();
-                boolean isClosed = today.isEqual(closeDate) || today.isAfter(closeDate);
+            boolean open = !isTerm
+                    || vault.getCloseDate() == null
+                    || !LocalDate.now().isBefore(vault.getCloseDate());
 
-                // Если ещё не закрыто
-                if (!isClosed) {
-                    response.setAllowedIncome(false);
-                    response.setAllowedExpense(false);
-                    response.setAllowedChangeAmount(false);
-                    response.setAllowedEdit(true);
-                    response.setAllowedDelete(true);
-                    response.setAllowedTransfer(false);
-                    return;
-                }
-            }
-            response.setAllowedIncome(true);
-            response.setAllowedExpense(true);
-            response.setAllowedChangeAmount(true);
+            // Итоговый флаг = галочка И правило срочного вклада
+            response.setAllowedIncome(open && vault.isAllowedIncome());
+            response.setAllowedExpense(open && vault.isAllowedExpense());
+            response.setAllowedTransfer(open && vault.isAllowedTransfer());
+
+            response.setAllowedChangeAmount(open);
             response.setAllowedEdit(true);
             response.setAllowedDelete(true);
-            response.setAllowedTransfer(true);
         }
 
     }
