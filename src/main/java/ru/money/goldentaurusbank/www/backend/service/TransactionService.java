@@ -172,11 +172,13 @@ public class TransactionService {
     // ------------------------------------------------------------------
     // Галочки хранилища. Гашение кнопок на фронте — подсказка, запрет здесь:
     // запрос в обход интерфейса должен падать, а не двигать деньги.
-    // Правки суммы слитка, стартового остатка и перемещения слитка целиком
-    // это не касается — там свои флаги.
+    // Проверки стоят на том, что пользователь жмёт кнопкой; правку суммы слитка
+    // проверяет BullionService.updateBullion по направлению дельты, поэтому
+    // методы публичные. Стартовый остаток нового слитка, архивация и импорт
+    // не проверяются: это регистрация уже накопленного, а не операция.
     // ------------------------------------------------------------------
 
-    private void requireIncomeAllowed(Bullion bullion) {
+    public void requireIncomeAllowed(Bullion bullion) {
         Vault vault = bullion.getVault();
         if (vault != null && !vault.isAllowedIncome()) {
             throw new ApplicationException(VAULT_INCOME_NOT_ALLOWED.getCode(),
@@ -184,7 +186,7 @@ public class TransactionService {
         }
     }
 
-    private void requireExpenseAllowed(Bullion bullion) {
+    public void requireExpenseAllowed(Bullion bullion) {
         Vault vault = bullion.getVault();
         if (vault != null && !vault.isAllowedExpense()) {
             throw new ApplicationException(VAULT_EXPENSE_NOT_ALLOWED.getCode(),

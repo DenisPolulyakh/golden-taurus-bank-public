@@ -40,6 +40,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("Интеграционные тесты галочек операций хранилища")
 class VaultAllowedFlagsIntegrationTest extends IntegrationTestBase {
 
+    private static final int VAULT_INCOME_NOT_ALLOWED = 4015;
+    private static final int VAULT_EXPENSE_NOT_ALLOWED = 4016;
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -221,9 +224,7 @@ class VaultAllowedFlagsIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.data.allowedIncome").value(true))
                 .andExpect(jsonPath("$.data.allowedExpense").value(true))
                 .andExpect(jsonPath("$.data.allowedTransfer").value(true))
-                .andExpect(jsonPath("$.data.allowedChangeAmount").value(true))
-                .andExpect(jsonPath("$.data.allowedEdit").value(true))
-                .andExpect(jsonPath("$.data.allowedDelete").value(true));
+                .andExpect(jsonPath("$.data.allowedChangeAmount").value(true));
     }
 
     @Test
@@ -263,10 +264,8 @@ class VaultAllowedFlagsIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.data[0].vault.allowedExpense").value(false))
                 .andExpect(jsonPath("$.data[0].vault.allowedIncome").value(true))
                 .andExpect(jsonPath("$.data[0].vault.allowedTransfer").value(true))
-                // константы маппера: без них правка суммы и удаление отвалились бы
-                .andExpect(jsonPath("$.data[0].vault.allowedChangeAmount").value(true))
-                .andExpect(jsonPath("$.data[0].vault.allowedEdit").value(true))
-                .andExpect(jsonPath("$.data[0].vault.allowedDelete").value(true));
+                // правка суммы производная: вносить можно, значит и вверх поправить можно
+                .andExpect(jsonPath("$.data[0].vault.allowedChangeAmount").value(true));
     }
 
     @Test
@@ -291,12 +290,101 @@ class VaultAllowedFlagsIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.data.bullionNameBullionList[0].vaults[0].allowedTransfer").value(false))
                 .andExpect(jsonPath("$.data.bullionNameBullionList[0].vaults[0].allowedIncome").value(true))
                 .andExpect(jsonPath("$.data.bullionNameBullionList[0].vaults[0].allowedExpense").value(true))
-                .andExpect(jsonPath("$.data.bullionNameBullionList[0].vaults[0].allowedChangeAmount").value(true))
-                .andExpect(jsonPath("$.data.bullionNameBullionList[0].vaults[0].allowedEdit").value(true))
-                .andExpect(jsonPath("$.data.bullionNameBullionList[0].vaults[0].allowedDelete").value(true));
+                .andExpect(jsonPath("$.data.bullionNameBullionList[0].vaults[0].allowedChangeAmount").value(true));
+    }
+
+    @Test
+    @DisplayName("Правка суммы вверх - это внесение, запрет вносить её останавливает")
+    void changeAmountUpRejectedWhenIncomeForbidden() throws Exception {
+        Long vaultId = createVault("""
+                {
+                    "name": "Без пополнения",
+                    "allowedIncome": false
+                }
+                """);
+        Long bullionId = createBullion(vaultId);
+
+        changeAmount(bullionId, vaultId, "150000")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(VAULT_INCOME_NOT_ALLOWED));
+    }
+
+    @Test
+    @DisplayName("Правка суммы вниз - это снятие, запрет снимать её останавливает")
+    void changeAmountDownRejectedWhenExpenseForbidden() throws Exception {
+        Long vaultId = createVault("""
+                {
+                    "name": "Без снятия",
+                    "allowedExpense": false
+                }
+                """);
+        Long bullionId = createBullion(vaultId);
+
+        changeAmount(bullionId, vaultId, "50000")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(VAULT_EXPENSE_NOT_ALLOWED));
+    }
+
+    @Test
+    @DisplayName("Разрешённое направление правки проходит")
+    void changeAmountPassesInAllowedDirection() throws Exception {
+        // Вносить нельзя, снимать можно: вниз пройдёт, вверх нет
+        Long vaultId = createVault("""
+                {
+                    "name": "Только снятие",
+                    "allowedIncome": false
+                }
+                """);
+        Long bullionId = createBullion(vaultId);
+
+        changeAmount(bullionId, vaultId, "50000").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Обе галочки сняты - правка суммы недоступна")
+    void changeAmountFlagFalseWhenBothForbidden() throws Exception {
+        Long vaultId = createVault("""
+                {
+                    "name": "Заперто",
+                    "allowedIncome": false,
+                    "allowedExpense": false
+                }
+                """);
+        createBullion(vaultId);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        getVault(vaultId)
+                .andExpect(jsonPath("$.data.allowedChangeAmount").value(false));
+
+        mockMvc.perform(get("/api/bullions")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].vault.allowedChangeAmount").value(false));
+
+        mockMvc.perform(get("/api/bullions/grouped")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.bullionNameBullionList[0].vaults[0].allowedChangeAmount").value(false));
     }
 
     // Вспомогательные методы
+    private ResultActions changeAmount(Long bullionId, Long vaultId, String amount) throws Exception {
+        entityManager.flush();
+        entityManager.clear();
+        return mockMvc.perform(put("/api/bullions/{bullionId}", bullionId)
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                            "bullionNameId": %d,
+                            "vaultId": %d,
+                            "amount": %s
+                        }
+                        """.formatted(bullionNameId, vaultId, amount)));
+    }
+
     private Long createVault(String requestBody) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/vaults")
                         .header("Authorization", "Bearer " + accessToken)
@@ -308,8 +396,8 @@ class VaultAllowedFlagsIntegrationTest extends IntegrationTestBase {
         return json(result).get("data").get("id").asLong();
     }
 
-    private void createBullion(Long vaultId) throws Exception {
-        mockMvc.perform(post("/api/bullions")
+    private Long createBullion(Long vaultId) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/bullions")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -320,7 +408,9 @@ class VaultAllowedFlagsIntegrationTest extends IntegrationTestBase {
                                     "dateOperation": "2026-07-20T12:00:00"
                                 }
                                 """.formatted(bullionNameId, vaultId)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
+        return json(result).get("data").get("id").asLong();
     }
 
     private ResultActions getVault(Long vaultId) throws Exception {

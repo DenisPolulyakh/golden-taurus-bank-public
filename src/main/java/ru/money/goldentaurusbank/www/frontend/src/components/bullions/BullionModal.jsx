@@ -14,7 +14,11 @@ function BullionModal({
                           isEditing,
                           initialBullionNameTitle,
                           initialDateOperation,
-                          allowedChangeAmount = true // 👈 ДОБАВИТЬ ЭТОТ ПРОПС
+                          // Правка суммы - это операция: вверх внесение, вниз снятие.
+                          // Флаги считает бэк, здесь только гасим поле и подсказываем
+                          allowedChangeAmount = true,
+                          allowedIncome = true,
+                          allowedExpense = true
                       }) {
     const [bullionNames, setBullionNames] = useState([]);
     const [vaults, setVaults] = useState([]);
@@ -43,6 +47,22 @@ function BullionModal({
     // Разницу считаем на клиенте: старую сумму слитка знает страница, а ответ PUT
     // о проведённой операции пока не рассказывает.
     const deltaCents = isEditing && !amountIsEmpty ? enteredCents() - toCents(initialAmount) : 0;
+
+    // Создание слитка галочки не трогают: это регистрация уже накопленного,
+    // а не операция. Гасим поле только при правке существующего.
+    const amountLocked = isEditing && !allowedChangeAmount;
+
+    // Направление правки: вверх упирается в «Можно вносить», вниз - в «Можно снимать»
+    const directionError = () => {
+        if (!isEditing) return '';
+        if (deltaCents > 0 && !allowedIncome) {
+            return 'В это хранилище вносить нельзя — сумму можно только уменьшить';
+        }
+        if (deltaCents < 0 && !allowedExpense) {
+            return 'Из этого хранилища снимать нельзя — сумму можно только увеличить';
+        }
+        return '';
+    };
 
     const handleAmountChange = (e) => {
         let value = e.target.value;
@@ -220,6 +240,12 @@ function BullionModal({
             return;
         }
 
+        const forbiddenDirection = directionError();
+        if (forbiddenDirection) {
+            setError(forbiddenDirection);
+            return;
+        }
+
         amountNum = Math.round(amountNum * 100) / 100;
 
         setSaving(true);
@@ -327,19 +353,24 @@ function BullionModal({
                                 placeholder="0.00"
                                 required
                                 inputMode="decimal"
-                                disabled={!allowedChangeAmount}
+                                disabled={amountLocked}
                             />
-                            {!allowedChangeAmount && (
+                            {amountLocked && (
                                 <small className="input-hint" style={{ color: '#e53e3e' }}>
-                                    ⚠️ Изменение суммы запрещено для этого хранилища
+                                    ⚠️ У хранилища сняты галочки внесения и снятия — сумму не изменить
                                 </small>
                             )}
-                            {allowedChangeAmount && !isEditing && (
+                            {!amountLocked && !isEditing && (
                                 <small className="input-hint">
                                     Используйте точку или запятую для копеек
                                 </small>
                             )}
-                            {allowedChangeAmount && isEditing && !amountIsEmpty && (
+                            {!amountLocked && isEditing && directionError() && (
+                                <small className="input-hint" style={{ color: '#e53e3e' }}>
+                                    ⚠️ {directionError()}
+                                </small>
+                            )}
+                            {!amountLocked && isEditing && !directionError() && !amountIsEmpty && (
                                 <small className={`input-hint amount-delta${
                                     deltaCents > 0 ? ' amount-delta-deposit' : deltaCents < 0 ? ' amount-delta-withdrawal' : ''
                                 }`}>

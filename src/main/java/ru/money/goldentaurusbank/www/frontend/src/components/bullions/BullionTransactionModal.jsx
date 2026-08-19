@@ -260,7 +260,6 @@ function BullionTransactionModal({
         return vaults.filter(vault => {
             if (type === 'refill' && vault.allowedIncome === false) return false;
             if (type === 'withdraw' && vault.allowedExpense === false) return false;
-            if (type === 'delete' && vault.allowedDelete === false) return false;
             return true;
         });
     };

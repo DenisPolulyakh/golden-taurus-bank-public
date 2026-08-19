@@ -284,8 +284,6 @@ function BullionsPage() {
             vaults = vaults.filter(v => v.allowedIncome !== false);
         } else if (operationType === 'withdraw') {
             vaults = vaults.filter(v => v.allowedExpense !== false);
-        } else if (operationType === 'delete') {
-            vaults = vaults.filter(v => v.allowedDelete !== false);
         }
 
         return vaults;

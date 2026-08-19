@@ -148,11 +148,15 @@ public class BullionService {
 
         // Ручная правка суммы оформляется корректирующей транзакцией на дельту:
         // иначе остаток разъезжается с графиком, который считается по операциям.
+        // Раз это операция, её тоже решают галочки: правка вверх — внесение,
+        // вниз — снятие. Иначе запрет снятия обходился бы через карандаш.
         if (request.getAmount() != null) {
             BigDecimal delta = request.getAmount().subtract(bullion.getAmount());
             if (delta.compareTo(BigDecimal.ZERO) > 0) {
+                transactionService.requireIncomeAllowed(bullion);
                 transactionService.deposit(bullionId, delta, user, determineComment(request.getUserComment(), DEPOSIT_AMOUNT_COMMENT), request.getDateOperation(), null);
             } else if (delta.compareTo(BigDecimal.ZERO) < 0) {
+                transactionService.requireExpenseAllowed(bullion);
                 transactionService.withdraw(bullionId, delta.negate(), user, determineComment(request.getUserComment(), WITHDRAWAL_AMOUNT_COMMENT), request.getDateOperation(), null);
             }
         }
@@ -257,12 +261,11 @@ public class BullionService {
                                 .allowedIncome(vault.isAllowedIncome())
                                 .allowedExpense(vault.isAllowedExpense())
                                 .allowedTransfer(vault.isAllowedTransfer())
-                                .allowedDelete(true)
-                                .allowedChangeAmount(true)
-                                .allowedEdit(true)
-                                // Перевести из хранилища = снять оттуда, перевести в него = внести
+                                // Перевести из хранилища = снять оттуда, перевести в него = внести,
+                                // поправить сумму = внести или снять смотря куда правим
                                 .allowedTransferOut(vault.isAllowedTransfer() && vault.isAllowedExpense())
                                 .allowedTransferIn(vault.isAllowedTransfer() && vault.isAllowedIncome())
+                                .allowedChangeAmount(vault.isAllowedIncome() || vault.isAllowedExpense())
                                 .build();
                     })
                     .collect(Collectors.toList());

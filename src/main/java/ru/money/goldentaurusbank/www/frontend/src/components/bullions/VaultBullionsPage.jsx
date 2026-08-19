@@ -446,9 +446,7 @@ function VaultBullionsPage() {
     const {
         allowedIncome = true,
         allowedExpense = true,
-        allowedDelete = true,
         allowedTransferOut = true,
-        allowedEdit = true,
         allowedChangeAmount = true
     } = vault;
 
@@ -580,10 +578,7 @@ function VaultBullionsPage() {
                                 vaultFlags={{
                                     allowedIncome,
                                     allowedExpense,
-                                    allowedDelete,
-                                    allowedTransferOut,
-                                    allowedEdit,
-                                    allowedChangeAmount
+                                    allowedTransferOut
                                 }}
                             />
                         ))
@@ -607,6 +602,8 @@ function VaultBullionsPage() {
                     initialDateOperation={editingBullion?.dateOperation}
                     isEditing={!!editingBullion}
                     allowedChangeAmount={allowedChangeAmount}
+                    allowedIncome={allowedIncome}
+                    allowedExpense={allowedExpense}
                 />
 
                 {currentTransaction && transactionModal.bullion && (
@@ -700,12 +697,11 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
     const {
         allowedIncome = true,
         allowedExpense = true,
-        allowedDelete = true,
-        allowedTransferOut = true,
-        allowedEdit = true
+        allowedTransferOut = true
     } = vaultFlags || {};
 
-    // Кнопки всегда видны, но disabled если флаг false или общий disabled
+    // Кнопки всегда видны, но disabled если флаг false или общий disabled.
+    // Правка и удаление слитка галочками не ограничены: галочки про движение денег
     const isDisabled = (flag) => disabled || !flag;
 
     return (
@@ -759,7 +755,7 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
                 <button
                     className="edit-vault-btn"
                     onClick={onEdit}
-                    disabled={isDisabled(allowedEdit)}
+                    disabled={disabled}
                 >
                     ✏️ Редактировать
                 </button>
@@ -774,7 +770,7 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
                 <button
                     className="delete-vault-btn"
                     onClick={onDelete}
-                    disabled={isDisabled(allowedDelete)}
+                    disabled={disabled}
                 >
                     🗑️ Удалить
                 </button>

@@ -42,11 +42,10 @@ public class BullionResponse {
         private BigDecimal interestRate;
         private String accountType;
         private LocalDate closeDate;
-        private Boolean allowedEdit;
         private Boolean allowedTransfer;
         private Boolean allowedIncome;
         private Boolean allowedExpense;
-        private Boolean allowedDelete;
+        // Производный: правка суммы вверх - внесение, вниз - снятие
         private boolean allowedChangeAmount;
         // Перевести из хранилища = снять оттуда, перевести в него = внести туда
         private Boolean allowedTransferOut;

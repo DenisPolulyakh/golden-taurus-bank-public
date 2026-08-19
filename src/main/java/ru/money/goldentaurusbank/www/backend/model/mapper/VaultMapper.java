@@ -34,6 +34,7 @@ public interface VaultMapper {
                     .build());
             response.setAllowedTransferOut(vault.isAllowedTransfer() && vault.isAllowedExpense());
             response.setAllowedTransferIn(vault.isAllowedTransfer() && vault.isAllowedIncome());
+            response.setAllowedChangeAmount(vault.isAllowedIncome() || vault.isAllowedExpense());
         }
 
     }
