@@ -383,7 +383,9 @@
     gap: 10px 20px;
 }
 
-.checkbox-label {
+/* Селектор с .modal-body обязателен: правило .modal-body label выше по
+   специфичности и иначе возвращает label в display: block */
+.modal-body .checkbox-label {
     display: inline-flex;
     align-items: center;
     gap: 12px;
@@ -394,11 +396,9 @@
     white-space: nowrap;
 }
 
-/* Текст в оптическом центре квадратика: своя line-height вместо наследуемой */
-.checkbox-text {
+/* Текст ровно по центру квадратика: своя line-height вместо наследуемой */
+.modal-body .checkbox-text {
     line-height: 1;
-    position: relative;
-    top: -1px;
 }
 
 /* Своя галочка: жирная зелёная. .modal-body input тянет ширину на 100% — чекбоксу это не нужно */
