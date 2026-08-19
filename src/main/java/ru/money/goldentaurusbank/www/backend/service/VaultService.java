@@ -21,7 +21,6 @@ import ru.money.goldentaurusbank.www.backend.model.dto.response.VaultResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.VaultSummaryResponse;
 import ru.money.goldentaurusbank.www.backend.model.mapper.VaultMapper;
 import ru.money.goldentaurusbank.www.backend.repository.BankRepository;
-import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
 
 import java.math.BigDecimal;
@@ -43,7 +42,6 @@ public class VaultService {
 
     private final VaultRepository vaultRepository;
     private final BankRepository bankRepository;
-    private final BullionRepository bullionRepository;
     private final VaultMapper vaultMapper;
     private final TransactionService transactionService;
 
@@ -86,7 +84,7 @@ public class VaultService {
     }
 
     public VaultResponse getVaultByIdAndUser(User user, Long vaultId) {
-        Vault vault = vaultRepository.findByIdAndUser(vaultId, user)
+        Vault vault = vaultRepository.findByIdAndUserAndArchivedFalse(vaultId, user)
                 .orElseThrow(() -> new ApplicationException(
                         VAULT_NOT_FOUND.getCode(),
                         VAULT_NOT_FOUND.getMessage()
@@ -102,7 +100,7 @@ public class VaultService {
 
     @Transactional
     public VaultResponse updateVaultAndGetResponse(User user, Long vaultId, VaultRequest request) {
-        Vault vault = vaultRepository.findByIdAndUser(vaultId, user)
+        Vault vault = vaultRepository.findByIdAndUserAndArchivedFalse(vaultId, user)
                 .orElseThrow(() -> new ApplicationException(
                         VAULT_NOT_FOUND.getCode(),
                         VAULT_NOT_FOUND.getMessage()
@@ -150,7 +148,7 @@ public class VaultService {
 
     @Transactional
     public void deleteVault(User user, Long vaultId) {
-        Vault vault = vaultRepository.findByIdAndUser(vaultId, user)
+        Vault vault = vaultRepository.findByIdAndUserAndArchivedFalse(vaultId, user)
                 .orElseThrow(() -> new ApplicationException(
                         VAULT_NOT_FOUND.getCode(),
                         VAULT_NOT_FOUND.getMessage()
@@ -178,13 +176,11 @@ public class VaultService {
             }
         }
 
-        for (Bullion bullion : bullionRepository.findAllByVault(vault)) {
-            bullion.setVault(null);
-            bullionRepository.save(bullion);
-        }
-
-        vaultRepository.delete(vault);
-        log.info("[VaultService.deleteVault] vault id = {} deleted, bullions moved to reserve = {}", vaultId, fundedCount);
+        // Хранилище остаётся в БД под флагом: на него ссылаются архивные слитки,
+        // а через них — история операций.
+        vault.setArchived(true);
+        vaultRepository.save(vault);
+        log.info("[VaultService.deleteVault] vault id = {} archived, bullions moved to reserve = {}", vaultId, fundedCount);
     }
 
     private boolean hasAmount(Bullion bullion) {
@@ -228,9 +224,9 @@ public class VaultService {
         Page<Vault> vaultPage;
 
         if (search != null && !search.trim().isEmpty()) {
-            vaultPage = vaultRepository.findByUserAndNameContainingIgnoreCase(user, search.trim(), pageable);
+            vaultPage = vaultRepository.findByUserAndNameContainingIgnoreCaseAndArchivedFalse(user, search.trim(), pageable);
         } else {
-            vaultPage = vaultRepository.findByUser(user, pageable);
+            vaultPage = vaultRepository.findByUserAndArchivedFalse(user, pageable);
         }
 
 
@@ -263,7 +259,7 @@ public class VaultService {
 
     @Transactional(readOnly = true)
     public VaultSummaryResponse getVaultSummary(User user, Long vaultId) {
-        Vault vault = vaultRepository.findByIdAndUser(vaultId, user)
+        Vault vault = vaultRepository.findByIdAndUserAndArchivedFalse(vaultId, user)
                 .orElseThrow(() -> new ApplicationException(
                         VAULT_NOT_FOUND.getCode(),
                         VAULT_NOT_FOUND.getMessage()
@@ -300,7 +296,7 @@ public class VaultService {
 
     @Transactional
     public Vault getLiquidityReserve(User user) {
-        Optional<Vault> existingVault = vaultRepository.findVaultByUserAndVaultType(user, VaultType.LIQUIDITY_BUFFER);
+        Optional<Vault> existingVault = vaultRepository.findVaultByUserAndVaultTypeAndArchivedFalse(user, VaultType.LIQUIDITY_BUFFER);
         if (existingVault.isPresent()) {
             log.info("[VaultService.getLiquidityReserve] liquidity reserve existing vault id = {}", existingVault.get().getId());
             return existingVault.get();

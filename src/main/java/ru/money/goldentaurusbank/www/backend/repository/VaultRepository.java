@@ -17,19 +17,26 @@ import java.util.Optional;
 public interface VaultRepository extends JpaRepository<Vault, Long> {
     
 
-    Page<Vault> findByUser(User user, Pageable pageable);
-    
+    Page<Vault> findByUserAndArchivedFalse(User user, Pageable pageable);
 
-    Page<Vault> findByUserAndNameContainingIgnoreCase(User user, String name, Pageable pageable);
-    
+
+    Page<Vault> findByUserAndNameContainingIgnoreCaseAndArchivedFalse(User user, String name, Pageable pageable);
+
+    /**
+     * Достаёт хранилище вместе с архивными: этим методом история грузит то,
+     * что пользователь уже удалил. Для операций нужен findByIdAndUserAndArchivedFalse.
+     */
     Optional<Vault> findByIdAndUser(Long id, User user);
 
-    @Query("SELECT v FROM Vault v WHERE v.user = :user AND v.bank = :bank")
+    Optional<Vault> findByIdAndUserAndArchivedFalse(Long id, User user);
+
+    @Query("SELECT v FROM Vault v WHERE v.user = :user AND v.bank = :bank AND v.archived = false")
     List<Vault> findByUserAndBank(@Param("user") User user, @Param("bank") BankDictionary bank);
 
 
 
     @Query("SELECT v FROM Vault v LEFT JOIN v.bank b WHERE v.user = :user AND LOWER(v.name) = LOWER(:name) "
+            + "AND v.archived = false "
             + "AND ((:bankId IS NULL AND b IS NULL) OR b.id = :bankId)")
     List<Vault> findByUserAndNameIgnoreCaseAndBankId(
             @Param("user") User user,
@@ -39,8 +46,11 @@ public interface VaultRepository extends JpaRepository<Vault, Long> {
 
 
     @EntityGraph(attributePaths = {"bullions"})
-    List<Vault> findByUser(User user);
+    List<Vault> findByUserAndArchivedFalse(User user);
 
-    Optional<Vault> findVaultByUserAndVaultType(User user, VaultType vaultType);
+    Optional<Vault> findVaultByUserAndVaultTypeAndArchivedFalse(User user, VaultType vaultType);
+
+    /** Архивные хранилища тоже держат банк — удалять его нельзя и после архивации. */
+    boolean existsByBank(BankDictionary bank);
 
 }

@@ -75,6 +75,12 @@ public class Vault {
     @Column(name = "close_date")
     private LocalDate closeDate;
 
+    // Удалённое хранилище остаётся в БД: на него ссылаются архивные слитки,
+    // а через них — история операций (иначе из описания пропадут хранилище и банк).
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean archived = false;
+
     @Column(name = "allowed_income", nullable = false)
     @Builder.Default
     private boolean allowedIncome = true;

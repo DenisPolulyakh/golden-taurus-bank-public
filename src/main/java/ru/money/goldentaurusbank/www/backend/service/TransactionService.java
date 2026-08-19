@@ -228,7 +228,7 @@ public class TransactionService {
     public void transferBullion(Long sourceBullionId, Long toVaultId, User user, Long batchId, LocalDateTime dateOperation) {
         Bullion source = loadBullion(sourceBullionId, user);
 
-        Vault toVault = vaultRepository.findByIdAndUser(toVaultId, user)
+        Vault toVault = vaultRepository.findByIdAndUserAndArchivedFalse(toVaultId, user)
                 .orElseThrow(() -> new ApplicationException(VAULT_NOT_FOUND.getCode(), "Целевое хранилище не найдено"));
 
         if (source.getVault() != null && source.getVault().getId().equals(toVault.getId())) {
@@ -654,6 +654,9 @@ public class TransactionService {
                 sb.append(" | ").append(vault.getBank().getName());
             }
             sb.append(" | ").append(vault.getName());
+            if (vault.isArchived()) {
+                sb.append(" (удалено)");
+            }
         }
 
         return sb.toString();
@@ -680,10 +683,19 @@ public class TransactionService {
                 segments.add(segment(vault.getBank().getName(), BANK_COLOR));
                 segments.add(segment(" | ", null));
             }
-            segments.add(segment(vault.getName(), VAULT_COLOR));
+            segments.add(vaultSegment(vault));
         }
 
         return segments;
+    }
+
+    /** Хранилища может уже не быть — история про это говорит, а не молчит. */
+    private DescriptionSegmentDto vaultSegment(Vault vault) {
+        return DescriptionSegmentDto.builder()
+                .text(vault.isArchived() ? vault.getName() + " (удалено)" : vault.getName())
+                .color(VAULT_COLOR)
+                .archived(vault.isArchived())
+                .build();
     }
 
     private String describeBullionById(Long bullionId) {

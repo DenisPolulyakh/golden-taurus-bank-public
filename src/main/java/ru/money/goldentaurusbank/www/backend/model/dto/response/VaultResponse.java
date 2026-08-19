@@ -30,6 +30,8 @@ public class VaultResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private String displayName;
+    /** Хранилище удалено пользователем и живёт только ради истории. */
+    private boolean archived;
     // @Builder.Default обязателен: без него билдер молча игнорирует "= true"
     // и поле уезжает как false. Здесь значения всё равно перетирает
     // VaultMapper.enrichVaultResponse, но объявление должно быть честным.
