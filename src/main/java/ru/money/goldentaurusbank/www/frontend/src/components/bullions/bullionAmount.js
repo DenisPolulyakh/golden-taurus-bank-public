@@ -22,7 +22,7 @@ export const toCents = (value) => {
 /**
  * Тост о корректирующей операции после правки суммы слитка. Дельту считаем на клиенте:
  * старую сумму страница знает до отправки формы, а ответ PUT о проведённой операции молчит.
- * Когда приедет Ф2 из PLAN_VAULT_FLAGS — переключить на appliedOperation/appliedAmount из ответа.
+ * Полей о проведённой операции в ответе не планируется — см. PLAN_BULLION_AMOUNT_EDIT.md, п. 3.4.
  */
 export const notifyAmountChange = (previousAmount, newAmount) => {
     const deltaCents = toCents(newAmount) - toCents(previousAmount);
