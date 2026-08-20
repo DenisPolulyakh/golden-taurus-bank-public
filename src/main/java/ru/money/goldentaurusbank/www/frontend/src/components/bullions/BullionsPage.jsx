@@ -2,6 +2,7 @@ import {useEffect, useMemo, useState} from 'react';
 import {Link, useNavigate} from 'react-router-dom';
 import api from '../../api/axios';
 import BullionModal from './BullionModal';
+import BullionTypeStamp from './BullionTypeStamp';
 import BullionTransactionModal from './BullionTransactionModal';
 import { notifyAmountChange } from './bullionAmount';
 import './Bullions.css';
@@ -115,6 +116,13 @@ function BullionsPage() {
     const handleAddBullion = () => {
         setEditingBullion(null);
         setModalOpen(true);
+    };
+
+    // Печати карточки: по одной на каждый встреченный тип, дебетовая первой.
+    // Тип пришёл позже слитков, у старых записей его может не быть — это DEBIT
+    const stampTypes = (bullionName) => {
+        const types = new Set((bullionName.vaults || []).map(v => v.bullionType || 'DEBIT'));
+        return ['DEBIT', 'CREDIT'].filter(type => types.has(type));
     };
 
     // Модалка открывается на первом хранилище, где операция разрешена:
@@ -526,6 +534,14 @@ function BullionsPage() {
                                         <div className="stat">
                                             <span className="stat-name">💰 Общая сумма:</span>
                                             <span className="stat-value">{formatAmount(bullionName.bullionNameAmount)} ₽</span>
+                                        </div>
+
+                                        {/* Наименование складывается из слитков разных хранилищ:
+                                            типы у них могут не совпасть, тогда печатей две */}
+                                        <div className="bullion-stamps">
+                                            {stampTypes(bullionName).map(type => (
+                                                <BullionTypeStamp key={type} type={type} />
+                                            ))}
                                         </div>
                                         <div className="stat">
                                             <span className="stat-name">📈 Средняя ставка:</span>

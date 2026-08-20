@@ -130,7 +130,9 @@ function BullionModal({
 
             if (initialAmount !== undefined && initialAmount !== '' && initialAmount !== null) {
                 const numAmount = typeof initialAmount === 'string' ? parseFloat(initialAmount) : initialAmount;
-                if (!isNaN(numAmount) && numAmount > 0) {
+                // Ноль подставляем как «0», а не пустотой: пустое поле не проходит
+                // required, и слиток с нулевым остатком было не сохранить
+                if (!isNaN(numAmount) && numAmount >= 0) {
                     const formatted = numAmount.toLocaleString('ru-RU', {
                         minimumFractionDigits: 0,
                         maximumFractionDigits: 2

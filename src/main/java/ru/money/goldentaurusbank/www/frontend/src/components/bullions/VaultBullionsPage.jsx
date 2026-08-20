@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import api from '../../api/axios';
 import BullionModal from './BullionModal';
+import BullionTypeStamp from './BullionTypeStamp';
 import BullionTransactionModal from './BullionTransactionModal';
 import { notifyAmountChange } from './bullionAmount';
 import './Bullions.css';
@@ -720,6 +721,10 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
                     <div className="stat">
                         <span className="stat-name">💰 Сумма:</span>
                         <span className="stat-value amount-value">{formatAmount(bullion.amount)} ₽</span>
+                    </div>
+
+                    <div className="bullion-stamps">
+                        <BullionTypeStamp type={bullion.bullionType} />
                     </div>
 
                     {bullion.description && (

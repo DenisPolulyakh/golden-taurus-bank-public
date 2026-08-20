@@ -99,6 +99,12 @@ public class BullionService {
                 user, request.getBullionNameId(), request.getVaultId());
 
         if (existingBullion.isPresent() && !existingBullion.get().isArchived()) {
+            // Нулевая сумма — не операция: пополнения на 0 не бывает, и раньше такой
+            // запрос падал с «сумма должна отличаться от 0». Слиток уже есть,
+            // сохранять нечего — просто отдаём его.
+            if (!isPositive(request.getAmount())) {
+                return bullionMapper.toResponse(existingBullion.get());
+            }
             RefillBullionRequest refillBullionRequest = bullionRequestMapper.toRefillBullionRequest(request, determineComment(request.getUserComment(), REFILL_EXISTS_BULLION_COMMENT));
             return refillBullion(user, refillBullionRequest);
         }
@@ -117,8 +123,9 @@ public class BullionService {
         bullionRepository.save(bullion);
 
         // Стартовый остаток не идёт в «Доход за месяц» — иначе месяц создания слитка
-        // показал бы доход на всю сумму уже накопленного.
-        if (request.getAmount() != null && request.getAmount().compareTo(BigDecimal.ZERO) > 0) {
+        // показал бы доход на всю сумму уже накопленного. Нулевой остаток операции
+        // не порождает: пустой слиток — это нормально.
+        if (isPositive(request.getAmount())) {
             transactionService.openingBalance(bullion.getId(), request.getAmount(), user,
                     determineComment(request.getUserComment(), CREATE_FIRST_BULLION_COMMENT), request.getDateOperation());
         }
@@ -265,6 +272,7 @@ public class BullionService {
                                 .amount(b.getAmount())
                                 .accountType(vault.getAccountType().name())
                                 .closeDate(vault.getCloseDate())
+                                .bullionType(b.getBullionType())
                                 // Операции разрешают только галочки хранилища,
                                 // те же правила, что в VaultMapper.enrichVaultResponse
                                 .allowedIncome(vault.isAllowedIncome())
@@ -392,6 +400,10 @@ public class BullionService {
 
     private static LocalDateTime atStartOfDay(LocalDate date) {
         return date == null ? null : date.atStartOfDay();
+    }
+
+    private static boolean isPositive(BigDecimal amount) {
+        return amount != null && amount.compareTo(BigDecimal.ZERO) > 0;
     }
 
     /**
