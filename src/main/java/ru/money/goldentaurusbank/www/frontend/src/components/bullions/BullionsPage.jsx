@@ -2,6 +2,7 @@ import {useEffect, useMemo, useState} from 'react';
 import {Link, useNavigate} from 'react-router-dom';
 import api from '../../api/axios';
 import BullionModal from './BullionModal';
+import BullionTypeStamp from './BullionTypeStamp';
 import BullionTransactionModal from './BullionTransactionModal';
 import { notifyAmountChange } from './bullionAmount';
 import './Bullions.css';
@@ -117,6 +118,13 @@ function BullionsPage() {
         setModalOpen(true);
     };
 
+    // Печати карточки: по одной на каждый встреченный тип, дебетовая первой.
+    // Тип пришёл позже слитков, у старых записей его может не быть — это DEBIT
+    const stampTypes = (bullionName) => {
+        const types = new Set((bullionName.vaults || []).map(v => v.bullionType || 'DEBIT'));
+        return ['DEBIT', 'CREDIT'].filter(type => types.has(type));
+    };
+
     // Модалка открывается на первом хранилище, где операция разрешена:
     // vaults[0] может оказаться как раз закрытым, и селектор стартовал бы с недоступного
     const firstAllowedVault = (bullionName, flag) =>
@@ -221,19 +229,19 @@ function BullionsPage() {
         }
     };
 
-    const handleSaveBullion = async (bullionNameId, vaultId, amount, description, dateOperation, userComment) => {
+    const handleSaveBullion = async (bullionNameId, vaultId, amount, description, dateOperation, userComment, bullionType) => {
         // Сумму до правки знает только страница: ответ PUT про проведённую операцию молчит
         const previousAmount = editingBullion?.amount;
         try {
             if (editingBullion) {
                 await api.put(`/bullions/${editingBullion.id}`, {
-                    bullionNameId, vaultId, amount, description, dateOperation,
+                    bullionNameId, vaultId, amount, description, dateOperation, bullionType,
                     userComment: userComment ?? null
                 });
                 notifyAmountChange(previousAmount, amount);
             } else {
                 await api.post('/bullions', {
-                    bullionNameId, vaultId, amount, description, dateOperation
+                    bullionNameId, vaultId, amount, description, dateOperation, bullionType
                 });
             }
             setModalOpen(false);
@@ -527,6 +535,14 @@ function BullionsPage() {
                                             <span className="stat-name">💰 Общая сумма:</span>
                                             <span className="stat-value">{formatAmount(bullionName.bullionNameAmount)} ₽</span>
                                         </div>
+
+                                        {/* Наименование складывается из слитков разных хранилищ:
+                                            типы у них могут не совпасть, тогда печатей две */}
+                                        <div className="bullion-stamps">
+                                            {stampTypes(bullionName).map(type => (
+                                                <BullionTypeStamp key={type} type={type} />
+                                            ))}
+                                        </div>
                                         <div className="stat">
                                             <span className="stat-name">📈 Средняя ставка:</span>
                                             <span className="stat-value">{bullionName.bullionNameAverageRate?.toFixed(2) || 0}%</span>
@@ -609,6 +625,7 @@ function BullionsPage() {
                     initialAmount={editingBullion?.amount}
                     initialDescription={editingBullion?.description}
                     initialDateOperation={editingBullion?.dateOperation}
+                    initialBullionType={editingBullion?.bullionType}
                     isEditing={!!editingBullion}
                 />
 

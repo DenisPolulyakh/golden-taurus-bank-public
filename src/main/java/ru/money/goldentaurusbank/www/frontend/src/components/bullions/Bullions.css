@@ -228,6 +228,21 @@
     font-size: 24px;
 }
 
+/* Печать типа слитка под суммой: чуть свёрнута набок, как приложенный штамп */
+.bullion-stamps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: -2px 0 12px;
+}
+
+.bullion-stamp {
+    width: 104px;
+    height: 32px;
+    flex-shrink: 0;
+    transform: rotate(-6deg);
+}
+
 /* ========== Стили для BullionsPage (хранилища в категориях) ========== */
 .vaults-list {
     margin-bottom: 16px;

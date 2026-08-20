@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.BullionType;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -56,6 +57,8 @@ public class GroupedBullionResponse {
             private BigDecimal amount;
             private String accountType;
             private LocalDate closeDate;
+            // Дебетовый или кредитный — карточка рисует по нему печать
+            private BullionType bullionType;
             // Без @Builder.Default билдер игнорирует "= true", и поле уходит
             // во фронт как null. JSON-дефолт (allowedIncome = true) при
             // деструктуризации от null не спасает — он ловит только undefined.

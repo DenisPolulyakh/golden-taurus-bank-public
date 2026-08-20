@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.BullionType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -37,6 +38,15 @@ public class Bullion {
     
     @Column(length = 500)
     private String description;
+
+    /**
+     * Дебетовый или кредитный. На суммы, проценты и операции пока не влияет —
+     * заготовка под учёт заёмных средств.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "bullion_type", nullable = false, length = 20)
+    @Builder.Default
+    private BullionType bullionType = BullionType.DEBIT;
 
     /**
      * Слиток с историей нельзя удалить физически — на него ссылаются транзакции.
