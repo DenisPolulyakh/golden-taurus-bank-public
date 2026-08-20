@@ -13,7 +13,9 @@ function CreditCardsPage() {
     const [totalDebt, setTotalDebt] = useState(0);
     const [count, setCount] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
-    const [sortConfig, setSortConfig] = useState({ field: 'debt', order: 'desc' });
+    // По умолчанию — ближайший конец льготного периода: сверху карта,
+    // которую гасить раньше всех
+    const [sortConfig, setSortConfig] = useState({ field: 'grace', order: 'asc' });
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState('');
@@ -70,15 +72,17 @@ function CreditCardsPage() {
     const reload = () => fetchCards(searchTerm, sortConfig.field, sortConfig.order);
 
     const handleSort = (field) => {
+        // У дней интересен минимум, у денег — максимум, отсюда разное
+        // направление при первом переключении на поле
         setSortConfig(prev => prev.field === field
             ? { field, order: prev.order === 'asc' ? 'desc' : 'asc' }
-            : { field, order: 'desc' });
+            : { field, order: field === 'grace' ? 'asc' : 'desc' });
     };
 
     const handleSaveCard = async (form) => {
         const payload = {
             name: form.name,
-            cardNumber: form.cardNumber || null,
+            last4: form.last4 || null,
             gracePeriodDate: form.gracePeriodDate || null,
             limit: form.limit === '' ? 0 : Number(form.limit),
             debt: form.debt === '' ? 0 : Number(form.debt),
@@ -167,6 +171,7 @@ function CreditCardsPage() {
                         />
                     </div>
                     <div className="sort-buttons">
+                        <SortButton label="По остатку дней" field="grace" sortConfig={sortConfig} onSort={handleSort} />
                         <SortButton label="По задолженности" field="debt" sortConfig={sortConfig} onSort={handleSort} />
                         <SortButton label="По лимиту" field="limit" sortConfig={sortConfig} onSort={handleSort} />
                         <SortButton label="По остатку" field="remainder" sortConfig={sortConfig} onSort={handleSort} />

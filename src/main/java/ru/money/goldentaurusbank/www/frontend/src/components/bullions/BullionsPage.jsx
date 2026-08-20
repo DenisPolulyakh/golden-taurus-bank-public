@@ -4,8 +4,11 @@ import api from '../../api/axios';
 import BullionModal from './BullionModal';
 import BullionTypeStamp from './BullionTypeStamp';
 import BullionTransactionModal from './BullionTransactionModal';
+import CreditCardOperationModal from '../credit-cards/CreditCardOperationModal';
 import { notifyAmountChange } from './bullionAmount';
 import './Bullions.css';
+// Кнопка и модалка погашения приходят с экрана карт — оттуда же их стили
+import '../credit-cards/CreditCards.css';
 
 const formatAmount = (amount) => {
     if (!amount && amount !== 0) return '0';
@@ -35,6 +38,11 @@ function BullionsPage() {
     const [editingBullion, setEditingBullion] = useState(null);
     const [sortField, setSortField] = useState('bullionNameAmount');
     const [sortOrder, setSortOrder] = useState('desc');
+
+    // Погашение карты из накопителя. У наименования накопителей может быть
+    // несколько (разные хранилища, а то и разные карты), поэтому слиток
+    // выбирается уже внутри модалки, а карты грузим заранее — все, что нужны
+    const [repayModal, setRepayModal] = useState({ isOpen: false, options: [], bullionId: null, cards: {} });
 
     const [transactionModal, setTransactionModal] = useState({
         isOpen: false,
@@ -129,6 +137,62 @@ function BullionsPage() {
     // vaults[0] может оказаться как раз закрытым, и селектор стартовал бы с недоступного
     const firstAllowedVault = (bullionName, flag) =>
         bullionName.vaults?.find(v => v[flag] !== false) || null;
+
+    // Слитки наименования, которые чей-то накопитель и из которых разрешено
+    // снимать: только они годятся в источник погашения
+    const repayOptions = (bullionName) => (bullionName.vaults || [])
+        .filter(vault => vault.creditCardId && vault.allowedExpense !== false)
+        .map(vault => ({
+            id: vault.bullionId,
+            vaultName: vault.name,
+            amount: vault.amount,
+            bullionNameTitle: bullionName.bullionNameTitle,
+            creditCardId: vault.creditCardId,
+            creditCardMasked: vault.creditCardMasked,
+            creditCardDebt: vault.creditCardDebt
+        }));
+
+    const hasAccumulator = (bullionName) => (bullionName.vaults || []).some(vault => vault.creditCardId);
+
+    // Гасить есть чем и есть что: в слитке лежат деньги, а на карте висит долг
+    const canRepay = (option) => Number(option.creditCardDebt) > 0 && Number(option.amount) > 0;
+
+    const handleOpenRepay = async (bullionName) => {
+        const options = repayOptions(bullionName);
+        if (options.length === 0) return;
+
+        try {
+            // Модалке нужна карта целиком (остаток лимита, долг), а сгруппированный
+            // ответ знает про неё только маску и долг
+            const cardIds = [...new Set(options.map(option => option.creditCardId))];
+            const responses = await Promise.all(cardIds.map(id => api.get(`/credit-cards/${id}`)));
+            const cards = Object.fromEntries(responses.map(response => {
+                const card = response.data.data;
+                return [card.id, card];
+            }));
+
+            const initial = options.find(canRepay) || options[0];
+            setRepayModal({ isOpen: true, options, bullionId: initial.id, cards });
+        } catch (err) {
+            console.error('Ошибка загрузки кредитной карты:', err);
+        }
+    };
+
+    const handleRepay = async ({ amount, comment, dateOperation }) => {
+        try {
+            await api.post('/credit-cards/repay-from-bullion', {
+                bullionId: repayModal.bullionId,
+                amount: Number(amount),
+                comment: comment || null,
+                dateOperation: dateOperation || null
+            });
+            setRepayModal({ isOpen: false, options: [], bullionId: null, cards: {} });
+            await fetchGroupedBullions();
+        } catch (err) {
+            console.error('Ошибка погашения по карте:', err);
+            throw err;
+        }
+    };
 
     const handleOpenRefill = (bullionNameId, bullionNameTitle, vaultId) => {
         setTransactionModal({
@@ -588,6 +652,20 @@ function BullionsPage() {
                                     >
                                         🔄 Перевод
                                     </button>
+                                    {/* Кнопка есть только у наименований, чьи слитки
+                                        привязаны к карте: остальным гасить нечего */}
+                                    {hasAccumulator(bullionName) && (
+                                        <button
+                                            className="repay-card-btn"
+                                            disabled={!repayOptions(bullionName).some(canRepay)}
+                                            title={repayOptions(bullionName).some(canRepay)
+                                                ? ''
+                                                : 'Гасить нечего: долга по карте нет либо снимать из этих хранилищ нельзя'}
+                                            onClick={() => handleOpenRepay(bullionName)}
+                                        >
+                                            💳 Погашение
+                                        </button>
+                                    )}
                                     <button
                                         className="delete-vault-btn"
                                         onClick={() => {
@@ -628,6 +706,22 @@ function BullionsPage() {
                     initialBullionType={editingBullion?.bullionType}
                     isEditing={!!editingBullion}
                 />
+
+                {repayModal.isOpen && (() => {
+                    const selected = repayModal.options.find(option => option.id === repayModal.bullionId);
+                    return (
+                        <CreditCardOperationModal
+                            isOpen={repayModal.isOpen}
+                            card={repayModal.cards[selected?.creditCardId]}
+                            bullion={selected}
+                            bullionOptions={repayModal.options}
+                            onSelectBullion={(bullionId) => setRepayModal(prev => ({ ...prev, bullionId }))}
+                            type="repay-bullion"
+                            onClose={() => setRepayModal({ isOpen: false, options: [], bullionId: null, cards: {} })}
+                            onSave={handleRepay}
+                        />
+                    );
+                })()}
 
                 {currentTransaction && (
                     <BullionTransactionModal

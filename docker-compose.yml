@@ -38,8 +38,6 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       # Шифрование номеров карт. Без них приложение не поднимется —
       # завести в .env до выкладки (salt: openssl rand -hex 8)
-      CARD_SECRET: ${CARD_SECRET}
-      CARD_SALT: ${CARD_SALT}
       SERVER_ADDRESS: 0.0.0.0
       SERVER_PORT: 8081
       FRONTEND_URL: ${FRONTEND_URL}

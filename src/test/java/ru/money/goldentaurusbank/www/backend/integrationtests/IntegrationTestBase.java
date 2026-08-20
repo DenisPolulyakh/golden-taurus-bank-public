@@ -85,8 +85,6 @@ abstract class IntegrationTestBase {
         registry.add("spring.mail.properties.mail.smtp.starttls.enable", () -> "false");
         registry.add("spring.mail.properties.mail.smtp.ssl.enable", () -> "false");
         registry.add("app.jwt.secret", () -> "testSecretKeyForJWTTokenGeneration2026");
-        registry.add("app.card.secret", () -> "testCardSecretForNumberEncryption2026");
-        registry.add("app.card.salt", () -> "0123456789abcdef");
         registry.add("app.jwt.access-expiration", () -> "3600000");
         registry.add("app.jwt.refresh-expiration", () -> "604800000");
     }

@@ -3,14 +3,15 @@ import api from '../../api/axios';
 import { formatAmount } from './creditCardFormat';
 
 /**
- * Заведение и правка карты. Номер при правке приходит пустым: наружу его не
- * отдают, и пустое поле означает «оставить прежний».
+ * Заведение и правка карты. Полный номер нигде не хранится и не спрашивается —
+ * только последние 4 цифры. При правке поле приходит пустым: пустое означает
+ * «оставить прежние».
  */
 function CreditCardModal({ isOpen, card, onClose, onSave }) {
     const isEditing = !!card;
 
     const [name, setName] = useState('');
-    const [cardNumber, setCardNumber] = useState('');
+    const [last4, setLast4] = useState('');
     const [gracePeriodDate, setGracePeriodDate] = useState('');
     const [limit, setLimit] = useState('');
     const [debt, setDebt] = useState('');
@@ -22,7 +23,7 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
         if (!isOpen) return;
 
         setName(card?.name || '');
-        setCardNumber('');
+        setLast4('');
         setGracePeriodDate(card?.gracePeriodDate || '');
         setLimit(card?.limit ?? '');
         setDebt(card?.debt ?? '');
@@ -46,11 +47,9 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
         e.preventDefault();
         setSaving(true);
         try {
-            await onSave({ name, cardNumber, gracePeriodDate, limit, debt, bullionIds });
+            await onSave({ name, last4, gracePeriodDate, limit, debt, bullionIds });
         } catch (err) {
-            // Текст ошибки показывает общий обработчик axios — форму не закрываем.
-            // Сам объект ошибки не печатаем: в err.config.data лежит тело
-            // запроса, то есть номер карты открытым текстом.
+            // Текст ошибки показывает общий обработчик axios — форму не закрываем
             console.error('Ошибка сохранения карты:', err.response?.status, err.response?.data?.message);
         } finally {
             setSaving(false);
@@ -80,19 +79,22 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
                         </div>
 
                         <div className="form-group">
-                            <label>Номер карты</label>
+                            <label>Последние 4 цифры карты</label>
                             <input
                                 type="text"
                                 inputMode="numeric"
-                                value={cardNumber}
-                                onChange={(e) => setCardNumber(e.target.value)}
-                                placeholder={isEditing ? card.maskedNumber : '4276 1600 1234 5678'}
+                                maxLength={4}
+                                value={last4}
+                                // Всё, кроме цифр, отсекаем на вводе: поле короткое,
+                                // и ругаться на пробел после сохранения было бы глупо
+                                onChange={(e) => setLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                placeholder={isEditing ? card.maskedNumber : '1234'}
                                 required={!isEditing}
                             />
                             <span className="input-hint">
                                 {isEditing
-                                    ? 'Оставьте пустым, чтобы не менять номер'
-                                    : 'В базе хранится зашифрованным, на экране — маской'}
+                                    ? 'Оставьте пустым, чтобы не менять цифры'
+                                    : 'Полный номер не хранится — только эти 4 цифры, для поиска и маски'}
                             </span>
                         </div>
 

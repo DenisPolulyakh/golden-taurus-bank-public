@@ -355,6 +355,81 @@
     color: #a0aec0;
 }
 
+/* Шестерёнка со справочниками: в шапке они были всё время на виду,
+   хотя открывают их раз в месяц */
+.settings-dropdown {
+    position: relative;
+    display: inline-flex;
+}
+
+.settings-btn {
+    /* Круглая: крутится только шестерёнка внутри, и вращать прямоугольник
+       вместе с ней выглядело бы как поехавшая кнопка */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    background: #edf2f7;
+    color: #4a5568;
+    border: 1px solid #667eea;
+    border-radius: 50%;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.settings-btn:hover {
+    background: #667eea;
+}
+
+.settings-btn.open {
+    background: #667eea;
+}
+
+.settings-icon {
+    display: inline-block;
+    transition: transform 0.4s ease;
+}
+
+.settings-btn.open .settings-icon {
+    transform: rotate(120deg);
+}
+
+.settings-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+    animation: settings-slide-down 0.18s ease-out;
+}
+
+.settings-menu .dashboard-link {
+    white-space: nowrap;
+    text-align: left;
+}
+
+@keyframes settings-slide-down {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 /* Адаптив для мобильных */
 @media (max-width: 768px) {
     .dashboard-header {
@@ -372,6 +447,21 @@
         width: 100%;
         text-align: center;
     }
+
+    /* Кнопка остаётся круглой и по центру: тянуть её во всю ширину незачем */
+    .settings-dropdown {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Колонкой места хватает: выпадашка становится обычным блоком,
+       иначе она накрывает кнопку «Выйти» */
+    .settings-menu {
+        position: static;
+        margin-top: 8px;
+        box-shadow: none;
+    }
+
 
     .dashboard-content {
         padding: 20px;

@@ -18,6 +18,7 @@ import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.GroupedBullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.mapper.BullionMapper;
 import ru.money.goldentaurusbank.www.backend.model.mapper.BullionRequestMapper;
+import ru.money.goldentaurusbank.www.backend.model.mapper.CreditCardMapper;
 import ru.money.goldentaurusbank.www.backend.repository.BullionNameRepository;
 import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
@@ -57,6 +58,7 @@ public class BullionService {
     private final BullionMapper bullionMapper;
     private final TransactionService transactionService;
     private final BullionRequestMapper bullionRequestMapper;
+    private final CreditCardMapper creditCardMapper;
 
 
     @Transactional
@@ -273,6 +275,10 @@ public class BullionService {
                                 .accountType(vault.getAccountType().name())
                                 .closeDate(vault.getCloseDate())
                                 .bullionType(b.getBullionType())
+                                .creditCardId(b.getCreditCard() == null ? null : b.getCreditCard().getId())
+                                .creditCardMasked(b.getCreditCard() == null
+                                        ? null : creditCardMapper.mask(b.getCreditCard().getLast4()))
+                                .creditCardDebt(b.getCreditCard() == null ? null : b.getCreditCard().getDebt())
                                 // Операции разрешают только галочки хранилища,
                                 // те же правила, что в VaultMapper.enrichVaultResponse
                                 .allowedIncome(vault.isAllowedIncome())
