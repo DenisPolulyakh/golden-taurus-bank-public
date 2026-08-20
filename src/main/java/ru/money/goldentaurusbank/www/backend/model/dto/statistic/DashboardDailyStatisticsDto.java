@@ -34,7 +34,12 @@ public class DashboardDailyStatisticsDto {
      * Общая сумма накоплений за месяц
      */
     private BigDecimal totalAmount;
-    
+
+    /**
+     * Задолженность по кредитным картам на конец месяца
+     */
+    private BigDecimal totalDebt;
+
     /**
      * Список дневных данных
      */
@@ -64,6 +69,11 @@ public class DashboardDailyStatisticsDto {
          * Изменение за день (доходы - расходы)
          */
         private BigDecimal dailyChange;
+
+        /**
+         * Задолженность по кредитным картам на конец дня — красные столбцы вниз
+         */
+        private BigDecimal debt;
         
         /**
          * Доходы за день

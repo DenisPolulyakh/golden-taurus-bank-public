@@ -33,4 +33,9 @@ public class TransactionDto {
     private Long reversalOfId;
     /** Id обратной транзакции, если эта операция уже откачена. */
     private Long reversedById;
+    /**
+     * Нога погашения по кредитной карте: откатывать её поодиночке нельзя,
+     * кнопка отката живёт в истории карты.
+     */
+    private boolean lockedByCard;
 }

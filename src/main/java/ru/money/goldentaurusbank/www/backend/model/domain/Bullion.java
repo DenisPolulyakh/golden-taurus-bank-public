@@ -49,6 +49,14 @@ public class Bullion {
     private BullionType bullionType = BullionType.DEBIT;
 
     /**
+     * Кредитная карта, накопителем которой служит слиток. Только для кредитных
+     * слитков: в накопителе копятся деньги на погашение долга этой карты.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "credit_card_id")
+    private CreditCard creditCard;
+
+    /**
      * Слиток с историей нельзя удалить физически — на него ссылаются транзакции.
      * Архивный слиток не попадает в списки и в сумму накоплений.
      */

@@ -14,6 +14,8 @@ import ru.money.goldentaurusbank.www.backend.model.dto.request.TransferRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.WithdrawBullionRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.*;
 import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
+import ru.money.goldentaurusbank.www.backend.repository.CreditCardHistoryRepository;
+import ru.money.goldentaurusbank.www.backend.repository.CreditCardRepository;
 import ru.money.goldentaurusbank.www.backend.repository.TransactionRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
 
@@ -36,6 +38,10 @@ public class TransactionService {
     private final BullionRepository bullionRepository;
     private final VaultRepository vaultRepository;
     private final TransactionRepository transactionRepository;
+    // Только репозиторий, не сервис карт: обратная зависимость шла бы в цикл —
+    // CreditCardTransactionService уже зависит от этого сервиса
+    private final CreditCardHistoryRepository creditCardHistoryRepository;
+    private final CreditCardRepository creditCardRepository;
     private final ColorConstants colorConstants;
 
     private static final String BANK_COLOR = "#FFA502";  // оранжевый
@@ -283,6 +289,22 @@ public class TransactionService {
      */
     @Transactional
     public Transaction rollbackTransaction(Long transactionId, User user) {
+        // Погашение по карте — две ноги в одной операции. Откат одной ноги вернул бы
+        // деньги на слиток, оставив долг погашенным, поэтому такие транзакции
+        // откатываются только целиком, из истории карты.
+        if (creditCardHistoryRepository.existsByBullionTransactionId(transactionId)) {
+            throw new ApplicationException(TRANSACTION_LOCKED_BY_CARD.getCode(),
+                    TRANSACTION_LOCKED_BY_CARD.getMessage());
+        }
+        return rollbackCardLinkedTransaction(transactionId, user);
+    }
+
+    /**
+     * Тот же откат, но без замка на связку с картой: им пользуется
+     * {@code CreditCardTransactionService}, когда отыгрывает погашение целиком.
+     */
+    @Transactional
+    public Transaction rollbackCardLinkedTransaction(Long transactionId, User user) {
         Transaction original = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new ApplicationException(TRANSACTION_NOT_FOUND.getCode(), TRANSACTION_NOT_FOUND.getMessage()));
 
@@ -385,6 +407,7 @@ public class TransactionService {
                 .totalExpense(totalExpense)
                 .netChange(totalIncome.subtract(totalExpense))
                 .totalAmount(bullionRepository.getTotalAmountByUserId(userId))
+                .totalDebt(creditCardRepository.getTotalDebtByUserId(userId))
                 .totalTransactions(totalTransactions)
                 .recentTransactions(recentTransactions)
                 .kindStats(kindStats)
@@ -398,14 +421,19 @@ public class TransactionService {
      * на том же дашборде — дрейф невозможен.
      */
     private List<MonthlyDataDto> buildFullYearMonths(Long userId, int year) {
+        LocalDateTime yearStart = LocalDate.of(year, 1, 1).atStartOfDay();
+        LocalDateTime yearEnd = LocalDate.of(year, 12, 31).atTime(LocalTime.MAX);
+
         Map<String, Object[]> byMonth = new HashMap<>();
-        List<Object[]> rows = transactionRepository.getMonthlyStatistics(
-                userId, LocalDate.of(year, 1, 1).atStartOfDay(), LocalDate.of(year, 12, 31).atTime(LocalTime.MAX));
+        List<Object[]> rows = transactionRepository.getMonthlyStatistics(userId, yearStart, yearEnd);
         for (Object[] row : rows) {
             byMonth.put(toLocalDateTime(row[0]).format(DateTimeFormatter.ofPattern("yyyy-MM")), row);
         }
 
-        BigDecimal savings = balanceAt(userId, LocalDate.of(year, 1, 1).atStartOfDay());
+        Map<String, BigDecimal> debtByMonth = debtDeltasByMonth(userId, yearStart, yearEnd);
+
+        BigDecimal savings = balanceAt(userId, yearStart);
+        BigDecimal debt = debtAt(userId, yearStart);
 
         List<MonthlyDataDto> result = new ArrayList<>(12);
         for (int m = 1; m <= 12; m++) {
@@ -415,6 +443,7 @@ public class TransactionService {
 
             BigDecimal netChange = row == null ? BigDecimal.ZERO : toBigDecimal(row[3]);
             savings = savings.add(netChange);
+            debt = debt.add(debtByMonth.getOrDefault(month, BigDecimal.ZERO));
 
             result.add(MonthlyDataDto.builder()
                     .month(month)
@@ -423,6 +452,7 @@ public class TransactionService {
                     .expense(row == null ? BigDecimal.ZERO : toBigDecimal(row[2]))
                     .netChange(netChange)
                     .savings(savings)
+                    .debt(debt)
                     .transactionCount(row == null ? 0L : toLong(row[4]))
                     .build());
         }
@@ -431,21 +461,27 @@ public class TransactionService {
 
     private List<MonthlyDataDto> buildSparseMonths(Long userId, LocalDateTime fromDate, LocalDateTime toDate) {
         List<Object[]> rows = transactionRepository.getMonthlyStatistics(userId, fromDate, toDate);
+        Map<String, BigDecimal> debtByMonth = debtDeltasByMonth(userId, fromDate, toDate);
+
         BigDecimal savings = balanceAt(userId, fromDate);
+        BigDecimal debt = debtAt(userId, fromDate);
 
         List<MonthlyDataDto> result = new ArrayList<>(rows.size());
         for (Object[] row : rows) {
             LocalDateTime monthDate = toLocalDateTime(row[0]);
+            String month = monthDate.format(DateTimeFormatter.ofPattern("yyyy-MM"));
             BigDecimal netChange = toBigDecimal(row[3]);
             savings = savings.add(netChange);
+            debt = debt.add(debtByMonth.getOrDefault(month, BigDecimal.ZERO));
 
             result.add(MonthlyDataDto.builder()
-                    .month(monthDate.format(DateTimeFormatter.ofPattern("yyyy-MM")))
+                    .month(month)
                     .monthLabel(monthDate.format(DateTimeFormatter.ofPattern("MMM yyyy")))
                     .income(toBigDecimal(row[1]))
                     .expense(toBigDecimal(row[2]))
                     .netChange(netChange)
                     .savings(savings)
+                    .debt(debt)
                     .transactionCount(toLong(row[4]))
                     .build());
         }
@@ -462,13 +498,37 @@ public class TransactionService {
         return current.subtract(deltaAfter == null ? BigDecimal.ZERO : deltaAfter);
     }
 
+    /**
+     * Задолженность по картам на момент — тем же обратным ходом, что и накопления:
+     * текущий долг карт минус всё, что случилось после. Правый край графика по
+     * построению совпадает с «Текущим долгом» на странице кредитных карт.
+     */
+    private BigDecimal debtAt(Long userId, LocalDateTime moment) {
+        BigDecimal current = creditCardRepository.getTotalDebtByUserId(userId);
+        BigDecimal deltaAfter = creditCardHistoryRepository.getDebtDeltaAfter(userId, moment);
+        return current.subtract(deltaAfter == null ? BigDecimal.ZERO : deltaAfter);
+    }
+
+    private Map<String, BigDecimal> debtDeltasByMonth(Long userId, LocalDateTime fromDate, LocalDateTime toDate) {
+        Map<String, BigDecimal> deltas = new HashMap<>();
+        for (Object[] row : creditCardHistoryRepository.getMonthlyDebtStatistics(userId, fromDate, toDate)) {
+            deltas.put(toLocalDateTime(row[0]).format(DateTimeFormatter.ofPattern("yyyy-MM")), toBigDecimal(row[1]));
+        }
+        return deltas;
+    }
+
     @Transactional(readOnly = true)
     public DashboardDailyStatisticsDto getDailyStatistics(Long userId, int year, int month) {
         Map<Integer, Object[]> byDay = transactionRepository.getDailyStatistics(userId, year, month).stream()
                 .collect(Collectors.toMap(row -> toLong(row[0]).intValue(), row -> row));
 
+        Map<Integer, BigDecimal> debtByDay = creditCardHistoryRepository
+                .getDailyDebtStatistics(userId, year, month).stream()
+                .collect(Collectors.toMap(row -> toLong(row[0]).intValue(), row -> toBigDecimal(row[1])));
+
         int daysInMonth = LocalDate.of(year, month, 1).lengthOfMonth();
         BigDecimal savings = balanceAt(userId, LocalDate.of(year, month, 1).atStartOfDay());
+        BigDecimal debt = debtAt(userId, LocalDate.of(year, month, 1).atStartOfDay());
 
         List<DashboardDailyStatisticsDto.DailyDataDto> dailyData = new ArrayList<>(daysInMonth);
         for (int day = 1; day <= daysInMonth; day++) {
@@ -478,11 +538,13 @@ public class TransactionService {
             BigDecimal expense = row == null ? BigDecimal.ZERO : toBigDecimal(row[2]);
             BigDecimal dailyChange = row == null ? BigDecimal.ZERO : toBigDecimal(row[3]);
             savings = savings.add(dailyChange);
+            debt = debt.add(debtByDay.getOrDefault(day, BigDecimal.ZERO));
 
             dailyData.add(DashboardDailyStatisticsDto.DailyDataDto.builder()
                     .day(day)
                     .date(String.format("%02d.%02d", day, month))
                     .savings(savings)
+                    .debt(debt)
                     .dailyChange(dailyChange)
                     .income(income)
                     .expense(expense)
@@ -495,6 +557,7 @@ public class TransactionService {
                 .month(month)
                 .monthLabel(LocalDate.of(year, month, 1).format(DateTimeFormatter.ofPattern("MMMM yyyy")))
                 .totalAmount(savings)
+                .totalDebt(debt)
                 .dailyData(dailyData)
                 .build();
     }
@@ -555,12 +618,16 @@ public class TransactionService {
         Map<Long, Long> reversedBy = transactionRepository.findReversalsOf(ids).stream()
                 .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
 
+        // Ноги погашений по карте: у них своя кнопка отката — в истории карты
+        Set<Long> lockedByCard = creditCardHistoryRepository.findBullionTransactionIds(ids);
+
         return transactions.stream()
-                .map(transaction -> toDto(transaction, reversedBy.get(transaction.getId())))
+                .map(transaction -> toDto(transaction, reversedBy.get(transaction.getId()),
+                        lockedByCard.contains(transaction.getId())))
                 .collect(Collectors.toList());
     }
 
-    private TransactionDto toDto(Transaction transaction, Long reversedById) {
+    private TransactionDto toDto(Transaction transaction, Long reversedById, boolean lockedByCard) {
         return TransactionDto.builder()
                 .id(transaction.getId())
                 .kind(transaction.getKind())
@@ -574,7 +641,8 @@ public class TransactionService {
                 .createdAt(transaction.getCreatedAt())
                 .dateOperation(transaction.getDateOperation())
                 .imported(transaction.isImported())
-                .canRollback(reversedById == null)
+                .canRollback(reversedById == null && !lockedByCard)
+                .lockedByCard(lockedByCard)
                 .reversalOfId(transaction.getReversalOfId())
                 .reversedById(reversedById)
                 .build();

@@ -10,6 +10,7 @@ import BanksPage from './components/banks/BanksPage';
 import VaultsPage from './components/vaults/VaultsPage';
 import BullionsPage from './components/bullions/BullionsPage';
 import VaultBullionsPage from './components/bullions/VaultBullionsPage';
+import CreditCardsPage from './components/credit-cards/CreditCardsPage';
 import TransactionHistoryPage from './components/history/TransactionHistoryPage';
 import api, { setAccessToken, clearAccessToken } from './api/axios';
 import BankDetailPage from './components/banks/BankDetailPage';
@@ -152,6 +153,15 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <BullionsPage />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/credit-cards"
+                    element={
+                        <ProtectedRoute>
+                            <CreditCardsPage />
                         </ProtectedRoute>
                     }
                 />

@@ -19,6 +19,7 @@ public class DashboardStatisticsDto {
     private BigDecimal totalExpense;
     private BigDecimal netChange;
     private BigDecimal totalAmount; // сумма всех слитков пользователя
+    private BigDecimal totalDebt;   // текущая задолженность по всем кредитным картам
     private Long totalTransactions;
     private List<TransactionDto> recentTransactions;
     private List<KindStatsDto> kindStats;
