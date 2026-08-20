@@ -48,8 +48,10 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
         try {
             await onSave({ name, cardNumber, gracePeriodDate, limit, debt, bullionIds });
         } catch (err) {
-            // Текст ошибки показывает общий обработчик axios — форму не закрываем
-            console.error('Ошибка сохранения карты:', err);
+            // Текст ошибки показывает общий обработчик axios — форму не закрываем.
+            // Сам объект ошибки не печатаем: в err.config.data лежит тело
+            // запроса, то есть номер карты открытым текстом.
+            console.error('Ошибка сохранения карты:', err.response?.status, err.response?.data?.message);
         } finally {
             setSaving(false);
         }
