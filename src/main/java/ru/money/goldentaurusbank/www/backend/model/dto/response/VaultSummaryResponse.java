@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.BullionType;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -30,5 +31,7 @@ public class VaultSummaryResponse {
         private String bullionNameTitle;
         private BigDecimal amount;
         private String description;
+        // Нужен форме редактирования слитка: подставить текущий тип
+        private BullionType bullionType;
     }
 }

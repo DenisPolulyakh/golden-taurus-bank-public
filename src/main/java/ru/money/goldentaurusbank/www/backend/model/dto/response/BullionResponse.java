@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.BullionType;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -19,6 +20,7 @@ public class BullionResponse {
     private VaultInfo vault;
     private BigDecimal amount;
     private String description;
+    private BullionType bullionType;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

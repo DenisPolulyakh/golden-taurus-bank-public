@@ -278,6 +278,7 @@ public class VaultService {
                         .bullionNameTitle(b.getBullionName().getTitle())
                         .amount(b.getAmount())
                         .description(b.getDescription())
+                        .bullionType(b.getBullionType())
                         .build())
                 .sorted((a, b) -> b.getAmount().compareTo(a.getAmount()))
                 .toList();

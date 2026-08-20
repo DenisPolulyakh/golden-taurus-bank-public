@@ -11,6 +11,7 @@ import ru.money.goldentaurusbank.www.backend.model.domain.Bullion;
 import ru.money.goldentaurusbank.www.backend.model.domain.BullionName;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.domain.Vault;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.BullionType;
 import ru.money.goldentaurusbank.www.backend.model.dto.enums.VaultType;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.*;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionResponse;
@@ -112,6 +113,7 @@ public class BullionService {
                 .build());
         bullion.setArchived(false);
         bullion.setDescription(request.getDescription());
+        bullion.setBullionType(typeOrDefault(request));
         bullionRepository.save(bullion);
 
         // Стартовый остаток не идёт в «Доход за месяц» — иначе месяц создания слитка
@@ -163,6 +165,12 @@ public class BullionService {
         }
 
         bullion.setDescription(request.getDescription());
+
+        // Пустой тип оставляет прежний: клиент, который про поле не знает,
+        // не должен молча переводить кредитный слиток в дебетовые
+        if (request.getBullionType() != null) {
+            bullion.setBullionType(request.getBullionType());
+        }
 
         if (request.getBullionNameId() != null && !bullion.getBullionName().getId().equals(request.getBullionNameId())) {
             BullionName bullionName = bullionNameRepository.findByIdAndUser(request.getBullionNameId(), user)
@@ -384,6 +392,14 @@ public class BullionService {
 
     private static LocalDateTime atStartOfDay(LocalDate date) {
         return date == null ? null : date.atStartOfDay();
+    }
+
+    /**
+     * Слиток без указанного типа — дебетовый: тип пришёл позже самих слитков,
+     * и старые клиенты его не присылают.
+     */
+    private BullionType typeOrDefault(BullionRequest request) {
+        return request.getBullionType() != null ? request.getBullionType() : BullionType.DEBIT;
     }
 
     private String determineComment(String userComment, String defaultComment) {

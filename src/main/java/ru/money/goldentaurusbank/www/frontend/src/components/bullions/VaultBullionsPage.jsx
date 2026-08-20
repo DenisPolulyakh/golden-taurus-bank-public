@@ -200,7 +200,8 @@ function VaultBullionsPage() {
             bullionNameId: bullion.bullionNameId,
             bullionNameTitle: bullion.bullionNameTitle,
             amount: bullion.amount,
-            description: bullion.description || ''
+            description: bullion.description || '',
+            bullionType: bullion.bullionType || 'DEBIT'
         });
         setModalOpen(true);
     };
@@ -337,7 +338,7 @@ function VaultBullionsPage() {
         await Promise.all([fetchVaultSummary(), fetchVault(), fetchAllVaults(), fetchAllBullions()]);
     }, [fetchVaultSummary, fetchVault, fetchAllVaults, fetchAllBullions]);
 
-    const handleSaveBullion = async (bullionNameId, vaultIdParam, amount, description, dateOperation) => {
+    const handleSaveBullion = async (bullionNameId, vaultIdParam, amount, description, dateOperation, bullionType) => {
         setActionLoading(true);
         try {
             await api.post('/bullions', {
@@ -345,7 +346,8 @@ function VaultBullionsPage() {
                 vaultId: vaultIdParam,
                 amount,
                 description,
-                dateOperation: dateOperation ? dateOperation : null
+                dateOperation: dateOperation ? dateOperation : null,
+                bullionType
             });
             closeModal();
             await refreshData();
@@ -357,7 +359,7 @@ function VaultBullionsPage() {
         }
     };
 
-    const handleUpdateBullion = async (bullionId, bullionNameId, vaultIdParam, amount, description, dateOperation, userComment) => {
+    const handleUpdateBullion = async (bullionId, bullionNameId, vaultIdParam, amount, description, dateOperation, userComment, bullionType) => {
         setActionLoading(true);
         // Сумму до правки знает только страница: ответ PUT про проведённую операцию молчит
         const previousAmount = editingBullion?.amount;
@@ -368,7 +370,8 @@ function VaultBullionsPage() {
                 amount,
                 description,
                 dateOperation: dateOperation ? dateOperation : null,
-                userComment: userComment ?? null
+                userComment: userComment ?? null,
+                bullionType
             });
             closeModal();
             notifyAmountChange(previousAmount, amount);
@@ -591,10 +594,10 @@ function VaultBullionsPage() {
                     isOpen={modalOpen}
                     onClose={closeModal}
                     onSave={editingBullion
-                        ? (bullionNameId, vaultIdParam, amount, description, dateOperation, userComment) =>
-                            handleUpdateBullion(editingBullion.id, bullionNameId, vaultIdParam, amount, description, dateOperation, userComment)
-                        : (bullionNameId, vaultIdParam, amount, description, dateOperation) =>
-                            handleSaveBullion(bullionNameId, vaultIdParam, amount, description, dateOperation)
+                        ? (bullionNameId, vaultIdParam, amount, description, dateOperation, userComment, bullionType) =>
+                            handleUpdateBullion(editingBullion.id, bullionNameId, vaultIdParam, amount, description, dateOperation, userComment, bullionType)
+                        : (bullionNameId, vaultIdParam, amount, description, dateOperation, userComment, bullionType) =>
+                            handleSaveBullion(bullionNameId, vaultIdParam, amount, description, dateOperation, bullionType)
                     }
                     initialBullionNameId={editingBullion?.bullionNameId}
                     initialBullionNameTitle={editingBullion?.bullionNameTitle}
@@ -602,6 +605,7 @@ function VaultBullionsPage() {
                     initialAmount={editingBullion?.amount}
                     initialDescription={editingBullion?.description}
                     initialDateOperation={editingBullion?.dateOperation}
+                    initialBullionType={editingBullion?.bullionType}
                     isEditing={!!editingBullion}
                     allowedChangeAmount={allowedChangeAmount}
                     allowedIncome={allowedIncome}

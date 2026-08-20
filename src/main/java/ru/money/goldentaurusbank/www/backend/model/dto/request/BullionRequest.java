@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.BullionType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -23,6 +24,10 @@ public class BullionRequest {
 
     @Size(max = 500, message = "Описание не должно превышать 500 символов")
     private String description;
+
+    // Пустое поле означает DEBIT: старые клиенты про тип не знают,
+    // а при правке пустое значение оставляет тип как был
+    private BullionType bullionType;
 
     private LocalDateTime dateOperation;
 

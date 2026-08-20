@@ -221,19 +221,19 @@ function BullionsPage() {
         }
     };
 
-    const handleSaveBullion = async (bullionNameId, vaultId, amount, description, dateOperation, userComment) => {
+    const handleSaveBullion = async (bullionNameId, vaultId, amount, description, dateOperation, userComment, bullionType) => {
         // Сумму до правки знает только страница: ответ PUT про проведённую операцию молчит
         const previousAmount = editingBullion?.amount;
         try {
             if (editingBullion) {
                 await api.put(`/bullions/${editingBullion.id}`, {
-                    bullionNameId, vaultId, amount, description, dateOperation,
+                    bullionNameId, vaultId, amount, description, dateOperation, bullionType,
                     userComment: userComment ?? null
                 });
                 notifyAmountChange(previousAmount, amount);
             } else {
                 await api.post('/bullions', {
-                    bullionNameId, vaultId, amount, description, dateOperation
+                    bullionNameId, vaultId, amount, description, dateOperation, bullionType
                 });
             }
             setModalOpen(false);
@@ -609,6 +609,7 @@ function BullionsPage() {
                     initialAmount={editingBullion?.amount}
                     initialDescription={editingBullion?.description}
                     initialDateOperation={editingBullion?.dateOperation}
+                    initialBullionType={editingBullion?.bullionType}
                     isEditing={!!editingBullion}
                 />
 

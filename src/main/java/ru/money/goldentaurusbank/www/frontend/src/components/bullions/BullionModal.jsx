@@ -14,6 +14,9 @@ function BullionModal({
                           isEditing,
                           initialBullionNameTitle,
                           initialDateOperation,
+                          // Дебетовый или кредитный. На расчёты пока не влияет,
+                          // но менять его можно и у существующего слитка
+                          initialBullionType,
                           // Правка суммы - это операция: вверх внесение, вниз снятие.
                           // Флаги считает бэк, здесь только гасим поле и подсказываем
                           allowedChangeAmount = true,
@@ -27,6 +30,7 @@ function BullionModal({
     const [amount, setAmount] = useState('');
     const [amountDisplay, setAmountDisplay] = useState('');
     const [description, setDescription] = useState('');
+    const [bullionType, setBullionType] = useState('DEBIT');
     const [userComment, setUserComment] = useState('');
     const [dateOperation, setDateOperation] = useState('');
     const [error, setError] = useState('');
@@ -188,10 +192,11 @@ function BullionModal({
             }
 
             setDescription(initialDescription || '');
+            setBullionType(initialBullionType || 'DEBIT');
             setUserComment('');
             setError('');
         }
-    }, [isOpen, initialBullionNameId, initialVaultId, initialAmount, initialDescription, isEditing, initialDateOperation]);
+    }, [isOpen, initialBullionNameId, initialVaultId, initialAmount, initialDescription, isEditing, initialDateOperation, initialBullionType]);
 
     const fetchBullionNames = async () => {
         try {
@@ -259,7 +264,8 @@ function BullionModal({
                 description.trim() || null,
                 dateOperation ? dateOperation : null,
                 // Без дельты операции не будет, комментарию некуда попасть
-                deltaCents !== 0 ? (userComment.trim() || null) : null
+                deltaCents !== 0 ? (userComment.trim() || null) : null,
+                bullionType
             );
             onClose();
         } catch (err) {
@@ -341,6 +347,22 @@ function BullionModal({
                                 </div>
                             </>
                         )}
+
+                        {/* Тип менять можно и при правке — в отличие от наименования и хранилища */}
+                        <div className="form-group">
+                            <label>Тип слитка *</label>
+                            <select
+                                value={bullionType}
+                                onChange={(e) => setBullionType(e.target.value)}
+                                required
+                            >
+                                <option value="DEBIT">Дебетовый</option>
+                                <option value="CREDIT">Кредитный</option>
+                            </select>
+                            <small className="input-hint">
+                                Дебетовый — свои накопления, кредитный — заёмные средства
+                            </small>
+                        </div>
 
                         <div className="form-group">
                             <label>Сумма * (₽)</label>
