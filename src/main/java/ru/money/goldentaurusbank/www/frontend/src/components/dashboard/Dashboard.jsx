@@ -179,7 +179,8 @@ function Dashboard({ user, onLogout }) {
                             aria-haspopup="menu"
                             title="Справочники"
                         >
-                            ⚙️
+                            {/* Крутится сама шестерёнка, а не кнопка вокруг неё */}
+                            <span className="settings-icon">⚙️</span>
                         </button>
                         {settingsOpen && (
                             <div className="settings-menu" role="menu">
