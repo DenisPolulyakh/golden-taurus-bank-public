@@ -18,7 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Кредитные карты: заведение, шифрование номера, поиск, сортировки, накопитель
+ * Кредитные карты: заведение, последние 4 цифры, поиск, сортировки, накопитель
  * и архивация (см. plans/PLAN_CREDIT_CARD.md).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -31,44 +31,40 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("Номер карты лежит в БД зашифрованным, наружу уходит только маска")
-    void cardNumberIsEncryptedInDatabase() throws Exception {
-        Long cardId = createCard("Платинум", "4276 1600 1234 4321", "300000", "0");
+    @DisplayName("От номера хранятся только последние 4 цифры, колонки под полный номер нет")
+    void onlyLast4IsStored() throws Exception {
+        Long cardId = createCard("Платинум", "4321", "300000", "0");
 
-        String stored = jdbcTemplate.queryForObject(
-                "SELECT card_number_enc FROM taurus.credit_cards WHERE id = ?", String.class, cardId);
-
-        assertThat(stored).doesNotContain("4276160012344321", "4321");
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT card_last4 FROM taurus.credit_cards WHERE id = ?", String.class, cardId))
                 .isEqualTo("4321");
 
+        // Колонку под шифртекст снесла миграция 012: полный номер хранить негде
+        Integer columns = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM information_schema.columns "
+                        + "WHERE table_schema = 'taurus' AND table_name = 'credit_cards' "
+                        + "AND column_name = 'card_number_enc'", Integer.class);
+        assertThat(columns).isZero();
+
         JsonNode card = getCard(cardId);
         assertThat(card.get("maskedNumber").asText()).isEqualTo("•••• 4321");
-        assertThat(card.has("cardNumber")).as("полный номер наружу не отдаётся").isFalse();
+        assertThat(card.get("last4").asText()).isEqualTo("4321");
+        assertThat(card.has("cardNumber")).as("полного номера нет ни в базе, ни в ответе").isFalse();
     }
 
     @Test
-    @DisplayName("Пробелы в номере не мешают, читается номер расшифрованным")
-    void cardNumberIsDecryptedBack() throws Exception {
-        Long cardId = createCard("Платинум", "4276-1600 1234 5678", "300000", "0");
+    @DisplayName("Пробелы и дефисы вокруг цифр не мешают")
+    void last4IsNormalized() throws Exception {
+        Long cardId = createCard("Платинум", " 5678 ", "300000", "0");
 
-        String stored = jdbcTemplate.queryForObject(
-                "SELECT card_number_enc FROM taurus.credit_cards WHERE id = ?", String.class, cardId);
-        String decrypted = jdbcTemplate.queryForObject(
-                "SELECT card_last4 FROM taurus.credit_cards WHERE id = ?", String.class, cardId);
-
-        // Шифртекст один и тот же номер каждый раз даёт разный — сравнивать можно только через приложение
-        assertThat(stored).isNotEqualTo("4276160012345678");
-        assertThat(decrypted).isEqualTo("5678");
         assertThat(getCard(cardId).get("last4").asText()).isEqualTo("5678");
     }
 
     @Test
     @DisplayName("Поиск идёт по названию и по последним 4 цифрам")
     void searchByNameAndLast4() throws Exception {
-        createCard("Платинум", "4276160012344321", "300000", "0");
-        createCard("Альфа Карта", "5536910012349999", "100000", "0");
+        createCard("Платинум", "4321", "300000", "0");
+        createCard("Альфа Карта", "9999", "100000", "0");
 
         assertThat(names(listCards("плати", null, null))).containsExactly("Платинум");
         assertThat(names(listCards("9999", null, null))).containsExactly("Альфа Карта");
@@ -79,9 +75,9 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
     @Test
     @DisplayName("Сортировка по задолженности, лимиту и остатку — в обе стороны")
     void sortingByDebtLimitAndRemainder() throws Exception {
-        createCard("Первая", "4276160011111111", "100000", "50000");   // остаток 50 000
-        createCard("Вторая", "4276160022222222", "300000", "10000");   // остаток 290 000
-        createCard("Третья", "4276160033333333", "200000", "80000");   // остаток 120 000
+        createCard("Первая", "1111", "100000", "50000");   // остаток 50 000
+        createCard("Вторая", "2222", "300000", "10000");   // остаток 290 000
+        createCard("Третья", "3333", "200000", "80000");   // остаток 120 000
 
         assertThat(names(listCards(null, "debt", "asc"))).containsExactly("Вторая", "Первая", "Третья");
         assertThat(names(listCards(null, "debt", "desc"))).containsExactly("Третья", "Первая", "Вторая");
@@ -93,8 +89,8 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
     @Test
     @DisplayName("Итоги списка: общий долг и количество карт")
     void listTotals() throws Exception {
-        createCard("Первая", "4276160011111111", "100000", "50000");
-        createCard("Вторая", "4276160022222222", "300000", "10000");
+        createCard("Первая", "1111", "100000", "50000");
+        createCard("Вторая", "2222", "300000", "10000");
 
         JsonNode list = listCardsRaw(null, null, null);
         assertThat(list.get("totalDebt").decimalValue()).isEqualByComparingTo("60000.00");
@@ -110,7 +106,7 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
     @Test
     @DisplayName("Остаток равен лимиту минус задолженность, стартовый долг попадает в историю")
     void remainderAndOpeningDebt() throws Exception {
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "120000");
+        Long cardId = createCard("Платинум", "4321", "300000", "120000");
 
         JsonNode card = getCard(cardId);
         assertThat(card.get("debt").decimalValue()).isEqualByComparingTo("120000.00");
@@ -127,7 +123,7 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
     void imbalanceIsAccumulatedMinusDebt() throws Exception {
         Long vaultId = createVault("Сбер-Депозит");
         Long bullionId = createCreditBullion(vaultId, "Подушка", "30000");
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "100000", List.of(bullionId));
+        Long cardId = createCard("Платинум", "4321", "300000", "100000", List.of(bullionId));
 
         JsonNode card = getCard(cardId);
         assertThat(card.get("accumulatedAmount").decimalValue()).isEqualByComparingTo("30000.00");
@@ -143,14 +139,34 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
     @Test
     @DisplayName("Льготный период отдаётся счётчиком дней")
     void graceDaysLeftIsCounted() throws Exception {
-        Long cardId = createCardWithGrace("Платинум", "4276160012344321", "300000",
+        Long cardId = createCardWithGrace("Платинум", "4321", "300000",
                 java.time.LocalDate.now().plusDays(21));
 
         assertThat(getCard(cardId).get("graceDaysLeft").asInt()).isEqualTo(21);
 
-        Long overdue = createCardWithGrace("Альфа", "5536910012349999", "100000",
+        Long overdue = createCardWithGrace("Альфа", "9999", "100000",
                 java.time.LocalDate.now().minusDays(3));
         assertThat(getCard(overdue).get("graceDaysLeft").asInt()).isEqualTo(-3);
+    }
+
+    @Test
+    @DisplayName("Сортировка по остатку дней: сначала ближайший срок, карты без периода — в конце")
+    void sortingByGraceDaysLeft() throws Exception {
+        createCardWithGrace("Через месяц", "1111", "100000", java.time.LocalDate.now().plusDays(30));
+        createCardWithGrace("Послезавтра", "2222", "100000", java.time.LocalDate.now().plusDays(2));
+        createCardWithGrace("Просрочена", "3333", "100000", java.time.LocalDate.now().minusDays(5));
+        createCard("Без периода", "4444", "100000", "0");
+
+        // Пустой sortBy — та же сортировка: это и есть порядок по умолчанию
+        assertThat(names(listCards(null, null, null)))
+                .containsExactly("Просрочена", "Послезавтра", "Через месяц", "Без периода");
+        assertThat(names(listCards(null, "grace", "asc")))
+                .containsExactly("Просрочена", "Послезавтра", "Через месяц", "Без периода");
+
+        // Переворот меняет порядок дат, но карту без периода наверх не поднимает:
+        // «не задан» — это не «дней много»
+        assertThat(names(listCards(null, "grace", "desc")))
+                .containsExactly("Через месяц", "Послезавтра", "Просрочена", "Без периода");
     }
 
     @Test
@@ -159,8 +175,31 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
         Long vaultId = createVault("Сбер-Депозит");
         Long debitBullionId = createBullion(vaultId, "Обычный", "10000", "DEBIT");
 
-        createCardExpectingError("Платинум", "4276160012344321", "300000", "0",
+        createCardExpectingError("Платинум", "4321", "300000", "0",
                 List.of(debitBullionId), 4024);
+    }
+
+    @Test
+    @DisplayName("Сводка «Мои слитки» знает про накопитель: карта, маска и её долг")
+    void groupedBullionsCarryCreditCard() throws Exception {
+        Long vaultId = createVault("Сбер-Депозит");
+        Long bullionId = createCreditBullion(vaultId, "Подушка", "30000");
+        Long cardId = createCard("Платинум", "4321", "300000", "100000", List.of(bullionId));
+
+        JsonNode vault = groupedVaults("Подушка").get(0);
+        assertThat(vault.get("creditCardId").asLong()).isEqualTo(cardId);
+        assertThat(vault.get("creditCardMasked").asText()).isEqualTo("•••• 4321");
+        assertThat(vault.get("creditCardDebt").decimalValue()).isEqualByComparingTo("100000.00");
+    }
+
+    @Test
+    @DisplayName("Слиток без карты в сводке приходит с пустым накопителем")
+    void groupedBullionWithoutCardHasNoAccumulator() throws Exception {
+        Long vaultId = createVault("Сбер-Депозит");
+        createBullion(vaultId, "Обычный", "10000", "DEBIT");
+
+        JsonNode vault = groupedVaults("Обычный").get(0);
+        assertThat(vault.get("creditCardId").isNull()).isTrue();
     }
 
     @Test
@@ -168,9 +207,9 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
     void bullionCannotBeLinkedTwice() throws Exception {
         Long vaultId = createVault("Сбер-Депозит");
         Long bullionId = createCreditBullion(vaultId, "Подушка", "30000");
-        createCard("Платинум", "4276160012344321", "300000", "0", List.of(bullionId));
+        createCard("Платинум", "4321", "300000", "0", List.of(bullionId));
 
-        createCardExpectingError("Альфа", "5536910012349999", "100000", "0",
+        createCardExpectingError("Альфа", "9999", "100000", "0",
                 List.of(bullionId), 4025);
     }
 
@@ -182,7 +221,7 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
         Long free = createCreditBullion(vaultId, "Резерв", "5000");
         createBullion(vaultId, "Обычный", "10000", "DEBIT");
 
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "0", List.of(linked));
+        Long cardId = createCard("Платинум", "4321", "300000", "0", List.of(linked));
 
         // Без карты — только свободные кредитные
         List<String> anyCard = titles(availableBullions(null));
@@ -200,7 +239,7 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
         Long vaultId = createVault("Сбер-Депозит");
         Long first = createCreditBullion(vaultId, "Подушка", "30000");
         Long second = createCreditBullion(vaultId, "Резерв", "5000");
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "0", List.of(first));
+        Long cardId = createCard("Платинум", "4321", "300000", "0", List.of(first));
 
         updateCard(cardId, "Платинум", null, "300000", null, List.of(second))
                 .andExpect(status().isOk());
@@ -212,9 +251,9 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
     }
 
     @Test
-    @DisplayName("Пустой номер при правке оставляет прежний")
-    void emptyNumberOnUpdateKeepsOld() throws Exception {
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "0");
+    @DisplayName("Пустое поле при правке оставляет прежние 4 цифры")
+    void emptyLast4OnUpdateKeepsOld() throws Exception {
+        Long cardId = createCard("Платинум", "4321", "300000", "0");
 
         updateCard(cardId, "Платинум Голд", null, "400000", null, null)
                 .andExpect(status().isOk())
@@ -226,7 +265,7 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
     @Test
     @DisplayName("Правка задолженности пишется операцией, а не молча в поле")
     void debtChangeOnUpdateBecomesOperation() throws Exception {
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "50000");
+        Long cardId = createCard("Платинум", "4321", "300000", "50000");
 
         updateCard(cardId, "Платинум", null, "300000", "80000", null)
                 .andExpect(status().isOk())
@@ -241,13 +280,13 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
     @Test
     @DisplayName("Лимит ниже задолженности не сохраняется")
     void limitBelowDebtIsRejected() throws Exception {
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "150000");
+        Long cardId = createCard("Платинум", "4321", "300000", "150000");
 
         updateCard(cardId, "Платинум", null, "100000", null, null)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(4030));
 
-        createCardExpectingError("Альфа", "5536910012349999", "50000", "80000", null, 4030);
+        createCardExpectingError("Альфа", "9999", "50000", "80000", null, 4030);
 
         // А вместе с погашением — можно: сначала долг, потом лимит
         updateCard(cardId, "Платинум", null, "100000", "90000", null)
@@ -257,13 +296,16 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
     }
 
     @Test
-    @DisplayName("Номер не из 12–19 цифр и дубль названия не проходят")
+    @DisplayName("Не ровно 4 цифры и дубль названия не проходят")
     void validation() throws Exception {
-        createCardExpectingError("Платинум", "4276-16", "300000", "0", null, 4023);
-        createCardExpectingError("Платинум", "4276160012344321abcd", "300000", "0", null, 4023);
+        createCardExpectingError("Платинум", "432", "300000", "0", null, 4023);
+        createCardExpectingError("Платинум", "43210", "300000", "0", null, 4023);
+        // Полный номер тоже отлуп: хранить его негде, а обрезать молча — обманывать
+        createCardExpectingError("Платинум", "4276160012344321", "300000", "0", null, 4023);
+        createCardExpectingError("Платинум", "abcd", "300000", "0", null, 4023);
 
-        createCard("Платинум", "4276160012344321", "300000", "0");
-        createCardExpectingError("платинум", "5536910012349999", "100000", "0", null, 4022);
+        createCard("Платинум", "4321", "300000", "0");
+        createCardExpectingError("платинум", "9999", "100000", "0", null, 4022);
     }
 
     @Test
@@ -271,7 +313,7 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
     void deleteArchivesCard() throws Exception {
         Long vaultId = createVault("Сбер-Депозит");
         Long bullionId = createCreditBullion(vaultId, "Подушка", "30000");
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "100000", List.of(bullionId));
+        Long cardId = createCard("Платинум", "4321", "300000", "100000", List.of(bullionId));
 
         deleteCard(cardId).andExpect(status().isOk());
 
@@ -294,7 +336,7 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
     @Test
     @DisplayName("Чужая карта не читается и не правится")
     void otherUsersCardIsInvisible() throws Exception {
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "0");
+        Long cardId = createCard("Платинум", "4321", "300000", "0");
         String otherToken = registerAndLogin("othercard@example.com", "Other Card User");
 
         mockMvc.perform(get("/api/credit-cards/{cardId}", cardId)

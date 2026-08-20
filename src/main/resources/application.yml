@@ -56,12 +56,6 @@ app:
     secret: ${JWT_SECRET:}
     access-expiration: ${JWT_ACCESS_EXPIRATION:900000}
     refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
-  # Номера карт лежат в БД шифртекстом. Без ключа приложение не стартует:
-  # с пустым или чужим ключом номера превратятся в мусор молча.
-  # salt — hex-строка, генерится как openssl rand -hex 8
-  card:
-    secret: ${CARD_SECRET:}
-    salt: ${CARD_SALT:}
 
 logging:
   level:

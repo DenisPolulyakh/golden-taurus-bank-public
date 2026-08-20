@@ -34,14 +34,10 @@ public class CreditCard {
     private String name;
 
     /**
-     * В коде номер открытый, в БД — шифртекст: за это отвечает конвертер.
-     * Наружу не отдаётся никогда, в API уходит только маска.
+     * Последние 4 цифры — всё, что хранится от номера: полный номер не нужен
+     * ни для одной операции, а хранить его — лишний риск. По ним идёт поиск
+     * и строится маска.
      */
-    @Convert(converter = CardNumberConverter.class)
-    @Column(name = "card_number_enc", nullable = false, length = 512)
-    private String cardNumber;
-
-    /** Открытым: шифр недетерминированный, искать и маскировать больше нечем. */
     @Column(name = "card_last4", nullable = false, length = 4)
     private String last4;
 

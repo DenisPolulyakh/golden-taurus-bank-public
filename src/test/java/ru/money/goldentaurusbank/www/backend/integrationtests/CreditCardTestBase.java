@@ -162,45 +162,45 @@ abstract class CreditCardTestBase extends IntegrationTestBase {
     // Карты
     // ------------------------------------------------------------------
 
-    protected Long createCard(String name, String number, String limit, String debt) throws Exception {
-        return createCard(name, number, limit, debt, null);
+    protected Long createCard(String name, String last4, String limit, String debt) throws Exception {
+        return createCard(name, last4, limit, debt, null);
     }
 
-    protected Long createCard(String name, String number, String limit, String debt, List<Long> bullionIds)
+    protected Long createCard(String name, String last4, String limit, String debt, List<Long> bullionIds)
             throws Exception {
-        MvcResult result = cardRequest(post("/api/credit-cards"), name, number, limit, debt, null, bullionIds)
+        MvcResult result = cardRequest(post("/api/credit-cards"), name, last4, limit, debt, null, bullionIds)
                 .andExpect(status().isOk())
                 .andReturn();
 
         return dataId(result);
     }
 
-    protected Long createCardWithGrace(String name, String number, String limit, LocalDate gracePeriodDate)
+    protected Long createCardWithGrace(String name, String last4, String limit, LocalDate gracePeriodDate)
             throws Exception {
-        MvcResult result = cardRequest(post("/api/credit-cards"), name, number, limit, "0", gracePeriodDate, null)
+        MvcResult result = cardRequest(post("/api/credit-cards"), name, last4, limit, "0", gracePeriodDate, null)
                 .andExpect(status().isOk())
                 .andReturn();
 
         return dataId(result);
     }
 
-    protected void createCardExpectingError(String name, String number, String limit, String debt,
+    protected void createCardExpectingError(String name, String last4, String limit, String debt,
                                             List<Long> bullionIds, int code) throws Exception {
-        cardRequest(post("/api/credit-cards"), name, number, limit, debt, null, bullionIds)
+        cardRequest(post("/api/credit-cards"), name, last4, limit, debt, null, bullionIds)
                 .andExpect(jsonPath("$.code").value(code));
     }
 
-    protected ResultActions updateCard(Long cardId, String name, String number, String limit, String debt,
+    protected ResultActions updateCard(Long cardId, String name, String last4, String limit, String debt,
                                        List<Long> bullionIds) throws Exception {
-        return cardRequest(put("/api/credit-cards/{cardId}", cardId), name, number, limit, debt, null, bullionIds);
+        return cardRequest(put("/api/credit-cards/{cardId}", cardId), name, last4, limit, debt, null, bullionIds);
     }
 
     private ResultActions cardRequest(org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder builder,
-                                      String name, String number, String limit, String debt,
+                                      String name, String last4, String limit, String debt,
                                       LocalDate gracePeriodDate, List<Long> bullionIds) throws Exception {
         StringBuilder body = new StringBuilder("{\"name\": \"").append(name).append('"');
-        if (number != null) {
-            body.append(", \"cardNumber\": \"").append(number).append('"');
+        if (last4 != null) {
+            body.append(", \"last4\": \"").append(last4).append('"');
         }
         if (limit != null) {
             body.append(", \"limit\": ").append(limit);
@@ -328,6 +328,26 @@ abstract class CreditCardTestBase extends IntegrationTestBase {
     protected ResultActions rollbackTransaction(Long transactionId) throws Exception {
         return mockMvc.perform(post("/api/transactions/{transactionId}/rollback", transactionId)
                 .header("Authorization", "Bearer " + accessToken));
+    }
+
+    /**
+     * Слитки одного наименования из сводки «Мои слитки»: экран решает по ним,
+     * показывать ли кнопку погашения.
+     */
+    protected JsonNode groupedVaults(String bullionNameTitle) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/bullions/grouped")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode groups = objectMapper.readTree(result.getResponse().getContentAsString())
+                .get("data").get("bullionNameBullionList");
+        for (JsonNode group : groups) {
+            if (bullionNameTitle.equals(group.get("bullionNameTitle").asText())) {
+                return group.get("vaults");
+            }
+        }
+        throw new AssertionError("В сводке нет наименования " + bullionNameTitle);
     }
 
     protected Long dataId(MvcResult result) throws Exception {

@@ -17,10 +17,10 @@ public class CreditCardRequest {
     private String name;
 
     /**
-     * При создании обязателен, при правке пустой означает «оставить прежний»:
-     * наружу номер не отдаётся, подставить его в форму нечем.
+     * Последние 4 цифры карты. При создании обязательны, при правке пустое
+     * поле означает «оставить прежние».
      */
-    private String cardNumber;
+    private String last4;
 
     private LocalDate gracePeriodDate;
 

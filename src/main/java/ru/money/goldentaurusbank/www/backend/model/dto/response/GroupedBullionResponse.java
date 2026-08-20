@@ -59,6 +59,11 @@ public class GroupedBullionResponse {
             private LocalDate closeDate;
             // Дебетовый или кредитный — карточка рисует по нему печать
             private BullionType bullionType;
+            // Накопитель карты: по этим полям сгруппированная карточка решает,
+            // показывать ли кнопку «Погашение», и что писать в выпадающем списке
+            private Long creditCardId;
+            private String creditCardMasked;
+            private BigDecimal creditCardDebt;
             // Без @Builder.Default билдер игнорирует "= true", и поле уходит
             // во фронт как null. JSON-дефолт (allowedIncome = true) при
             // деструктуризации от null не спасает — он ловит только undefined.

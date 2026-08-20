@@ -26,7 +26,7 @@ class CreditCardTransactionIntegrationTest extends CreditCardTestBase {
     @Test
     @DisplayName("Списание увеличивает задолженность и уменьшает остаток")
     void spendIncreasesDebt() throws Exception {
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "0");
+        Long cardId = createCard("Платинум", "4321", "300000", "0");
 
         spend(cardId, "120000")
                 .andExpect(status().isOk())
@@ -43,7 +43,7 @@ class CreditCardTransactionIntegrationTest extends CreditCardTestBase {
     @Test
     @DisplayName("Больше лимита списать нельзя, задолженность при этом не двигается")
     void spendOverLimitIsRejected() throws Exception {
-        Long cardId = createCard("Платинум", "4276160012344321", "100000", "60000");
+        Long cardId = createCard("Платинум", "4321", "100000", "60000");
 
         spend(cardId, "50000")
                 .andExpect(status().isBadRequest())
@@ -57,7 +57,7 @@ class CreditCardTransactionIntegrationTest extends CreditCardTestBase {
     @Test
     @DisplayName("Погашение уменьшает задолженность, больше долга погасить нельзя")
     void repayDecreasesDebt() throws Exception {
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "100000");
+        Long cardId = createCard("Платинум", "4321", "300000", "100000");
 
         repay(cardId, "40000")
                 .andExpect(status().isOk())
@@ -74,7 +74,7 @@ class CreditCardTransactionIntegrationTest extends CreditCardTestBase {
     @Test
     @DisplayName("Откат списания и погашения возвращает задолженность, дважды не откатывается")
     void rollbackReturnsDebt() throws Exception {
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "0");
+        Long cardId = createCard("Платинум", "4321", "300000", "0");
         spend(cardId, "50000").andExpect(status().isOk());
 
         Long spendId = history(cardId).get(0).get("id").asLong();
@@ -108,7 +108,7 @@ class CreditCardTransactionIntegrationTest extends CreditCardTestBase {
     void repayFromBullionMovesBothSides() throws Exception {
         Long vaultId = createVault("Сбер-Депозит");
         Long bullionId = createCreditBullion(vaultId, "Подушка", "80000");
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "100000", List.of(bullionId));
+        Long cardId = createCard("Платинум", "4321", "300000", "100000", List.of(bullionId));
 
         repayFromBullion(bullionId, "50000")
                 .andExpect(status().isOk())
@@ -127,7 +127,7 @@ class CreditCardTransactionIntegrationTest extends CreditCardTestBase {
     void rollbackRepayFromBullionReturnsBothSides() throws Exception {
         Long vaultId = createVault("Сбер-Депозит");
         Long bullionId = createCreditBullion(vaultId, "Подушка", "80000");
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "100000", List.of(bullionId));
+        Long cardId = createCard("Платинум", "4321", "300000", "100000", List.of(bullionId));
 
         repayFromBullion(bullionId, "50000").andExpect(status().isOk());
         Long operationId = history(cardId).get(0).get("id").asLong();
@@ -143,7 +143,7 @@ class CreditCardTransactionIntegrationTest extends CreditCardTestBase {
     void bullionLegCannotBeRolledBackAlone() throws Exception {
         Long vaultId = createVault("Сбер-Депозит");
         Long bullionId = createCreditBullion(vaultId, "Подушка", "80000");
-        createCard("Платинум", "4276160012344321", "300000", "100000", List.of(bullionId));
+        createCard("Платинум", "4321", "300000", "100000", List.of(bullionId));
 
         repayFromBullion(bullionId, "50000").andExpect(status().isOk());
 
@@ -169,7 +169,7 @@ class CreditCardTransactionIntegrationTest extends CreditCardTestBase {
     void repayFromUnlinkedBullionIsRejected() throws Exception {
         Long vaultId = createVault("Сбер-Депозит");
         Long freeBullionId = createCreditBullion(vaultId, "Резерв", "80000");
-        createCard("Платинум", "4276160012344321", "300000", "100000");
+        createCard("Платинум", "4321", "300000", "100000");
 
         repayFromBullion(freeBullionId, "10000")
                 .andExpect(status().isBadRequest())
@@ -183,7 +183,7 @@ class CreditCardTransactionIntegrationTest extends CreditCardTestBase {
     void repayFromBullionOverDebtKeepsBullionIntact() throws Exception {
         Long vaultId = createVault("Сбер-Депозит");
         Long bullionId = createCreditBullion(vaultId, "Подушка", "80000");
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "20000", List.of(bullionId));
+        Long cardId = createCard("Платинум", "4321", "300000", "20000", List.of(bullionId));
 
         repayFromBullion(bullionId, "50000")
                 .andExpect(status().isBadRequest())
@@ -198,7 +198,7 @@ class CreditCardTransactionIntegrationTest extends CreditCardTestBase {
     void repayFromBullionRespectsVaultFlags() throws Exception {
         Long vaultId = createVault("Сбер-Депозит");
         Long bullionId = createCreditBullion(vaultId, "Подушка", "80000");
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "100000", List.of(bullionId));
+        Long cardId = createCard("Платинум", "4321", "300000", "100000", List.of(bullionId));
 
         forbidExpense(vaultId, "Сбер-Депозит");
 
@@ -213,7 +213,7 @@ class CreditCardTransactionIntegrationTest extends CreditCardTestBase {
     @Test
     @DisplayName("Чужой картой распоряжаться нельзя")
     void otherUserCannotOperateCard() throws Exception {
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "100000");
+        Long cardId = createCard("Платинум", "4321", "300000", "100000");
 
         accessToken = registerAndLogin("othercardops@example.com", "Other Card Ops");
 
@@ -228,7 +228,7 @@ class CreditCardTransactionIntegrationTest extends CreditCardTestBase {
     @Test
     @DisplayName("Задолженность попадает в статистику графика")
     void debtGoesToDashboardStatistics() throws Exception {
-        Long cardId = createCard("Платинум", "4276160012344321", "300000", "0");
+        Long cardId = createCard("Платинум", "4321", "300000", "0");
         spend(cardId, "70000").andExpect(status().isOk());
 
         java.time.LocalDate today = java.time.LocalDate.now();

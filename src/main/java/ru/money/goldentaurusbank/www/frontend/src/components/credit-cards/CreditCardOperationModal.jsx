@@ -4,8 +4,12 @@ import { formatAmount } from './creditCardFormat';
 /**
  * Списание и погашение по карте, а также погашение из накопителя (тип
  * {@code repay-bullion}) — форма у всех троих одна: сумма, дата, комментарий.
+ *
+ * На экране конкретного хранилища накопитель известен заранее, а на «Моих
+ * слитках» их у наименования может быть несколько — тогда сверху появляется
+ * выпадающий список {@code bullionOptions}, и выбор решает, какую карту гасим.
  */
-function CreditCardOperationModal({ isOpen, card, type, bullion, onClose, onSave }) {
+function CreditCardOperationModal({ isOpen, card, type, bullion, bullionOptions, onSelectBullion, onClose, onSave }) {
     const [amount, setAmount] = useState('');
     const [comment, setComment] = useState('');
     const [dateOperation, setDateOperation] = useState('');
@@ -20,7 +24,13 @@ function CreditCardOperationModal({ isOpen, card, type, bullion, onClose, onSave
         setDateOperation(now.toISOString().slice(0, 16));
     }, [isOpen]);
 
-    if (!isOpen) return null;
+    // Смена накопителя меняет и карту, и потолок суммы — введённое до этого
+    // число к новому слитку отношения не имеет
+    useEffect(() => {
+        setAmount('');
+    }, [bullion?.id]);
+
+    if (!isOpen || !card) return null;
 
     const isSpend = type === 'spend';
     const fromBullion = type === 'repay-bullion';
@@ -59,6 +69,22 @@ function CreditCardOperationModal({ isOpen, card, type, bullion, onClose, onSave
 
                 <form onSubmit={handleSubmit}>
                     <div className="modal-body">
+                        {fromBullion && bullionOptions?.length > 0 && (
+                            <div className="form-group">
+                                <label>💳 Гасим со слитка</label>
+                                <select
+                                    value={bullion?.id ?? ''}
+                                    onChange={(e) => onSelectBullion(Number(e.target.value))}
+                                >
+                                    {bullionOptions.map(option => (
+                                        <option key={option.id} value={option.id}>
+                                            {option.vaultName} — {formatAmount(option.amount)} ₽ · карта {option.creditCardMasked}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
                         <div className="operation-summary">
                             <div className="stat">
                                 <span className="stat-name">Задолженность:</span>

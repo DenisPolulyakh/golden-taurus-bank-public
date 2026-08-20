@@ -19,6 +19,7 @@ import ru.money.goldentaurusbank.www.backend.repository.CreditCardRepository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -42,8 +43,6 @@ public class CreditCardService {
     public static final String ADJUST_UP_COMMENT = "Увеличение задолженности при корректировке карты";
     public static final String ADJUST_DOWN_COMMENT = "Уменьшение задолженности при корректировке карты";
 
-    private static final int MIN_CARD_NUMBER_LENGTH = 12;
-    private static final int MAX_CARD_NUMBER_LENGTH = 19;
 
     private final CreditCardRepository creditCardRepository;
     private final BullionRepository bullionRepository;
@@ -77,14 +76,29 @@ public class CreditCardService {
                 .build();
     }
 
+    /**
+     * По умолчанию — ближайший конец льготного периода: он и решает, какую карту
+     * гасить первой. Дни считаются от одной и той же «сегодня», поэтому сортировать
+     * можно прямо по дате.
+     */
     private Comparator<CreditCard> comparator(String sortBy, String sortOrder) {
-        Comparator<CreditCard> comparator = switch (sortBy == null ? "" : sortBy) {
+        boolean desc = "desc".equalsIgnoreCase(sortOrder);
+
+        if (StringUtils.isBlank(sortBy) || "grace".equals(sortBy)) {
+            // Карты без льготного периода всегда в конце: «не задан» — это не
+            // «много дней», и переворот направления поднимать их наверх не должен.
+            // Отсюда nullsLast поверх направления, а не reversed() поверх результата.
+            Comparator<LocalDate> byDate = desc ? Comparator.reverseOrder() : Comparator.naturalOrder();
+            return Comparator.comparing(CreditCard::getGracePeriodDate, Comparator.nullsLast(byDate));
+        }
+
+        Comparator<CreditCard> comparator = switch (sortBy) {
             case "debt" -> Comparator.comparing(CreditCard::getDebt);
             case "limit" -> Comparator.comparing(CreditCard::getCardLimit);
             case "remainder" -> Comparator.comparing(CreditCard::getRemainder);
             default -> Comparator.comparing(CreditCard::getName, String.CASE_INSENSITIVE_ORDER);
         };
-        return "desc".equalsIgnoreCase(sortOrder) ? comparator.reversed() : comparator;
+        return desc ? comparator.reversed() : comparator;
     }
 
     @Transactional(readOnly = true)
@@ -121,7 +135,7 @@ public class CreditCardService {
         String name = request.getName().trim();
         requireNameFree(user, name, null);
 
-        String number = normalizeNumber(request.getCardNumber());
+        String last4 = normalizeLast4(request.getLast4());
         BigDecimal limit = scale(request.getLimit() == null ? BigDecimal.ZERO : request.getLimit());
         BigDecimal debt = scale(request.getDebt() == null ? BigDecimal.ZERO : request.getDebt());
 
@@ -133,8 +147,7 @@ public class CreditCardService {
         CreditCard card = creditCardRepository.save(CreditCard.builder()
                 .user(user)
                 .name(name)
-                .cardNumber(number)
-                .last4(last4(number))
+                .last4(last4)
                 .gracePeriodDate(request.getGracePeriodDate())
                 .cardLimit(limit)
                 // Долг ставит операция, а не поле: иначе история начиналась бы
@@ -160,12 +173,9 @@ public class CreditCardService {
         requireNameFree(user, name, cardId);
         card.setName(name);
 
-        // Пустой номер — «оставить прежний»: наружу он не отдаётся,
-        // подставить его в форму правки нечем
-        if (StringUtils.isNotBlank(request.getCardNumber())) {
-            String number = normalizeNumber(request.getCardNumber());
-            card.setCardNumber(number);
-            card.setLast4(last4(number));
+        // Пустое поле — «оставить прежние цифры»
+        if (StringUtils.isNotBlank(request.getLast4())) {
+            card.setLast4(normalizeLast4(request.getLast4()));
         }
 
         card.setGracePeriodDate(request.getGracePeriodDate());
@@ -293,21 +303,17 @@ public class CreditCardService {
     }
 
     /**
-     * Пробелы и дефисы из формы убираются, дальше — только цифры. Проверить
-     * контрольную сумму Луна здесь нельзя: карту заводят и по памяти, и с
-     * опечаткой в номере она всё равно должна сохраниться.
+     * Пробелы и дефисы из формы убираются, дальше — ровно четыре цифры.
+     * Полный номер не принимается намеренно: хранить его негде и незачем,
+     * так что обрезать молча было бы обманом — пусть форма спросит правильно.
      */
-    private String normalizeNumber(String rawNumber) {
-        String digits = rawNumber == null ? "" : rawNumber.replaceAll("[\\s-]", "");
-        if (!digits.matches("\\d{" + MIN_CARD_NUMBER_LENGTH + "," + MAX_CARD_NUMBER_LENGTH + "}")) {
+    private String normalizeLast4(String rawLast4) {
+        String digits = rawLast4 == null ? "" : rawLast4.replaceAll("[\\s-]", "");
+        if (!digits.matches("\\d{4}")) {
             throw new ApplicationException(CREDIT_CARD_INVALID_NUMBER.getCode(),
                     CREDIT_CARD_INVALID_NUMBER.getMessage());
         }
         return digits;
-    }
-
-    private static String last4(String number) {
-        return number.substring(number.length() - 4);
     }
 
     private static BigDecimal scale(BigDecimal value) {

@@ -54,7 +54,7 @@ public enum ResponseCodes {
     CREDIT_CARD_LIMIT_EXCEEDED(4020, "Списание превышает доступный лимит карты", HttpStatus.BAD_REQUEST),
     CREDIT_CARD_REPAY_EXCEEDS_DEBT(4021, "Погашение больше текущей задолженности", HttpStatus.BAD_REQUEST),
     CREDIT_CARD_ALREADY_EXISTS(4022, "Карта с таким названием уже существует", HttpStatus.CONFLICT),
-    CREDIT_CARD_INVALID_NUMBER(4023, "Номер карты должен состоять из 12–19 цифр", HttpStatus.BAD_REQUEST),
+    CREDIT_CARD_INVALID_NUMBER(4023, "Последние 4 цифры карты — это ровно 4 цифры", HttpStatus.BAD_REQUEST),
     BULLION_NOT_CREDIT(4024, "В накопитель можно добавить только кредитный слиток", HttpStatus.BAD_REQUEST),
     BULLION_ALREADY_LINKED(4025, "Слиток уже привязан к другой карте", HttpStatus.BAD_REQUEST),
     CREDIT_CARD_HISTORY_NOT_FOUND(4026, "Операция по карте не найдена", HttpStatus.NOT_FOUND),
