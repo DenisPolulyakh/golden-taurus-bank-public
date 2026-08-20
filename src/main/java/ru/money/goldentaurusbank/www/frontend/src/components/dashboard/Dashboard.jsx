@@ -145,6 +145,9 @@ function Dashboard({ user, onLogout }) {
                     <Link to="/banks" className="dashboard-link">
                         🏛️ Банки
                     </Link>
+                    <Link to="/credit-cards" className="dashboard-link">
+                        💳 Кредитные карты
+                    </Link>
                     <Link to="/transactions" className="dashboard-link">
                         📜 История
                     </Link>
@@ -210,6 +213,9 @@ function Dashboard({ user, onLogout }) {
                         </Link>
                         <Link to="/banks" className="action-btn">
                             🏛️ Управлять банками
+                        </Link>
+                        <Link to="/credit-cards" className="action-btn">
+                            💳 Кредитные карты
                         </Link>
                         <Link to="/transactions" className="action-btn">
                             📜 История операций

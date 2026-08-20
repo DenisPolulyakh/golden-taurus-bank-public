@@ -4,8 +4,10 @@ import api from '../../api/axios';
 import BullionModal from './BullionModal';
 import BullionTypeStamp from './BullionTypeStamp';
 import BullionTransactionModal from './BullionTransactionModal';
+import CreditCardOperationModal from '../credit-cards/CreditCardOperationModal';
 import { notifyAmountChange } from './bullionAmount';
 import './Bullions.css';
+import '../credit-cards/CreditCards.css';
 
 const formatAmount = (amount) => {
     if (!amount && amount !== 0) return '0';
@@ -63,6 +65,9 @@ function VaultBullionsPage() {
 
     const [transferTargets, setTransferTargets] = useState([]);
     const [allBullions, setAllBullions] = useState([]);
+
+    // Погашение долга карты из накопителя: одна кнопка — две операции
+    const [repayModal, setRepayModal] = useState({ isOpen: false, bullion: null, card: null });
 
     const fetchVault = useCallback(async () => {
         try {
@@ -254,6 +259,36 @@ function VaultBullionsPage() {
             fromBullionId: bullionId,
             fromAmount: amount
         }));
+    };
+
+    // Карта нужна модалке целиком (остаток лимита, долг), а сводка хранилища
+    // знает про неё только маску и долг
+    const handleOpenRepayCard = async (bullion) => {
+        try {
+            const response = await api.get(`/credit-cards/${bullion.creditCardId}`);
+            setRepayModal({ isOpen: true, bullion, card: response.data.data });
+        } catch (err) {
+            console.error('Ошибка загрузки кредитной карты:', err);
+        }
+    };
+
+    const handleRepayCard = async ({ amount, comment, dateOperation }) => {
+        setActionLoading(true);
+        try {
+            await api.post('/credit-cards/repay-from-bullion', {
+                bullionId: repayModal.bullion.id,
+                amount: Number(amount),
+                comment: comment || null,
+                dateOperation: dateOperation || null
+            });
+            setRepayModal({ isOpen: false, bullion: null, card: null });
+            await refreshData();
+        } catch (err) {
+            console.error('Ошибка погашения по карте:', err);
+            throw err;
+        } finally {
+            setActionLoading(false);
+        }
     };
 
     const handleRefill = async (amount, userComment, selectedVaultId, dateOperation) => {
@@ -580,6 +615,7 @@ function VaultBullionsPage() {
                                 onRefill={() => handleOpenRefill(bullion)}
                                 onWithdraw={() => handleOpenWithdraw(bullion)}
                                 onTransfer={() => handleOpenTransfer(bullion)}
+                                onRepayCard={() => handleOpenRepayCard(bullion)}
                                 disabled={actionLoading}
                                 vaultFlags={{
                                     allowedIncome,
@@ -640,6 +676,17 @@ function VaultBullionsPage() {
                     />
                 )}
 
+                {repayModal.isOpen && (
+                    <CreditCardOperationModal
+                        isOpen={repayModal.isOpen}
+                        card={repayModal.card}
+                        bullion={repayModal.bullion}
+                        type="repay-bullion"
+                        onClose={() => setRepayModal({ isOpen: false, bullion: null, card: null })}
+                        onSave={handleRepayCard}
+                    />
+                )}
+
                 {transferModal.isOpen && (
                     <BullionTransactionModal
                         isOpen={transferModal.isOpen}
@@ -690,7 +737,7 @@ const SortButton = ({ label, field, currentField, currentOrder, onSort, disabled
     );
 };
 
-const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransfer, disabled, vaultFlags }) => {
+const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransfer, onRepayCard, disabled, vaultFlags }) => {
     const formatDate = (dateString) => {
         if (!dateString) return '';
         const date = new Date(dateString);
@@ -726,6 +773,12 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
                     <div className="bullion-stamps">
                         <BullionTypeStamp type={bullion.bullionType} />
                     </div>
+
+                    {bullion.creditCardId && (
+                        <div className="credit-card-badge" title="Слиток копит деньги на погашение этой карты">
+                            💳 Накопитель карты {bullion.creditCardMasked}
+                        </div>
+                    )}
 
                     {bullion.description && (
                         <div className="stat">
@@ -778,6 +831,19 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
                 >
                     🔄 Перевод
                 </button>
+                {/* Погашение — тоже снятие со слитка, поэтому и оно под галочкой */}
+                {bullion.creditCardId && (
+                    <button
+                        className="repay-card-btn"
+                        onClick={onRepayCard}
+                        disabled={isDisabled(allowedExpense) || !(Number(bullion.creditCardDebt) > 0)}
+                        title={Number(bullion.creditCardDebt) > 0
+                            ? 'Списать со слитка и погасить долг карты'
+                            : 'Задолженность по карте уже нулевая'}
+                    >
+                        💳 Погашение
+                    </button>
+                )}
                 <button
                     className="delete-vault-btn"
                     onClick={onDelete}

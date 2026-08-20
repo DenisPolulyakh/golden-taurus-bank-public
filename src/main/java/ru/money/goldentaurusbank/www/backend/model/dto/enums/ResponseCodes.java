@@ -50,6 +50,18 @@ public enum ResponseCodes {
     VAULT_EXPENSE_NOT_ALLOWED(4016, "Из этого хранилища снимать нельзя: снята галочка «Можно снимать»", HttpStatus.BAD_REQUEST),
     VAULT_TRANSFER_NOT_ALLOWED(4017, "Это хранилище не участвует в переводах: снята галочка «Можно переводить»", HttpStatus.BAD_REQUEST),
     BANK_LINKED(4018, "Банк привязан к хранилищу, сначала удалите хранилище", HttpStatus.BAD_REQUEST),
+    CREDIT_CARD_NOT_FOUND(4019, "Кредитная карта не найдена", HttpStatus.BAD_REQUEST),
+    CREDIT_CARD_LIMIT_EXCEEDED(4020, "Списание превышает доступный лимит карты", HttpStatus.BAD_REQUEST),
+    CREDIT_CARD_REPAY_EXCEEDS_DEBT(4021, "Погашение больше текущей задолженности", HttpStatus.BAD_REQUEST),
+    CREDIT_CARD_ALREADY_EXISTS(4022, "Карта с таким названием уже существует", HttpStatus.CONFLICT),
+    CREDIT_CARD_INVALID_NUMBER(4023, "Номер карты должен состоять из 12–19 цифр", HttpStatus.BAD_REQUEST),
+    BULLION_NOT_CREDIT(4024, "В накопитель можно добавить только кредитный слиток", HttpStatus.BAD_REQUEST),
+    BULLION_ALREADY_LINKED(4025, "Слиток уже привязан к другой карте", HttpStatus.BAD_REQUEST),
+    CREDIT_CARD_HISTORY_NOT_FOUND(4026, "Операция по карте не найдена", HttpStatus.NOT_FOUND),
+    CREDIT_CARD_OPERATION_ALREADY_REVERSED(4027, "Операция по карте уже откачена", HttpStatus.BAD_REQUEST),
+    BULLION_NOT_ACCUMULATOR(4028, "Слиток не привязан к кредитной карте", HttpStatus.BAD_REQUEST),
+    TRANSACTION_LOCKED_BY_CARD(4029, "Операция входит в погашение по карте — откатывайте её из истории карты", HttpStatus.BAD_REQUEST),
+    CREDIT_CARD_LIMIT_BELOW_DEBT(4030, "Лимит не может быть меньше задолженности", HttpStatus.BAD_REQUEST),
 
 
     // Системные ошибки (5xxx)

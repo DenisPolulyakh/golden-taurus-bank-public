@@ -7,6 +7,7 @@ import ru.money.goldentaurusbank.www.backend.model.domain.Bullion;
 import ru.money.goldentaurusbank.www.backend.model.domain.BullionName;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.domain.Vault;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.BullionType;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -31,6 +32,11 @@ public interface BullionRepository extends JpaRepository<Bullion, Long> {
 
 
     boolean existsByBullionNameIdAndUserId(Long bullionNameId, Long userId);
+
+    /** Кредитные слитки, ещё не занятые ни одной картой — из них собирается накопитель. */
+    List<Bullion> findByUserAndBullionTypeAndArchivedFalseAndCreditCardIsNull(User user, BullionType bullionType);
+
+    List<Bullion> findByCreditCardIdAndArchivedFalse(Long creditCardId);
 
     @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user = :user AND b.archived = false")
     BigDecimal getTotalAmountByUser(@Param("user") User user);

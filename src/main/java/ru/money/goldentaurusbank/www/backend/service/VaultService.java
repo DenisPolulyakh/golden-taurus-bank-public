@@ -19,6 +19,7 @@ import ru.money.goldentaurusbank.www.backend.model.dto.request.VaultRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.PageResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.VaultResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.VaultSummaryResponse;
+import ru.money.goldentaurusbank.www.backend.model.mapper.CreditCardMapper;
 import ru.money.goldentaurusbank.www.backend.model.mapper.VaultMapper;
 import ru.money.goldentaurusbank.www.backend.repository.BankRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
@@ -43,6 +44,7 @@ public class VaultService {
     private final VaultRepository vaultRepository;
     private final BankRepository bankRepository;
     private final VaultMapper vaultMapper;
+    private final CreditCardMapper creditCardMapper;
     private final TransactionService transactionService;
 
     @Transactional
@@ -279,6 +281,10 @@ public class VaultService {
                         .amount(b.getAmount())
                         .description(b.getDescription())
                         .bullionType(b.getBullionType())
+                        .creditCardId(b.getCreditCard() == null ? null : b.getCreditCard().getId())
+                        .creditCardMasked(b.getCreditCard() == null
+                                ? null : creditCardMapper.mask(b.getCreditCard().getLast4()))
+                        .creditCardDebt(b.getCreditCard() == null ? null : b.getCreditCard().getDebt())
                         .build())
                 .sorted((a, b) -> b.getAmount().compareTo(a.getAmount()))
                 .toList();

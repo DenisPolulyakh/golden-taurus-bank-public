@@ -219,6 +219,14 @@ const TransactionHistoryPage = () => {
                                     >
                                         ↩️ Откатить
                                     </button>
+                                ) : tx.lockedByCard ? (
+                                    // Нога погашения по карте: откат только целиком, из истории карты
+                                    <span
+                                        className="rolled-back-label"
+                                        title="Операция входит в погашение по кредитной карте — откатывайте её из истории карты"
+                                    >
+                                        💳 откат из карты
+                                    </span>
                                 ) : (
                                     <span className="rolled-back-label">Откачена</span>
                                 )}

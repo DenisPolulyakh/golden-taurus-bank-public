@@ -15,6 +15,7 @@ const SavingsChart = ({ refreshKey }) => {
     const [viewMode, setViewMode] = useState('month');
     const [loading, setLoading] = useState(true);
     const [totalSavings, setTotalSavings] = useState(0);
+    const [totalDebt, setTotalDebt] = useState(0);
 
     const monthNames = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
     const currentDate = new Date();
@@ -71,18 +72,23 @@ const SavingsChart = ({ refreshKey }) => {
             const monthlyData = response.data.monthlyData || [];
 
             setTotalSavings(monthlyData[monthlyData.length - 1]?.savings || 0);
+            setTotalDebt(response.data.totalDebt || 0);
 
             const transformedData = monthlyData.map((item) => {
                 const monthNum = parseInt(item.month.split('-')[1]);
                 const isFuture = selectedYear === currentYear && monthNum > currentMonth;
                 const isCurrentMonth = selectedYear === currentYear && monthNum === currentMonth;
                 const savings = item.savings || 0;
+                const debt = Number(item.debt || 0);
 
                 return {
                     ...item,
                     monthLabel: `${monthNames[monthNum - 1]} ${selectedYear}`,
                     monthNumber: monthNum,
                     savings,
+                    debt,
+                    // Задолженность рисуется вниз, поэтому в график уходит с минусом
+                    debtBar: -debt,
                     change: item.netChange || 0,
                     barColor: savings >= 0 ? '#667eea' : '#e53e3e',
                     barOpacity: isFuture ? 0.35 : (isCurrentMonth ? 0.7 : 1)
@@ -113,6 +119,7 @@ const SavingsChart = ({ refreshKey }) => {
             // Бэкенд отдаёт все дни месяца, включая пустые, — достраивать нечего.
             const dailyData = response.data.dailyData || [];
             setTotalSavings(dailyData[dailyData.length - 1]?.savings || 0);
+            setTotalDebt(response.data.totalDebt || 0);
 
             const isCurrentMonth = selectedYear === currentYear && selectedMonth === currentMonth;
 
@@ -120,10 +127,14 @@ const SavingsChart = ({ refreshKey }) => {
                 const isFuture = isCurrentMonth && item.day > currentDay;
                 const isToday = isCurrentMonth && item.day === currentDay;
                 const savings = item.savings || 0;
+                const debt = Number(item.debt || 0);
 
                 return {
                     ...item,
                     date: `${String(item.day).padStart(2, '0')}.${String(selectedMonth).padStart(2, '0')}`,
+                    debt,
+                    // Задолженность рисуется вниз, поэтому в график уходит с минусом
+                    debtBar: -debt,
                     change: item.dailyChange || 0,
                     barColor: savings >= 0 ? '#667eea' : '#e53e3e',
                     barOpacity: isFuture ? 0.35 : (isToday ? 0.7 : 1)
@@ -174,8 +185,10 @@ const SavingsChart = ({ refreshKey }) => {
 
     const CustomTooltip = ({ active, payload, label }) => {
         if (active && payload && payload.length) {
-            const savings = payload[0]?.value || 0;
-            const change = payload[0]?.payload?.change || 0;
+            const point = payload[0]?.payload || {};
+            const savings = point.savings || 0;
+            const debt = point.debt || 0;
+            const change = point.change || 0;
             const changeLabel = viewMode === 'year'
                 ? 'к прошлому месяцу'
                 : 'к прошлому дню';
@@ -199,6 +212,11 @@ const SavingsChart = ({ refreshKey }) => {
                     <p style={{ margin: '4px 0 0 0', color: changeColor, fontWeight: 500, fontSize: '13px' }}>
                         {changeSign}{formatCurrency(change)} <span style={{ color: '#a0aec0' }}>{changeLabel}</span>
                     </p>
+                    {debt > 0 && (
+                        <p style={{ margin: '8px 0 0 0', color: '#c53030', fontWeight: 600, fontSize: '14px' }}>
+                            Долг по картам: {formatCurrency(debt)}
+                        </p>
+                    )}
                 </div>
             );
         }
@@ -218,6 +236,8 @@ const SavingsChart = ({ refreshKey }) => {
     }
 
     const isYearView = viewMode === 'year';
+    // Красные столбцы вниз показываем только тем, у кого есть кредитные карты
+    const hasDebt = data.some(item => Number(item.debt || 0) > 0);
 
     return (
         <div>
@@ -235,6 +255,13 @@ const SavingsChart = ({ refreshKey }) => {
                         Общая сумма: <span style={{ fontWeight: 600, color: '#667eea' }}>
                             {formatCurrency(totalSavings)}
                         </span>
+                        {totalDebt > 0 && (
+                            <>
+                                {' · '}Долг по картам: <span style={{ fontWeight: 600, color: '#c53030' }}>
+                                    {formatCurrency(totalDebt)}
+                                </span>
+                            </>
+                        )}
                     </p>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -312,7 +339,10 @@ const SavingsChart = ({ refreshKey }) => {
             </div>
 
             <ResponsiveContainer width="100%" height={380}>
-                <ComposedChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                {/* stackOffset="sign" — иначе стек копит сумму и долг откладывается
+                    вниз от вершины синего столбца, а не от нулевой линии */}
+                <ComposedChart data={data} stackOffset="sign"
+                               margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis
                         dataKey={isYearView ? 'monthLabel' : 'date'}
@@ -321,8 +351,11 @@ const SavingsChart = ({ refreshKey }) => {
                     />
                     <YAxis
                         tickFormatter={(value) => {
-                            if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-                            if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                            // Ось уходит в минус под столбцы задолженности — сокращаем по модулю
+                            const sign = value < 0 ? '-' : '';
+                            const abs = Math.abs(value);
+                            if (abs >= 1000000) return `${sign}${(abs / 1000000).toFixed(1)}M`;
+                            if (abs >= 1000) return `${sign}${(abs / 1000).toFixed(0)}K`;
                             return value;
                         }}
                     />
@@ -330,6 +363,8 @@ const SavingsChart = ({ refreshKey }) => {
                     <Bar
                         dataKey="savings"
                         name="Накопления"
+                        stackId="savingsDebt"
+                        maxBarSize={56}
                         radius={[6, 6, 0, 0]}
                     >
                         {data.map((entry, index) => (
@@ -340,6 +375,29 @@ const SavingsChart = ({ refreshKey }) => {
                             />
                         ))}
                     </Bar>
+                    {/* Задолженность по картам: столбцы вниз ровно под накоплениями
+                        (общий stackId), по их вершинам — жёлтая линия */}
+                    {hasDebt && (
+                        <Bar
+                            dataKey="debtBar"
+                            name="Задолженность"
+                            fill="#c53030"
+                            stackId="savingsDebt"
+                            maxBarSize={56}
+                            radius={[0, 0, 6, 6]}
+                        />
+                    )}
+                    {hasDebt && (
+                        <Line
+                            type="monotone"
+                            dataKey="debtBar"
+                            name="Долг"
+                            stroke="#ecc94b"
+                            strokeWidth={3}
+                            dot={{ r: 4, fill: '#ecc94b', stroke: 'white', strokeWidth: 2 }}
+                            activeDot={{ r: 7, fill: '#ecc94b', stroke: '#fff', strokeWidth: 3 }}
+                        />
+                    )}
                     <Line
                         type="monotone"
                         dataKey="savings"
@@ -390,6 +448,11 @@ const SavingsChart = ({ refreshKey }) => {
                 {!isYearView && selectedYear === currentYear && selectedMonth === currentMonth && (
                     <span style={{ marginLeft: '12px', color: '#667eea' }}>
                         🔵 Полупрозрачные столбцы — будущие дни
+                    </span>
+                )}
+                {hasDebt && (
+                    <span style={{ marginLeft: '12px', color: '#c53030' }}>
+                        🔴 Столбцы вниз — задолженность по кредитным картам
                     </span>
                 )}
             </div>

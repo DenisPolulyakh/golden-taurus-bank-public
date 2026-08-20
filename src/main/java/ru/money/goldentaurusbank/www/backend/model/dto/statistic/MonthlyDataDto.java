@@ -19,5 +19,7 @@ public class MonthlyDataDto {
     private BigDecimal expense;
     private BigDecimal netChange;
     private BigDecimal savings;
+    /** Задолженность по кредитным картам на конец месяца — красные столбцы вниз. */
+    private BigDecimal debt;
     private Long transactionCount;
 }

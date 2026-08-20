@@ -19,6 +19,7 @@ abstract class IntegrationTestBase {
 
     /** Все таблицы схемы; порядок неважен — CASCADE сам разберётся со связями. */
     private static final String TRUNCATE_ALL = "TRUNCATE TABLE "
+            + "taurus.credit_card_history, taurus.credit_cards, "
             + "taurus.transactions, taurus.bullions, taurus.vaults, "
             + "taurus.bullion_names, taurus.bank_dictionary, taurus.users "
             + "RESTART IDENTITY CASCADE";
@@ -84,6 +85,8 @@ abstract class IntegrationTestBase {
         registry.add("spring.mail.properties.mail.smtp.starttls.enable", () -> "false");
         registry.add("spring.mail.properties.mail.smtp.ssl.enable", () -> "false");
         registry.add("app.jwt.secret", () -> "testSecretKeyForJWTTokenGeneration2026");
+        registry.add("app.card.secret", () -> "testCardSecretForNumberEncryption2026");
+        registry.add("app.card.salt", () -> "0123456789abcdef");
         registry.add("app.jwt.access-expiration", () -> "3600000");
         registry.add("app.jwt.refresh-expiration", () -> "604800000");
     }
