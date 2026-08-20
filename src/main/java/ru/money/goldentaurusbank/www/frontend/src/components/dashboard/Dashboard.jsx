@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api, { clearAccessToken } from '../../api/axios';
 import SavingsChart from './SavingsChart.jsx';
@@ -15,12 +15,37 @@ function Dashboard({ user, onLogout }) {
     const [bullionDistribution, setBullionDistribution] = useState([]);
     const [refreshKey, setRefreshKey] = useState(0);
     const [currentDateTime, setCurrentDateTime] = useState(new Date());
+    // Справочники убраны под шестерёнку: в шапке им место только раз в месяц
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const settingsRef = useRef(null);
     const navigate = useNavigate();
 
     useEffect(() => {
         fetchUserData();
         fetchDashboardData();
     }, [refreshKey]);
+
+    // Меню закрывается щелчком мимо и по Escape: иначе оно висит поверх
+    // страницы, пока не ткнёшь в саму шестерёнку
+    useEffect(() => {
+        if (!settingsOpen) return;
+
+        const onPointerDown = (event) => {
+            if (!settingsRef.current?.contains(event.target)) {
+                setSettingsOpen(false);
+            }
+        };
+        const onKeyDown = (event) => {
+            if (event.key === 'Escape') setSettingsOpen(false);
+        };
+
+        document.addEventListener('mousedown', onPointerDown);
+        document.addEventListener('keydown', onKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', onPointerDown);
+            document.removeEventListener('keydown', onKeyDown);
+        };
+    }, [settingsOpen]);
 
     // Обновляем текущие дату и время каждую секунду
     useEffect(() => {
@@ -139,18 +164,44 @@ function Dashboard({ user, onLogout }) {
                     <Link to="/vaults" className="dashboard-link">
                         🏦 Хранилища
                     </Link>
-                    <Link to="/bullion-names" className="dashboard-link">
-                        📁 Наименования
-                    </Link>
-                    <Link to="/banks" className="dashboard-link">
-                        🏛️ Банки
-                    </Link>
                     <Link to="/credit-cards" className="dashboard-link">
                         💳 Кредитные карты
                     </Link>
                     <Link to="/transactions" className="dashboard-link">
                         📜 История
                     </Link>
+                    <div className="settings-dropdown" ref={settingsRef}>
+                        <button
+                            type="button"
+                            className={`settings-btn ${settingsOpen ? 'open' : ''}`}
+                            onClick={() => setSettingsOpen(open => !open)}
+                            aria-expanded={settingsOpen}
+                            aria-haspopup="menu"
+                            title="Справочники"
+                        >
+                            ⚙️
+                        </button>
+                        {settingsOpen && (
+                            <div className="settings-menu" role="menu">
+                                <Link
+                                    to="/bullion-names"
+                                    className="dashboard-link"
+                                    role="menuitem"
+                                    onClick={() => setSettingsOpen(false)}
+                                >
+                                    📁 Наименования
+                                </Link>
+                                <Link
+                                    to="/banks"
+                                    className="dashboard-link"
+                                    role="menuitem"
+                                    onClick={() => setSettingsOpen(false)}
+                                >
+                                    🏛️ Банки
+                                </Link>
+                            </div>
+                        )}
+                    </div>
                     <button onClick={handleLogout} className="logout-btn">
                         Выйти
                     </button>
