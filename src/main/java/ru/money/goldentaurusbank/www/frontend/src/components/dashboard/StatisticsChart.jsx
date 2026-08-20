@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid,
-    Tooltip, Legend, ResponsiveContainer, Line, ComposedChart
+    Tooltip, Legend, ResponsiveContainer, Line, ComposedChart, ReferenceLine
 } from 'recharts';
 import api from '../../api/axios.js';
 
@@ -53,6 +53,8 @@ const StatisticsChart = ({ refreshKey }) => {
                 const [year, month] = item.month.split('-');
                 return {
                     ...item,
+                    // расход рисуем вниз от нуля: в тултипе показываем модуль
+                    expenseDown: -Math.abs(item.expense || 0),
                     monthLabel: `${monthNames[parseInt(month) - 1]} ${year}`
                 };
             });
@@ -77,6 +79,7 @@ const StatisticsChart = ({ refreshKey }) => {
 
     const CustomTooltip = ({ active, payload, label }) => {
         if (active && payload && payload.length) {
+            const valueOf = (key) => payload.find(p => p.dataKey === key)?.value || 0;
             return (
                 <div style={{
                     background: 'white',
@@ -88,14 +91,14 @@ const StatisticsChart = ({ refreshKey }) => {
                     <p style={{ margin: '0 0 8px 0', fontWeight: 600, color: '#2d3748' }}>
                         {label}
                     </p>
-                    <p style={{ margin: '4px 0', color: '#48bb78' }}>
-                        📈 Доход: {formatCurrency(payload[0]?.value || 0)}
+                    <p style={{ margin: '4px 0', color: '#3182ce' }}>
+                        📈 Доход: {formatCurrency(valueOf('income'))}
                     </p>
                     <p style={{ margin: '4px 0', color: '#e53e3e' }}>
-                        📉 Расход: {formatCurrency(payload[1]?.value || 0)}
+                        📉 Расход: {formatCurrency(Math.abs(valueOf('expenseDown')))}
                     </p>
                     <p style={{ margin: '4px 0', color: '#667eea', fontWeight: 600 }}>
-                        💰 Изменение: {formatCurrency(payload[2]?.value || 0)}
+                        💰 Изменение: {formatCurrency(valueOf('netChange'))}
                     </p>
                 </div>
             );
@@ -143,15 +146,20 @@ const StatisticsChart = ({ refreshKey }) => {
                     <XAxis dataKey="monthLabel" stroke="#718096" />
                     <YAxis
                         tickFormatter={(value) => {
-                            if (value >= 1000000) return `${(value / 1000000).toFixed(0)}M`;
-                            if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                            const abs = Math.abs(value);
+                            const sign = value < 0 ? '-' : '';
+                            if (abs >= 1000000) return `${sign}${(abs / 1000000).toFixed(0)}M`;
+                            if (abs >= 1000) return `${sign}${(abs / 1000).toFixed(0)}K`;
                             return value;
                         }}
                     />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
-                    <Bar dataKey="income" name="Доход" fill="#48bb78" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="expense" name="Расход" fill="#e53e3e" radius={[4, 4, 0, 0]} />
+                    <ReferenceLine y={0} stroke="#a0aec0" />
+                    <Bar dataKey="income" name="Доход" stackId="io" fill="#3182ce"
+                         radius={[4, 4, 0, 0]} maxBarSize={56} />
+                    <Bar dataKey="expenseDown" name="Расход" stackId="io" fill="#e53e3e"
+                         radius={[0, 0, 4, 4]} maxBarSize={56} />
                     <Line
                         type="monotone"
                         dataKey="netChange"
