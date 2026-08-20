@@ -339,7 +339,10 @@ const SavingsChart = ({ refreshKey }) => {
             </div>
 
             <ResponsiveContainer width="100%" height={380}>
-                <ComposedChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                {/* stackOffset="sign" — иначе стек копит сумму и долг откладывается
+                    вниз от вершины синего столбца, а не от нулевой линии */}
+                <ComposedChart data={data} stackOffset="sign"
+                               margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis
                         dataKey={isYearView ? 'monthLabel' : 'date'}
