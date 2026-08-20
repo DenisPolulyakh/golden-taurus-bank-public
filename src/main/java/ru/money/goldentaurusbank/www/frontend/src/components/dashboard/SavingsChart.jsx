@@ -360,6 +360,8 @@ const SavingsChart = ({ refreshKey }) => {
                     <Bar
                         dataKey="savings"
                         name="Накопления"
+                        stackId="savingsDebt"
+                        maxBarSize={56}
                         radius={[6, 6, 0, 0]}
                     >
                         {data.map((entry, index) => (
@@ -370,12 +372,15 @@ const SavingsChart = ({ refreshKey }) => {
                             />
                         ))}
                     </Bar>
-                    {/* Задолженность по картам: столбцы вниз, по их вершинам — жёлтая линия */}
+                    {/* Задолженность по картам: столбцы вниз ровно под накоплениями
+                        (общий stackId), по их вершинам — жёлтая линия */}
                     {hasDebt && (
                         <Bar
                             dataKey="debtBar"
                             name="Задолженность"
                             fill="#c53030"
+                            stackId="savingsDebt"
+                            maxBarSize={56}
                             radius={[0, 0, 6, 6]}
                         />
                     )}
