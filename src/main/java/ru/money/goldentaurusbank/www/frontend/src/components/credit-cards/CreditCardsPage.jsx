@@ -5,12 +5,13 @@ import api from '../../api/axios';
 import CreditCardModal from './CreditCardModal';
 import CreditCardOperationModal from './CreditCardOperationModal';
 import CreditCardHistoryModal from './CreditCardHistoryModal';
-import { formatAmount, formatSigned, formatDate, graceClass, graceText } from './creditCardFormat';
+import { formatAmount, formatSigned, formatDate, graceClass, graceText, limitUsage, usageClass, usageText } from './creditCardFormat';
 import './CreditCards.css';
 
 function CreditCardsPage() {
     const [cards, setCards] = useState([]);
     const [totalDebt, setTotalDebt] = useState(0);
+    const [totalLimit, setTotalLimit] = useState(0);
     const [count, setCount] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
     // По умолчанию — ближайший конец льготного периода: сверху карта,
@@ -40,6 +41,7 @@ function CreditCardsPage() {
             const data = response.data.data;
             setCards(data.cards || []);
             setTotalDebt(data.totalDebt || 0);
+            setTotalLimit(data.totalLimit || 0);
             setCount(data.count || 0);
             setError('');
         } catch (err) {
@@ -132,6 +134,8 @@ function CreditCardsPage() {
         return <div className="credit-cards-container">Загрузка...</div>;
     }
 
+    const usage = limitUsage(totalDebt, totalLimit);
+
     return (
         <div className="credit-cards-container">
             <div className="credit-cards-content">
@@ -154,6 +158,14 @@ function CreditCardsPage() {
                     <div className="stat-card">
                         <div className="stat-label">💸 Текущий долг</div>
                         <div className="stat-value total-debt-value">{formatAmount(totalDebt)} ₽</div>
+                    </div>
+                    <div className="stat-card">
+                        <div className="stat-label">💳 Общий лимит</div>
+                        <div className="stat-value total-limit-value">{formatAmount(totalLimit)} ₽</div>
+                        <div className="limit-usage">
+                            Лимит использован на:{' '}
+                            <span className={`limit-usage-value ${usageClass(usage)}`}>{usageText(usage)}</span>
+                        </div>
                     </div>
                     <div className="stat-card">
                         <div className="stat-label">💳 Количество кредитных карт</div>

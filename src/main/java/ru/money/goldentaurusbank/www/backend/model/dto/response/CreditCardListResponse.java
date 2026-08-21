@@ -20,6 +20,7 @@ import java.util.List;
 public class CreditCardListResponse {
 
     private BigDecimal totalDebt;
+    private BigDecimal totalLimit;
     private Integer count;
     private List<CreditCardResponse> cards;
 }

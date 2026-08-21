@@ -71,6 +71,7 @@ public class CreditCardService {
                 // Итоги — по всем активным картам, а не по найденному:
                 // в шапке стоит «Текущий долг», а не «долг найденного»
                 .totalDebt(creditCardRepository.getTotalDebt(user))
+                .totalLimit(creditCardRepository.getTotalLimit(user))
                 .count(creditCardRepository.countByUserAndArchivedFalse(user))
                 .cards(creditCardMapper.toResponseList(sorted))
                 .build();
