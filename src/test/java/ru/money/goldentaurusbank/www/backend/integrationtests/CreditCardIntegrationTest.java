@@ -87,20 +87,27 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
     }
 
     @Test
-    @DisplayName("Итоги списка: общий долг и количество карт")
+    @DisplayName("Итоги списка: общий долг, общий лимит и количество карт")
     void listTotals() throws Exception {
         createCard("Первая", "1111", "100000", "50000");
-        createCard("Вторая", "2222", "300000", "10000");
+        Long second = createCard("Вторая", "2222", "300000", "10000");
 
         JsonNode list = listCardsRaw(null, null, null);
         assertThat(list.get("totalDebt").decimalValue()).isEqualByComparingTo("60000.00");
+        assertThat(list.get("totalLimit").decimalValue()).isEqualByComparingTo("400000.00");
         assertThat(list.get("count").asInt()).isEqualTo(2);
 
         // Поиск сужает список, но не итоги: в шапке «Текущий долг», а не «долг найденного»
         JsonNode filtered = listCardsRaw("Перв", null, null);
         assertThat(filtered.get("cards")).hasSize(1);
         assertThat(filtered.get("totalDebt").decimalValue()).isEqualByComparingTo("60000.00");
+        assertThat(filtered.get("totalLimit").decimalValue()).isEqualByComparingTo("400000.00");
         assertThat(filtered.get("count").asInt()).isEqualTo(2);
+
+        // Архивная карта из итогов уходит вместе со своим лимитом
+        deleteCard(second).andExpect(status().isOk());
+        JsonNode afterDelete = listCardsRaw(null, null, null);
+        assertThat(afterDelete.get("totalLimit").decimalValue()).isEqualByComparingTo("100000.00");
     }
 
     @Test

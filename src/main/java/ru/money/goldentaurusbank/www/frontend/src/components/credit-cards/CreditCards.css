@@ -34,6 +34,38 @@
     font-weight: 800;
 }
 
+/* Общий лимит — зелёный противовес долгу */
+.total-limit-value {
+    color: #2f855a;
+    font-weight: 800;
+}
+
+.limit-usage {
+    margin-top: 6px;
+    font-size: 14px;
+    color: #718096;
+}
+
+.limit-usage-value {
+    font-weight: 700;
+}
+
+.usage-ok {
+    color: #2f855a;
+}
+
+.usage-notice {
+    color: #d69e2e;
+}
+
+.usage-warning {
+    color: #dd6b20;
+}
+
+.usage-danger {
+    color: #c53030;
+}
+
 .credit-card .card-header {
     background: linear-gradient(135deg, #c53030 0%, #742a2a 100%);
 }

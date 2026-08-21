@@ -40,4 +40,7 @@ public interface CreditCardRepository extends JpaRepository<CreditCard, Long> {
 
     @Query("SELECT COALESCE(SUM(c.debt), 0) FROM CreditCard c WHERE c.user.id = :userId AND c.archived = false")
     BigDecimal getTotalDebtByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT COALESCE(SUM(c.cardLimit), 0) FROM CreditCard c WHERE c.user = :user AND c.archived = false")
+    BigDecimal getTotalLimit(@Param("user") User user);
 }

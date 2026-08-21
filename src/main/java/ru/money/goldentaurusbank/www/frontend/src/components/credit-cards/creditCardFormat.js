@@ -67,6 +67,34 @@ export function graceClass(daysLeft) {
     return 'grace-ok';
 }
 
+/**
+ * Доля использованного лимита в процентах. Лимит 0 (или карт нет) — делить не на
+ * что, возвращаем null: это «неизвестно», а не «0 % использовано».
+ */
+export function limitUsage(totalDebt, totalLimit) {
+    const limit = Number(totalLimit || 0);
+    if (!limit) return null;
+    return (Number(totalDebt || 0) / limit) * 100;
+}
+
+/**
+ * Цвет процента: до 30 — зелёный, до 50 — жёлтый, до 80 — оранжевый, от 80 —
+ * красный. Границы уходят в более тревожный цвет — так же, как у graceClass.
+ */
+export function usageClass(percent) {
+    if (percent === null || percent === undefined) return '';
+    if (percent >= 80) return 'usage-danger';
+    if (percent >= 50) return 'usage-warning';
+    if (percent >= 30) return 'usage-notice';
+    return 'usage-ok';
+}
+
+export function usageText(percent) {
+    if (percent === null || percent === undefined) return '—';
+    // Дробные доли процента здесь ничего не решают, читается хуже
+    return `${Math.round(percent)} %`;
+}
+
 export function graceText(daysLeft) {
     if (daysLeft === null || daysLeft === undefined) return '—';
     if (daysLeft < 0) return `Просрочено на ${pluralDays(daysLeft)}`;
