@@ -59,17 +59,10 @@ jobs:
         working-directory: ${{ env.FRONTEND_DIR }}
         run: npm run lint
 
+      # Артефакт CI больше не выкладывает: его никто не забирал. Выкладка собирает
+      # себе jar и dist сама и в том же прогоне их и распаковывает (deploy.yml,
+      # job `build` → `deploy-<sha>`). Лишняя копия только ела 500 МБ квоты на Free
+      # и в итоге роняла зелёный прогон на `Artifact storage quota has been hit`.
       - name: Фронт — сборка
         working-directory: ${{ env.FRONTEND_DIR }}
         run: npm run build
-
-      - name: Отдать артефакты деплою
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: actions/upload-artifact@v7
-        with:
-          name: dist-${{ github.sha }}
-          retention-days: 1     # квота хранилища на Free — 500 МБ
-          if-no-files-found: error
-          path: |
-            target/*.jar
-            src/main/java/ru/money/goldentaurusbank/www/frontend/dist
