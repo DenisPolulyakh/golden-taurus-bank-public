@@ -99,7 +99,7 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
                         </div>
 
                         <div className="form-group">
-                            <label>Льготный период до</label>
+                            <label>Ближайший платёж</label>
                             <input
                                 type="date"
                                 value={gracePeriodDate}
