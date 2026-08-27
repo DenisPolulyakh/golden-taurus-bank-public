@@ -14,8 +14,7 @@ function CreditCardsPage() {
     const [totalLimit, setTotalLimit] = useState(0);
     const [count, setCount] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
-    // По умолчанию — ближайший конец льготного периода: сверху карта,
-    // которую гасить раньше всех
+    // По умолчанию — ближайший платёж: сверху карта, которую гасить раньше всех
     const [sortConfig, setSortConfig] = useState({ field: 'grace', order: 'asc' });
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
@@ -272,7 +271,7 @@ const CreditCard = ({ card, disabled, onSpend, onRepay, onHistory, onEdit, onDel
                         <span className="stat-description card-number">{card.maskedNumber}</span>
                     </div>
                     <div className="stat">
-                        <span className="stat-name">Льготный период до:</span>
+                        <span className="stat-name">Ближайший платёж:</span>
                         <span className="stat-description">
                             {card.gracePeriodDate ? formatDate(card.gracePeriodDate) : '—'}
                         </span>
