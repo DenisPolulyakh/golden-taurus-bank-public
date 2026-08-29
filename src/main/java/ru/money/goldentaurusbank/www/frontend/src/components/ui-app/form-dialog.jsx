@@ -25,6 +25,7 @@ export function FormDialog({
     onSubmit,
     saving = false,
     submitText = 'Сохранить',
+    submitVariant = 'default',
     savingText = 'Сохранение...',
     cancelText = 'Отмена',
     submitDisabled = false,
@@ -59,7 +60,7 @@ export function FormDialog({
                         >
                             {cancelText}
                         </Button>
-                        <Button type="submit" disabled={saving || submitDisabled}>
+                        <Button type="submit" variant={submitVariant} disabled={saving || submitDisabled}>
                             {saving && <Spinner />}
                             {saving ? savingText : submitText}
                         </Button>

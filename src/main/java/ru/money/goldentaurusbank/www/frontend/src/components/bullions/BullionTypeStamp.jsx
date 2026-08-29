@@ -14,8 +14,9 @@ function BullionTypeStamp({ type }) {
     const stamp = STAMPS[type] || STAMPS.DEBIT;
 
     return (
+        // Размеры пришли из .bullion-stamp в удалённом Bullions.css
         <svg
-            className="bullion-stamp"
+            className="h-[30px] w-[98px] shrink-0"
             viewBox="0 0 150 46"
             role="img"
             aria-label={`Тип слитка: ${stamp.label.toLowerCase()}`}
