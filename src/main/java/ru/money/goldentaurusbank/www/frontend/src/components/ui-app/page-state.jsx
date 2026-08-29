@@ -36,7 +36,7 @@ export function EmptyState({ icon: Icon, title, description, children, className
         <Empty className={cn('border', className)}>
             <EmptyHeader>
                 {Icon && (
-                    <EmptyMedia variant="icon">
+                    <EmptyMedia variant="icon" className="bg-primary/10 text-primary">
                         <Icon />
                     </EmptyMedia>
                 )}

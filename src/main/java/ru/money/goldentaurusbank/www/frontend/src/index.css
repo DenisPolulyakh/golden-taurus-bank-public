@@ -36,6 +36,9 @@
     --success: oklch(0.6342 0.1283 156.20);             /* #38a169 */
     --success-foreground: oklch(1.0000 0 0);            /* #ffffff */
 
+    --info: oklch(0.5946 0.1398 250.30);                /* #3182ce */
+    --info-foreground: oklch(1.0000 0 0);               /* #ffffff */
+
     --warning: oklch(0.6533 0.1638 48.41);              /* #dd6b20 */
     --warning-foreground: oklch(1.0000 0 0);            /* #ffffff */
 
@@ -43,12 +46,18 @@
     --input: oklch(0.9288 0.0126 255.51);               /* #e2e8f0 */
     --ring: oklch(0.6271 0.1638 271.53);                /* #667eea */
 
+    /* Фирменный градиент: тот самый #667eea → #764ba2 со старого экрана входа.
+       Живёт в шапке, на логотипе и на фоне страниц авторизации. */
+    --brand-from: oklch(0.6271 0.1638 271.53);          /* #667eea */
+    --brand-to: oklch(0.5012 0.1384 304.73);            /* #764ba2 */
+
     /* Серии графиков: те же цвета, что сейчас захардкожены в recharts */
     --chart-1: oklch(0.6271 0.1638 271.53);             /* #667eea */
     --chart-2: oklch(0.7096 0.1434 154.53);             /* #48bb78 */
     --chart-3: oklch(0.6137 0.2039 25.56);              /* #e53e3e */
     --chart-4: oklch(0.7244 0.1534 56.07);              /* #ed8936 */
     --chart-5: oklch(0.5012 0.1384 304.73);             /* #764ba2 */
+    --chart-6: oklch(0.6964 0.1053 190.24);             /* #38b2ac */
 
     --sidebar: oklch(0.9834 0.0042 236.50);             /* #f7fafc */
     --sidebar-foreground: oklch(0.3351 0.0331 260.91);  /* #2d3748 */
@@ -90,6 +99,9 @@
     --success: oklch(0.7096 0.1434 154.53);             /* #48bb78 */
     --success-foreground: oklch(0.2433 0.0247 263.95);
 
+    --info: oklch(0.5946 0.1398 250.30);                /* #3182ce */
+    --info-foreground: oklch(0.9834 0.0042 236.50);
+
     --warning: oklch(0.7244 0.1534 56.07);              /* #ed8936 */
     --warning-foreground: oklch(0.2433 0.0247 263.95);
 
@@ -128,6 +140,10 @@
     --color-destructive-foreground: var(--destructive-foreground);
     --color-success: var(--success);
     --color-success-foreground: var(--success-foreground);
+    --color-info: var(--info);
+    --color-info-foreground: var(--info-foreground);
+    --color-brand-from: var(--brand-from);
+    --color-brand-to: var(--brand-to);
     --color-warning: var(--warning);
     --color-warning-foreground: var(--warning-foreground);
     --color-border: var(--border);
@@ -138,6 +154,7 @@
     --color-chart-3: var(--chart-3);
     --color-chart-4: var(--chart-4);
     --color-chart-5: var(--chart-5);
+    --color-chart-6: var(--chart-6);
     --color-sidebar: var(--sidebar);
     --color-sidebar-foreground: var(--sidebar-foreground);
     --color-sidebar-primary: var(--sidebar-primary);
@@ -158,7 +175,45 @@
         @apply border-border outline-ring/50;
     }
 
+    /* Фон не белый лист, а мягкая подсветка фирменными цветами по углам:
+       карточки на нём читаются как отдельный слой, а не как рамки на бумаге. */
     body {
         @apply bg-background text-foreground;
+        background-image:
+            radial-gradient(60rem 30rem at 100% -10%,
+                color-mix(in oklch, var(--brand-from) 12%, transparent), transparent),
+            radial-gradient(45rem 25rem at -10% 0%,
+                color-mix(in oklch, var(--brand-to) 10%, transparent), transparent);
+        background-attachment: fixed;
+        background-repeat: no-repeat;
+    }
+}
+
+@layer components {
+    /* Полировка общая для всех карточек и таблиц — иначе одни и те же классы
+       пришлось бы дописывать в трёх десятках мест. */
+    [data-slot="card"] {
+        box-shadow:
+            0 1px 2px oklch(0 0 0 / 4%),
+            0 12px 32px -16px oklch(0 0 0 / 14%);
+    }
+
+    [data-slot="table-header"] {
+        background-color: color-mix(in oklch, var(--muted) 75%, transparent);
+    }
+
+    [data-slot="table-row"] {
+        transition: background-color 0.15s ease;
+    }
+
+    /* Фирменная заливка: логотип, аватар экрана входа, иконки плиток */
+    .brand-gradient {
+        background-image: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+    }
+
+    .brand-text {
+        background-image: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+        background-clip: text;
+        color: transparent;
     }
 }

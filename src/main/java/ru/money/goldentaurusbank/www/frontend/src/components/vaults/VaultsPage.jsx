@@ -324,7 +324,13 @@ function VaultsPage() {
                                             </TableCell>
                                             <TableCell>
                                                 <span className="flex flex-wrap items-center gap-1.5">
-                                                    <Badge variant="secondary">
+                                                    <Badge
+                                                        variant={
+                                                            vault.accountType === 'SAVINGS'
+                                                                ? 'success'
+                                                                : 'info'
+                                                        }
+                                                    >
                                                         {vault.accountType === 'SAVINGS'
                                                             ? 'Накопительный'
                                                             : 'Срочный'}

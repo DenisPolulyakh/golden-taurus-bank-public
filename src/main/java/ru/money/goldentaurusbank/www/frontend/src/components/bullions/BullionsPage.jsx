@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Coins, CreditCard, Minus, Plus, Repeat, Trash2 } from 'lucide-react'
+import { Coins, CreditCard, Minus, Plus, Repeat, Trash2, TrendingUp, Wallet } from 'lucide-react'
 import api from '@/api/axios'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -516,8 +516,18 @@ function BullionsPage() {
             </PageHeader>
 
             <StatGrid className="lg:grid-cols-2">
-                <StatCard label="Общая сумма" value={`${formatAmount(totalAmount)} ₽`} accent />
-                <StatCard label="Средняя ставка" value={`${averageRate.toFixed(2)}%`} />
+                <StatCard
+                    icon={Wallet}
+                    label="Общая сумма"
+                    value={`${formatAmount(totalAmount)} ₽`}
+                    tone="brand"
+                />
+                <StatCard
+                    icon={TrendingUp}
+                    label="Средняя ставка"
+                    value={`${averageRate.toFixed(2)}%`}
+                    tone="success"
+                />
             </StatGrid>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -564,9 +574,28 @@ function BullionsPage() {
             ) : (
                 <div className="grid gap-4 lg:grid-cols-2">
                     {getFilteredAndSorted.map((bullionName) => (
-                        <Card key={bullionName.bullionNameId} className="gap-4">
-                            <CardHeader>
-                                <CardTitle className="text-base">
+                        <Card
+                            key={bullionName.bullionNameId}
+                            className="gap-4 overflow-hidden pt-0 transition-shadow hover:shadow-md"
+                        >
+                            {/* Цвет наименования уже хранится в справочнике —
+                                здесь он и опознаёт карточку */}
+                            <div
+                                className="h-1 w-full"
+                                style={{
+                                    backgroundColor:
+                                        bullionName.bullionNameColor || 'var(--border)',
+                                }}
+                            />
+                            <CardHeader className="pt-4">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <span
+                                        className="size-2.5 shrink-0 rounded-full"
+                                        style={{
+                                            backgroundColor:
+                                                bullionName.bullionNameColor || 'var(--border)',
+                                        }}
+                                    />
                                     {bullionName.bullionNameTitle}
                                 </CardTitle>
                                 {/* Наименование складывается из слитков разных хранилищ:
@@ -616,6 +645,7 @@ function BullionsPage() {
                                     разрешает хоть одно хранилище наименования. Считает их бэк. */}
                                 <ButtonGroup className="flex-wrap">
                                     <Button
+                                        className="text-success hover:text-success"
                                         variant="outline"
                                         size="sm"
                                         disabled={bullionName.allowedIncome === false}
@@ -635,6 +665,7 @@ function BullionsPage() {
                                         Внести
                                     </Button>
                                     <Button
+                                        className="text-warning hover:text-warning"
                                         variant="outline"
                                         size="sm"
                                         disabled={bullionName.allowedExpense === false}
@@ -654,6 +685,7 @@ function BullionsPage() {
                                         Снять
                                     </Button>
                                     <Button
+                                        className="text-primary hover:text-primary"
                                         variant="outline"
                                         size="sm"
                                         disabled={bullionName.allowedTransfer === false}
@@ -673,6 +705,7 @@ function BullionsPage() {
                                         привязаны к карте: остальным гасить нечего */}
                                     {hasAccumulator(bullionName) && (
                                         <Button
+                                            className="text-success hover:text-success"
                                             variant="outline"
                                             size="sm"
                                             disabled={!repayOptions(bullionName).some(canRepay)}

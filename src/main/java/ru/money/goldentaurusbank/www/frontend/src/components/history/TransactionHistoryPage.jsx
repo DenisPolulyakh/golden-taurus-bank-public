@@ -51,9 +51,9 @@ const KIND_AMOUNT_CLASS = {
 }
 
 const KIND_BADGE_VARIANT = {
-    DEPOSIT: 'secondary',
-    WITHDRAWAL: 'secondary',
-    TRANSFER: 'outline',
+    DEPOSIT: 'success',
+    WITHDRAWAL: 'danger',
+    TRANSFER: 'info',
     OPENING_BALANCE: 'outline',
 }
 

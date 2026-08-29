@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { Coins, CreditCard, Minus, Pencil, Plus, Repeat, Trash2 } from 'lucide-react'
+import { Coins, CreditCard, Minus, Pencil, Plus, Repeat, Trash2, TrendingUp, Wallet } from 'lucide-react'
 import api from '@/api/axios'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -539,9 +539,24 @@ function VaultBullionsPage() {
             </PageHeader>
 
             <StatGrid className="lg:grid-cols-3">
-                <StatCard label="Общая сумма в хранилище" value={`${formatAmount(totalAmount)} ₽`} accent />
-                <StatCard label="Количество наименований" value={bullionsCount} />
-                <StatCard label="Процентная ставка" value={`${vault.interestRate || 0}%`} />
+                <StatCard
+                    icon={Wallet}
+                    label="Общая сумма в хранилище"
+                    value={`${formatAmount(totalAmount)} ₽`}
+                    tone="brand"
+                />
+                <StatCard
+                    icon={Coins}
+                    label="Количество наименований"
+                    value={bullionsCount}
+                    tone="info"
+                />
+                <StatCard
+                    icon={TrendingUp}
+                    label="Процентная ставка"
+                    value={`${vault.interestRate || 0}%`}
+                    tone="success"
+                />
             </StatGrid>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -696,7 +711,7 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
     const isDisabled = (flag) => disabled || !flag
 
     return (
-        <Card className="gap-4">
+        <Card className="gap-4 transition-shadow hover:shadow-md">
             <CardHeader>
                 <CardTitle className="text-base">{bullion.bullionNameTitle}</CardTitle>
                 <CardAction>
@@ -747,6 +762,7 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
             <CardContent>
                 <ButtonGroup className="flex-wrap">
                     <Button
+                        className="text-success hover:text-success"
                         variant="outline"
                         size="sm"
                         onClick={onRefill}
@@ -756,6 +772,7 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
                         Внести
                     </Button>
                     <Button
+                        className="text-warning hover:text-warning"
                         variant="outline"
                         size="sm"
                         onClick={onWithdraw}
@@ -770,6 +787,7 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
                     </Button>
                     {/* Перевод отсюда - это снятие: нет галочки «Можно снимать», нет и перевода */}
                     <Button
+                        className="text-primary hover:text-primary"
                         variant="outline"
                         size="sm"
                         onClick={onTransfer}
@@ -781,6 +799,7 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
                     {/* Погашение — тоже снятие со слитка, поэтому и оно под галочкой */}
                     {bullion.creditCardId && (
                         <Button
+                            className="text-success hover:text-success"
                             variant="outline"
                             size="sm"
                             onClick={onRepayCard}

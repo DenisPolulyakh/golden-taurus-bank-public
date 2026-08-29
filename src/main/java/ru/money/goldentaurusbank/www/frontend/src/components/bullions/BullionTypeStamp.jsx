@@ -5,8 +5,8 @@
  * а картинку пришлось бы держать двумя файлами и тянуть отдельным запросом.
  */
 const STAMPS = {
-    DEBIT: { label: 'Дебетовый', color: '#2f855a' },
-    CREDIT: { label: 'Кредитный', color: '#c53030' }
+    DEBIT: { label: 'Дебетовый', color: 'var(--success)' },
+    CREDIT: { label: 'Кредитный', color: 'var(--destructive)' }
 };
 
 function BullionTypeStamp({ type }) {

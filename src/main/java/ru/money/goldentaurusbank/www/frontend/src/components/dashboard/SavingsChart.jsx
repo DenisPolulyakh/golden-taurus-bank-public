@@ -108,7 +108,7 @@ const SavingsChart = ({ refreshKey }) => {
                     // Задолженность рисуется вниз, поэтому в график уходит с минусом
                     debtBar: -debt,
                     change: item.netChange || 0,
-                    barColor: savings >= 0 ? 'var(--chart-1)' : 'var(--destructive)',
+                    barColor: savings >= 0 ? 'url(#savingsFill)' : 'var(--destructive)',
                     barOpacity: isFuture ? 0.35 : (isCurrentMonth ? 0.7 : 1)
                 };
             });
@@ -154,7 +154,7 @@ const SavingsChart = ({ refreshKey }) => {
                     // Задолженность рисуется вниз, поэтому в график уходит с минусом
                     debtBar: -debt,
                     change: item.dailyChange || 0,
-                    barColor: savings >= 0 ? 'var(--chart-1)' : 'var(--destructive)',
+                    barColor: savings >= 0 ? 'url(#savingsFill)' : 'var(--destructive)',
                     barOpacity: isFuture ? 0.35 : (isToday ? 0.7 : 1)
                 };
             }));
@@ -325,6 +325,18 @@ const SavingsChart = ({ refreshKey }) => {
                     вниз от вершины синего столбца, а не от нулевой линии */}
                 <ComposedChart data={data} stackOffset="sign"
                                margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                    <defs>
+                        {/* Градиент по высоте столбца: плоская заливка выглядит
+                            плакатно, особенно на широком графике за год */}
+                        <linearGradient id="savingsFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={1} />
+                            <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.55} />
+                        </linearGradient>
+                        <linearGradient id="debtFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="var(--destructive)" stopOpacity={0.55} />
+                            <stop offset="100%" stopColor="var(--destructive)" stopOpacity={1} />
+                        </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis
                         dataKey={isYearView ? 'monthLabel' : 'date'}
@@ -363,7 +375,7 @@ const SavingsChart = ({ refreshKey }) => {
                         <Bar
                             dataKey="debtBar"
                             name="Задолженность"
-                            fill="var(--destructive)"
+                            fill="url(#debtFill)"
                             stackId="savingsDebt"
                             maxBarSize={56}
                             radius={[0, 0, 6, 6]}

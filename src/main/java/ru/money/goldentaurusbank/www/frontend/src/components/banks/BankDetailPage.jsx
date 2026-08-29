@@ -1,7 +1,7 @@
 // components/banks/BankDetailPage.jsx
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Vault } from 'lucide-react'
+import { Vault, Wallet } from 'lucide-react'
 import api from '@/api/axios'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -111,8 +111,18 @@ function BankDetailPage() {
             <PageHeader title={bankData.bankName} onBack={() => navigate('/vaults')} />
 
             <StatGrid className="lg:grid-cols-2">
-                <StatCard label="Общая сумма в банке" value={`${formatAmount(totalAmount)} ₽`} accent />
-                <StatCard label="Количество хранилищ" value={totalElements} />
+                <StatCard
+                    icon={Wallet}
+                    label="Общая сумма в банке"
+                    value={`${formatAmount(totalAmount)} ₽`}
+                    tone="brand"
+                />
+                <StatCard
+                    icon={Vault}
+                    label="Количество хранилищ"
+                    value={totalElements}
+                    tone="primary"
+                />
             </StatGrid>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -167,7 +177,11 @@ function BankDetailPage() {
                                     </button>
                                 </CardTitle>
                                 <CardAction>
-                                    <Badge variant="secondary">
+                                    <Badge
+                                        variant={
+                                            vault.accountType === 'SAVINGS' ? 'success' : 'info'
+                                        }
+                                    >
                                         {vault.accountType === 'SAVINGS'
                                             ? 'Накопительный'
                                             : 'Срочный'}

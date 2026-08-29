@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import { History, Minus, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
+import { CreditCard as CreditCardIcon, History, Minus, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
 import api from '@/api/axios'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -177,10 +177,17 @@ function CreditCardsPage() {
             </PageHeader>
 
             <StatGrid className="lg:grid-cols-3">
-                <StatCard label="Текущий долг" value={`${formatAmount(totalDebt)} ₽`} accent />
                 <StatCard
+                    icon={Minus}
+                    label="Текущий долг"
+                    value={`${formatAmount(totalDebt)} ₽`}
+                    tone="destructive"
+                />
+                <StatCard
+                    icon={Wallet}
                     label="Общий лимит"
                     value={`${formatAmount(totalLimit)} ₽`}
+                    tone="brand"
                     hint={
                         <span>
                             Лимит использован на:{' '}
@@ -190,7 +197,12 @@ function CreditCardsPage() {
                         </span>
                     }
                 />
-                <StatCard label="Количество кредитных карт" value={count} />
+                <StatCard
+                    icon={CreditCardIcon}
+                    label="Количество кредитных карт"
+                    value={count}
+                    tone="info"
+                />
             </StatGrid>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -299,7 +311,7 @@ const CreditCard = ({ card, disabled, onSpend, onRepay, onHistory, onEdit, onDel
     const accumulators = card.accumulators || []
 
     return (
-        <Card className="gap-4">
+        <Card className="gap-4 transition-shadow hover:shadow-md">
             <CardHeader>
                 <CardTitle className="text-base">{card.name}</CardTitle>
             </CardHeader>
@@ -363,11 +375,18 @@ const CreditCard = ({ card, disabled, onSpend, onRepay, onHistory, onEdit, onDel
 
             <CardContent>
                 <ButtonGroup className="flex-wrap">
-                    <Button variant="outline" size="sm" onClick={onSpend} disabled={disabled}>
+                    <Button
+                        className="text-warning hover:text-warning"
+                        variant="outline"
+                        size="sm"
+                        onClick={onSpend}
+                        disabled={disabled}
+                    >
                         <Minus />
                         Списание
                     </Button>
                     <Button
+                        className="text-success hover:text-success"
                         variant="outline"
                         size="sm"
                         onClick={onRepay}
@@ -376,7 +395,13 @@ const CreditCard = ({ card, disabled, onSpend, onRepay, onHistory, onEdit, onDel
                         <Plus />
                         Погашение
                     </Button>
-                    <Button variant="outline" size="sm" onClick={onHistory} disabled={disabled}>
+                    <Button
+                        className="text-info hover:text-info"
+                        variant="outline"
+                        size="sm"
+                        onClick={onHistory}
+                        disabled={disabled}
+                    >
                         <History />
                         История
                     </Button>

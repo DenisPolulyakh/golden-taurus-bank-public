@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Coins, CreditCard, FolderTree, History, Landmark, TrendingUp, Vault } from 'lucide-react'
+import { Coins, CreditCard, FolderTree, History, Landmark, TrendingUp, Vault, Wallet } from 'lucide-react'
 import api, { clearAccessToken } from '@/api/axios'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -120,7 +120,7 @@ function Dashboard({ user, onLogout }) {
         bullionDistribution.some(item => item.amount > 0)
 
     return (
-        <div className="min-h-screen bg-muted/30">
+        <div className="min-h-screen">
             <AppHeader onLogout={handleLogout} />
 
             {loading ? (
@@ -141,16 +141,28 @@ function Dashboard({ user, onLogout }) {
 
                     <StatGrid>
                         <StatCard
+                            icon={Wallet}
                             label="Общая сумма всех слитков"
                             value={`${formatAmount(totalAmount)} ₽`}
-                            accent
+                            tone="brand"
                         />
-                        <StatCard icon={Coins} label="Количество слитков" value={countBullions} />
-                        <StatCard icon={Vault} label="Количество хранилищ" value={countVaults} />
+                        <StatCard
+                            icon={Coins}
+                            label="Количество слитков"
+                            value={countBullions}
+                            tone="info"
+                        />
+                        <StatCard
+                            icon={Vault}
+                            label="Количество хранилищ"
+                            value={countVaults}
+                            tone="primary"
+                        />
                         <StatCard
                             icon={TrendingUp}
                             label="Средняя ставка"
                             value={`${averageRate.toFixed(2)}%`}
+                            tone="success"
                         />
                     </StatGrid>
 
