@@ -1,9 +1,178 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* Tailwind v4 подключён БЕЗ preflight. Обычный `@import "tailwindcss"` тянет за
+   собой сброс браузерных стилей, а он немедленно ломает все ещё не переписанные
+   экраны со старым CSS: гасит оформление кнопок, обнуляет поля и списки.
+   На этапе 10, когда старых .css не останется, эти две строки заменяются на
+   одну — `@import "tailwindcss";`. См. plans/PLAN_SHADCN_UI.md, п. 3.3. */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Палитра — не дефолтная от shadcn, а нынешние цвета проекта, переведённые в
+   oklch: #667eea → primary, серо-синяя шкала #2d3748…#f7fafc → foreground,
+   muted и border, #e53e3e → destructive, #38a169 → success. */
+:root {
+    --radius: 0.625rem;
+
+    --background: oklch(1.0000 0 0);                    /* #ffffff */
+    --foreground: oklch(0.3351 0.0331 260.91);          /* #2d3748 */
+
+    --card: oklch(1.0000 0 0);                          /* #ffffff */
+    --card-foreground: oklch(0.3351 0.0331 260.91);     /* #2d3748 */
+
+    --popover: oklch(1.0000 0 0);                       /* #ffffff */
+    --popover-foreground: oklch(0.3351 0.0331 260.91);  /* #2d3748 */
+
+    --primary: oklch(0.6271 0.1638 271.53);             /* #667eea */
+    --primary-foreground: oklch(1.0000 0 0);            /* #ffffff */
+
+    --secondary: oklch(0.9588 0.0086 247.92);           /* #edf2f7 */
+    --secondary-foreground: oklch(0.3351 0.0331 260.91);/* #2d3748 */
+
+    --muted: oklch(0.9834 0.0042 236.50);               /* #f7fafc */
+    --muted-foreground: oklch(0.5956 0.0381 257.87);    /* #718096 */
+
+    --accent: oklch(0.9588 0.0086 247.92);              /* #edf2f7 */
+    --accent-foreground: oklch(0.3351 0.0331 260.91);   /* #2d3748 */
+
+    --destructive: oklch(0.6137 0.2039 25.56);          /* #e53e3e */
+    --destructive-foreground: oklch(1.0000 0 0);        /* #ffffff */
+
+    --success: oklch(0.6342 0.1283 156.20);             /* #38a169 */
+    --success-foreground: oklch(1.0000 0 0);            /* #ffffff */
+
+    --warning: oklch(0.6533 0.1638 48.41);              /* #dd6b20 */
+    --warning-foreground: oklch(1.0000 0 0);            /* #ffffff */
+
+    --border: oklch(0.9288 0.0126 255.51);              /* #e2e8f0 */
+    --input: oklch(0.9288 0.0126 255.51);               /* #e2e8f0 */
+    --ring: oklch(0.6271 0.1638 271.53);                /* #667eea */
+
+    /* Серии графиков: те же цвета, что сейчас захардкожены в recharts */
+    --chart-1: oklch(0.6271 0.1638 271.53);             /* #667eea */
+    --chart-2: oklch(0.7096 0.1434 154.53);             /* #48bb78 */
+    --chart-3: oklch(0.6137 0.2039 25.56);              /* #e53e3e */
+    --chart-4: oklch(0.7244 0.1534 56.07);              /* #ed8936 */
+    --chart-5: oklch(0.5012 0.1384 304.73);             /* #764ba2 */
+
+    --sidebar: oklch(0.9834 0.0042 236.50);             /* #f7fafc */
+    --sidebar-foreground: oklch(0.3351 0.0331 260.91);  /* #2d3748 */
+    --sidebar-primary: oklch(0.6271 0.1638 271.53);     /* #667eea */
+    --sidebar-primary-foreground: oklch(1.0000 0 0);
+    --sidebar-accent: oklch(0.9588 0.0086 247.92);      /* #edf2f7 */
+    --sidebar-accent-foreground: oklch(0.3351 0.0331 260.91);
+    --sidebar-border: oklch(0.9288 0.0126 255.51);      /* #e2e8f0 */
+    --sidebar-ring: oklch(0.6271 0.1638 271.53);
 }
 
-body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+/* Тёмная тема пока не включается: переключателя нет, класс .dark никто не
+   вешает. Блок держим, чтобы компоненты shadcn не ссылались в пустоту. */
+.dark {
+    --background: oklch(0.2433 0.0247 263.95);          /* #1a202c */
+    --foreground: oklch(0.9588 0.0086 247.92);          /* #edf2f7 */
+
+    --card: oklch(0.3351 0.0331 260.91);                /* #2d3748 */
+    --card-foreground: oklch(0.9588 0.0086 247.92);
+
+    --popover: oklch(0.3351 0.0331 260.91);
+    --popover-foreground: oklch(0.9588 0.0086 247.92);
+
+    --primary: oklch(0.6271 0.1638 271.53);             /* #667eea */
+    --primary-foreground: oklch(0.9834 0.0042 236.50);
+
+    --secondary: oklch(0.4474 0.0343 261.32);           /* #4a5568 */
+    --secondary-foreground: oklch(0.9588 0.0086 247.92);
+
+    --muted: oklch(0.4474 0.0343 261.32);
+    --muted-foreground: oklch(0.7457 0.0304 254.72);    /* #a0aec0 */
+
+    --accent: oklch(0.4474 0.0343 261.32);
+    --accent-foreground: oklch(0.9588 0.0086 247.92);
+
+    --destructive: oklch(0.6137 0.2039 25.56);
+    --destructive-foreground: oklch(0.9834 0.0042 236.50);
+
+    --success: oklch(0.7096 0.1434 154.53);             /* #48bb78 */
+    --success-foreground: oklch(0.2433 0.0247 263.95);
+
+    --warning: oklch(0.7244 0.1534 56.07);              /* #ed8936 */
+    --warning-foreground: oklch(0.2433 0.0247 263.95);
+
+    --border: oklch(0.4474 0.0343 261.32);
+    --input: oklch(0.4474 0.0343 261.32);
+    --ring: oklch(0.6271 0.1638 271.53);
+
+    --sidebar: oklch(0.3351 0.0331 260.91);
+    --sidebar-foreground: oklch(0.9588 0.0086 247.92);
+    --sidebar-primary: oklch(0.6271 0.1638 271.53);
+    --sidebar-primary-foreground: oklch(0.9834 0.0042 236.50);
+    --sidebar-accent: oklch(0.4474 0.0343 261.32);
+    --sidebar-accent-foreground: oklch(0.9588 0.0086 247.92);
+    --sidebar-border: oklch(0.4474 0.0343 261.32);
+    --sidebar-ring: oklch(0.6271 0.1638 271.53);
+}
+
+@theme inline {
+    --font-sans: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+    /* ВРЕМЕННО, снести на этапе 10 вместе с включением preflight.
+       Старые .css рассчитывают на этот сброс, а preflight пока выключен.
+       Лежит именно в @layer base: без слоя эти правила перебивали бы
+       утилиты Tailwind (p-4, m-2 и прочие просто перестали бы работать). */
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--background);
+        color: var(--foreground);
+    }
 }
