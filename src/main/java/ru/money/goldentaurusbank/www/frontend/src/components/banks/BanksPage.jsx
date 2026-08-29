@@ -193,20 +193,23 @@ function BanksPage() {
                             <TableHeader>
                                 <TableRow>
                                     <SortableHead
+                                        className="w-full"
                                         label="Название банка"
                                         field="name"
                                         sortField="name"
                                         sortOrder={sortOrder}
                                         onSort={toggleSortOrder}
                                     />
-                                    <TableHead className="w-28 text-right">Действия</TableHead>
+                                    <TableHead className="w-0 text-right">Действия</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {currentItems.map((bank) => (
                                     <TableRow key={bank.id}>
-                                        <TableCell className="font-medium">{bank.name}</TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="whitespace-normal font-medium">
+                                            <div className="break-words">{bank.name}</div>
+                                        </TableCell>
+                                        <TableCell className="w-0 text-right">
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
                                                     <Button

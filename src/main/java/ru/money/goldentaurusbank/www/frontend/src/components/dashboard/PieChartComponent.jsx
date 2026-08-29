@@ -23,6 +23,37 @@ const PieChartComponent = ({ data, formatAmount }) => {
 
     const toggle = (index) => setActiveIndex(activeIndex === index ? null : index)
 
+    // Процент пишем прямо в сектор, но только там, где он помещается:
+    // на узких кусках подпись налезала бы на соседние
+    const renderPercentLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+        if (percent * 100 <= 5) return null
+
+        const radian = Math.PI / 180
+        const radius = innerRadius + (outerRadius - innerRadius) * 0.55
+        const x = cx + radius * Math.cos(-midAngle * radian)
+        const y = cy + radius * Math.sin(-midAngle * radian)
+
+        return (
+            <text
+                x={x}
+                y={y}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill="#fff"
+                fontSize={12}
+                fontWeight={600}
+                opacity={activeIndex === null || activeIndex === index ? 1 : 0.35}
+                // обводка цветом сектора: белые цифры на светлой заливке иначе теряются
+                stroke="oklch(0 0 0 / 35%)"
+                strokeWidth={2.5}
+                paintOrder="stroke"
+                className="pointer-events-none select-none"
+            >
+                {Math.round(percent * 100)}%
+            </text>
+        )
+    }
+
     return (
         <div className="flex flex-col items-center gap-6">
             <div className="relative h-[300px] w-full max-w-[320px]">
@@ -39,6 +70,8 @@ const PieChartComponent = ({ data, formatAmount }) => {
                             paddingAngle={1}
                             startAngle={90}
                             endAngle={-270}
+                            label={renderPercentLabel}
+                            labelLine={false}
                             onClick={(_, index) => toggle(index)}
                         >
                             {data.map((item, index) => (

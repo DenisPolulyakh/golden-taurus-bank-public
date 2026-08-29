@@ -203,20 +203,21 @@ function BullionNamesPage() {
                             <TableHeader>
                                 <TableRow>
                                     <SortableHead
+                                        className="w-full"
                                         label="Название наименования"
                                         field="title"
                                         sortField="title"
                                         sortOrder={sortOrder}
                                         onSort={toggleSortOrder}
                                     />
-                                    <TableHead className="w-28 text-right">Действия</TableHead>
+                                    <TableHead className="w-0 text-right">Действия</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {currentItems.map((bullionName) => (
                                     <TableRow key={bullionName.id}>
-                                        <TableCell>
-                                            <span className="flex items-center gap-2 font-medium">
+                                        <TableCell className="whitespace-normal">
+                                            <span className="flex items-center gap-2 font-medium break-words">
                                                 <span
                                                     className="inline-block size-3 shrink-0 rounded-full border"
                                                     style={{
@@ -227,7 +228,7 @@ function BullionNamesPage() {
                                                 {bullionName.title}
                                             </span>
                                         </TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="w-0 text-right">
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
                                                     <Button
