@@ -1,332 +1,270 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
-import api from '../../api/axios';
-import BankModal from './BankModal';
-import './Banks.css';
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { FileDown, FileUp, Landmark, Pencil, Plus, Trash2 } from 'lucide-react'
+import api from '@/api/axios'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Spinner } from '@/components/ui/spinner'
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { PageContainer, PageHeader } from '@/components/ui-app/page-header'
+import { SearchInput } from '@/components/ui-app/search-input'
+import { SortableHead, TablePager } from '@/components/ui-app/data-table'
+import { EmptyState, ErrorMessage, PageLoading } from '@/components/ui-app/page-state'
+import { useConfirm } from '@/components/ui-app/confirm-dialog'
+import { useExcelPort } from '@/components/ui-app/use-excel-port'
+import BankModal from './BankModal'
+
+const ITEMS_PER_PAGE = 10
 
 function BanksPage() {
-    const [banks, setBanks] = useState([]);
-    const [filteredBanks, setFilteredBanks] = useState([]);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [modalOpen, setModalOpen] = useState(false);
-    const [editingBank, setEditingBank] = useState(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(10);
-    const [importing, setImporting] = useState(false);
-    const [importResult, setImportResult] = useState(null);
+    const [banks, setBanks] = useState([])
+    const [filteredBanks, setFilteredBanks] = useState([])
+    const [searchTerm, setSearchTerm] = useState('')
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState('')
+    const [modalOpen, setModalOpen] = useState(false)
+    const [editingBank, setEditingBank] = useState(null)
+    const [currentPage, setCurrentPage] = useState(1)
 
-    const fileInputRef = useRef(null);
+    const [sortOrder, setSortOrder] = useState('asc')
+    const navigate = useNavigate()
+    const { confirm, confirmDialog } = useConfirm()
 
-    const [sortOrder, setSortOrder] = useState('asc');
-    const navigate = useNavigate();
+    const { importing, handleExport, handleImportClick, fileInputProps } = useExcelPort({
+        basePath: '/banks',
+        fileName: 'banks.xlsx',
+        exportErrorText: 'Не удалось экспортировать банки',
+        onImported: () => fetchBanks(),
+    })
 
     useEffect(() => {
-        fetchBanks();
-    }, []);
+        fetchBanks()
+    }, [])
 
     useEffect(() => {
-        let filtered = [...banks];
+        let filtered = [...banks]
 
         if (searchTerm) {
-            filtered = filtered.filter(bank =>
+            filtered = filtered.filter((bank) =>
                 bank.name.toLowerCase().includes(searchTerm.toLowerCase())
-            );
+            )
         }
 
-        filtered.sort((a, b) => {
-            if (sortOrder === 'asc') {
-                return a.name.localeCompare(b.name, 'ru');
-            } else {
-                return b.name.localeCompare(a.name, 'ru');
-            }
-        });
+        filtered.sort((a, b) =>
+            sortOrder === 'asc'
+                ? a.name.localeCompare(b.name, 'ru')
+                : b.name.localeCompare(a.name, 'ru')
+        )
 
-        setFilteredBanks(filtered);
-        setCurrentPage(1);
-    }, [searchTerm, banks, sortOrder]);
+        setFilteredBanks(filtered)
+        setCurrentPage(1)
+    }, [searchTerm, banks, sortOrder])
 
     const fetchBanks = async () => {
         try {
-            const response = await api.get('/banks');
-            setBanks(response.data.data || []);
-            setError('');
+            const response = await api.get('/banks')
+            setBanks(response.data.data || [])
+            setError('')
         } catch (err) {
-            console.error('Ошибка загрузки банков:', err);
-            setError('Не удалось загрузить список банков');
+            console.error('Ошибка загрузки банков:', err)
+            setError('Не удалось загрузить список банков')
         } finally {
-            setLoading(false);
+            setLoading(false)
         }
-    };
+    }
 
     const handleAddBank = () => {
-        setEditingBank(null);
-        setModalOpen(true);
-    };
+        setEditingBank(null)
+        setModalOpen(true)
+    }
 
     const handleEditBank = (bank) => {
-        setEditingBank(bank);
-        setModalOpen(true);
-    };
+        setEditingBank(bank)
+        setModalOpen(true)
+    }
 
     const handleSaveBank = async (name) => {
         try {
             if (editingBank) {
-                const response = await api.put(`/banks/${editingBank.id}`, { name });
-                setBanks(prev => prev.map(bank =>
-                    bank.id === editingBank.id ? response.data.data : bank
-                ));
+                const response = await api.put(`/banks/${editingBank.id}`, { name })
+                setBanks((prev) =>
+                    prev.map((bank) => (bank.id === editingBank.id ? response.data.data : bank))
+                )
             } else {
-                const response = await api.post('/banks', { name });
-                setBanks(prev => [...prev, response.data.data]);
+                const response = await api.post('/banks', { name })
+                setBanks((prev) => [...prev, response.data.data])
             }
-            setModalOpen(false);
-            setEditingBank(null);
+            setModalOpen(false)
+            setEditingBank(null)
         } catch (err) {
-            console.error('Ошибка сохранения банка:', err);
-            throw err;
+            console.error('Ошибка сохранения банка:', err)
+            throw err
         }
-    };
+    }
 
-    const handleDeleteBank = async (id, name) => {
-        if (window.confirm(`Удалить банк "${name}"?`)) {
-            try {
-                await api.delete(`/banks/${id}`);
-                setBanks(prev => prev.filter(bank => bank.id !== id));
-            } catch (err) {
-                console.error('Ошибка удаления банка:', err);
-            }
-        }
-    };
-
-    // Экспорт в Excel
-    const handleExport = async () => {
-        try {
-            const response = await api.get('/banks/export', {
-                responseType: 'blob',
-                _skipErrorToast: true
-            });
-
-            // Создаем ссылку для скачивания
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', 'banks.xlsx');
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
-        } catch (err) {
-            console.error('Ошибка экспорта:', err);
-            toast.error('Не удалось экспортировать банки');
-        }
-    };
-
-    // Импорт из Excel
-    const handleImportClick = () => {
-        fileInputRef.current.click();
-    };
-
-    const handleFileChange = async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        // Проверка расширения
-        const fileExt = file.name.split('.').pop().toLowerCase();
-        if (!['xlsx', 'xls'].includes(fileExt)) {
-            toast.error('Пожалуйста, выберите файл с расширением .xlsx или .xls');
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        setImporting(true);
-        setImportResult(null);
-
-        try {
-            const response = await api.post('/banks/import', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            });
-
-            const result = response.data.data;
-            setImportResult(result);
-
-            // Показываем результат импорта
-            let description = `Добавлено: ${result.added}, пропущено (дубликаты): ${result.skipped}`;
-            if (result.errors.length > 0) {
-                description += `\nОшибки (${result.errors.length}): ${result.errors.slice(0, 5).join('; ')}`;
-                if (result.errors.length > 5) {
-                    description += ` ...и еще ${result.errors.length - 5}`;
+    const handleDeleteBank = (id, name) => {
+        confirm({
+            title: 'Удаление банка',
+            description: `Удалить банк "${name}"?`,
+            onConfirm: async () => {
+                try {
+                    await api.delete(`/banks/${id}`)
+                    setBanks((prev) => prev.filter((bank) => bank.id !== id))
+                } catch (err) {
+                    console.error('Ошибка удаления банка:', err)
                 }
-                toast.warning('Импорт завершён с ошибками', { description });
-            } else {
-                toast.success('Импорт завершён', { description });
-            }
-
-            // Обновляем список банков
-            await fetchBanks();
-        } catch (err) {
-            console.error('Ошибка импорта:', err);
-        } finally {
-            setImporting(false);
-            // Очищаем input, чтобы можно было загрузить тот же файл повторно
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
-    };
+            },
+        })
+    }
 
     const toggleSortOrder = () => {
-        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    };
+        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    }
 
-    const indexOfLastItem = currentPage * itemsPerPage;
-    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentItems = filteredBanks.slice(indexOfFirstItem, indexOfLastItem);
-    const totalPages = Math.ceil(filteredBanks.length / itemsPerPage);
-
-    const paginate = (pageNumber) => setCurrentPage(pageNumber);
+    const indexOfLastItem = currentPage * ITEMS_PER_PAGE
+    const currentItems = filteredBanks.slice(indexOfLastItem - ITEMS_PER_PAGE, indexOfLastItem)
+    const totalPages = Math.ceil(filteredBanks.length / ITEMS_PER_PAGE)
 
     if (loading) {
-        return <div className="banks-container">Загрузка...</div>;
+        return (
+            <PageContainer>
+                <PageLoading />
+            </PageContainer>
+        )
     }
 
     return (
-        <div className="banks-container">
-            <div className="banks-content">
-                <div className="banks-header">
-                    <h1>🏦 Справочник банков</h1>
-                    <div className="header-actions">
-                        <button onClick={() => navigate('/dashboard')} className="back-btn">
-                            ← Назад
-                        </button>
-                        <button onClick={handleExport} className="export-btn">
-                            📎 Экспорт Excel
-                        </button>
-                        <button onClick={handleImportClick} className="import-btn" disabled={importing}>
-                            📂 Импорт Excel
-                        </button>
-                        <button onClick={handleAddBank} className="add-bank-btn">
-                            + Добавить банк
-                        </button>
-                    </div>
-                </div>
+        <TooltipProvider>
+            <PageContainer>
+                <PageHeader title="Справочник банков" onBack={() => navigate('/dashboard')}>
+                    <Button variant="outline" onClick={handleExport}>
+                        <FileDown />
+                        Экспорт Excel
+                    </Button>
+                    <Button variant="outline" onClick={handleImportClick} disabled={importing}>
+                        {importing ? <Spinner /> : <FileUp />}
+                        {importing ? 'Импорт данных...' : 'Импорт Excel'}
+                    </Button>
+                    <Button onClick={handleAddBank}>
+                        <Plus />
+                        Добавить банк
+                    </Button>
+                </PageHeader>
 
-                <div className="search-bar">
-                    <input
-                        type="text"
-                        placeholder="🔍 Поиск банков..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-
-                {error && <div className="error-message">{error}</div>}
-
-                {/* Скрытый input для выбора файла */}
-                <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    accept=".xlsx,.xls"
-                    style={{ display: 'none' }}
+                <SearchInput
+                    value={searchTerm}
+                    onChange={setSearchTerm}
+                    placeholder="Поиск банков..."
                 />
 
-                {/* Индикатор импорта */}
-                {importing && (
-                    <div className="import-progress">
-                        <div className="spinner"></div>
-                        <span>Импорт данных...</span>
-                    </div>
-                )}
+                <ErrorMessage>{error}</ErrorMessage>
 
-                <div className="banks-table-wrapper">
-                    <table className="banks-table">
-                        <thead>
-                        <tr>
-                            <th className="sortable-header" onClick={toggleSortOrder}>
-                                Название банка
-                                <span className="sort-indicator">
-                                        {sortOrder === 'asc' ? ' ↑' : ' ↓'}
-                                    </span>
-                            </th>
-                            <th>Действия</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {currentItems.length === 0 ? (
-                            <tr>
-                                <td colSpan="2" className="empty-row">
-                                    {searchTerm ? 'Ничего не найдено' : 'Нет банков. Добавьте первый или импортируйте из Excel!'}
-                                </td>
-                            </tr>
-                        ) : (
-                            currentItems.map((bank) => (
-                                <tr key={bank.id}>
-                                    <td className="bank-name">{bank.name}</td>
-                                    <td className="actions">
-                                        <button
-                                            onClick={() => handleEditBank(bank)}
-                                            className="edit-btn"
-                                            title="Редактировать"
-                                        >
-                                            ✏️
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeleteBank(bank.id, bank.name)}
-                                            className="delete-btn"
-                                            title="Удалить"
-                                        >
-                                            🗑️
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))
+                {/* Скрытый input для выбора файла */}
+                <input {...fileInputProps} />
+
+                {currentItems.length === 0 ? (
+                    <EmptyState
+                        icon={Landmark}
+                        title={searchTerm ? 'Ничего не найдено' : 'Нет банков'}
+                        description={
+                            searchTerm
+                                ? 'Попробуйте изменить запрос'
+                                : 'Добавьте первый банк или импортируйте список из Excel'
+                        }
+                    >
+                        {!searchTerm && (
+                            <Button onClick={handleAddBank}>
+                                <Plus />
+                                Добавить банк
+                            </Button>
                         )}
-                        </tbody>
-                    </table>
-                </div>
-
-                {totalPages > 1 && (
-                    <div className="pagination">
-                        <button
-                            onClick={() => paginate(currentPage - 1)}
-                            disabled={currentPage === 1}
-                            className="page-btn"
-                        >
-                            ← Назад
-                        </button>
-                        <span className="page-info">
-                            Страница {currentPage} из {totalPages}
-                        </span>
-                        <button
-                            onClick={() => paginate(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                            className="page-btn"
-                        >
-                            Вперёд →
-                        </button>
-                    </div>
+                    </EmptyState>
+                ) : (
+                    <Card className="overflow-hidden py-0">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <SortableHead
+                                        label="Название банка"
+                                        field="name"
+                                        sortField="name"
+                                        sortOrder={sortOrder}
+                                        onSort={toggleSortOrder}
+                                    />
+                                    <TableHead className="w-28 text-right">Действия</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {currentItems.map((bank) => (
+                                    <TableRow key={bank.id}>
+                                        <TableCell className="font-medium">{bank.name}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon-sm"
+                                                        onClick={() => handleEditBank(bank)}
+                                                        aria-label="Редактировать"
+                                                    >
+                                                        <Pencil />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>Редактировать</TooltipContent>
+                                            </Tooltip>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon-sm"
+                                                        className="text-destructive hover:text-destructive"
+                                                        onClick={() => handleDeleteBank(bank.id, bank.name)}
+                                                        aria-label="Удалить"
+                                                    >
+                                                        <Trash2 />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>Удалить</TooltipContent>
+                                            </Tooltip>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </Card>
                 )}
+
+                <TablePager
+                    page={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    total={filteredBanks.length}
+                    totalLabel="Всего банков:"
+                />
 
                 <BankModal
                     isOpen={modalOpen}
                     onClose={() => {
-                        setModalOpen(false);
-                        setEditingBank(null);
+                        setModalOpen(false)
+                        setEditingBank(null)
                     }}
                     onSave={handleSaveBank}
                     initialName={editingBank?.name || ''}
                     isEditing={!!editingBank}
                 />
-            </div>
-        </div>
-    );
+
+                {confirmDialog}
+            </PageContainer>
+        </TooltipProvider>
+    )
 }
 
-export default BanksPage;
+export default BanksPage
