@@ -1,78 +1,78 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import api from '../api/axios';
-import './Login.css';
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import api from '@/api/axios'
+import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
+import { AuthShell } from '@/components/ui-app/auth-shell'
+import { ErrorMessage } from '@/components/ui-app/page-state'
 
 function VerifyEmail() {
-    const [searchParams] = useSearchParams();
-    const token = searchParams.get('token');
-    const navigate = useNavigate();
+    const [searchParams] = useSearchParams()
+    const token = searchParams.get('token')
+    const navigate = useNavigate()
 
-    const [status, setStatus] = useState('loading');
-    const [message, setMessage] = useState('');
-    const hasVerified = useRef(false);
+    const [status, setStatus] = useState('loading')
+    const [message, setMessage] = useState('')
+    const hasVerified = useRef(false)
 
     useEffect(() => {
         if (!token) {
-            setStatus('error');
-            setMessage('Неверная ссылка подтверждения');
-            return;
+            setStatus('error')
+            setMessage('Неверная ссылка подтверждения')
+            return
         }
 
         // Защита от повторного вызова (React StrictMode вызывает эффект дважды)
         if (hasVerified.current) {
-            return;
+            return
         }
-        hasVerified.current = true;
+        hasVerified.current = true
 
         const verifyEmail = async () => {
             try {
-                const response = await api.get(`/auth/verify?token=${token}`, { _skipErrorToast: true });
-                setStatus('success');
-                setMessage(response.data.message || 'Email успешно подтверждён!');
+                const response = await api.get(`/auth/verify?token=${token}`, { _skipErrorToast: true })
+                setStatus('success')
+                setMessage(response.data.message || 'Email успешно подтверждён!')
 
                 setTimeout(() => {
-                    navigate('/login');
-                }, 3000);
+                    navigate('/login')
+                }, 3000)
             } catch (err) {
-                setStatus('error');
-                setMessage(err.response?.data?.message || 'Ошибка подтверждения email');
+                setStatus('error')
+                setMessage(err.response?.data?.message || 'Ошибка подтверждения email')
             }
-        };
+        }
 
-        verifyEmail();
-    }, [token, navigate]);
+        verifyEmail()
+    }, [token, navigate])
 
     return (
-        <div className="login-container">
-            <div className="login-card">
-                <h1>Твой личный банк</h1>
-                <h2>Подтверждение email</h2>
+        <AuthShell title="Подтверждение email">
+            {status === 'loading' && (
+                <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                    <Spinner />
+                    Подтверждение email...
+                </div>
+            )}
 
-                {status === 'loading' && (
-                    <div className="loading-message">
-                        <p>Подтверждение email...</p>
-                    </div>
-                )}
+            {status === 'success' && (
+                <div
+                    role="status"
+                    className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success"
+                >
+                    <p>{message}</p>
+                    <p>Перенаправление на страницу входа...</p>
+                </div>
+            )}
 
-                {status === 'success' && (
-                    <div className="success-message">
-                        <p>{message}</p>
-                        <p>Перенаправление на страницу входа...</p>
-                    </div>
-                )}
-
-                {status === 'error' && (
-                    <div className="error-message">
-                        <p>{message}</p>
-                        <button onClick={() => navigate('/login')}>
-                            Перейти к входу
-                        </button>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
+            {status === 'error' && (
+                <>
+                    <ErrorMessage>{message}</ErrorMessage>
+                    <Button onClick={() => navigate('/login')}>Перейти к входу</Button>
+                </>
+            )}
+        </AuthShell>
+    )
 }
 
-export default VerifyEmail;
+export default VerifyEmail

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { Toaster } from 'sonner';
+import { Toaster } from '@/components/ui/sonner';
+import { FullScreenLoading } from '@/components/ui-app/page-state';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/dashboard/Dashboard.jsx';
@@ -14,7 +15,6 @@ import CreditCardsPage from './components/credit-cards/CreditCardsPage';
 import TransactionHistoryPage from './components/history/TransactionHistoryPage';
 import api, { setAccessToken, clearAccessToken } from './api/axios';
 import BankDetailPage from './components/banks/BankDetailPage';
-import './App.css';
 
 function App() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -75,12 +75,7 @@ function App() {
     };
 
     if (loading) {
-        return (
-            <div className="loading-screen">
-                <div className="loading-spinner"></div>
-                <p>Загрузка...</p>
-            </div>
-        );
+        return <FullScreenLoading />;
     }
 
     const ProtectedRoute = ({ children }) => {

@@ -1,141 +1,149 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import api from '../api/axios';
-import './Login.css';
+import { useState } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
+import api from '@/api/axios'
+import { Button } from '@/components/ui/button'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
+import { AuthShell } from '@/components/ui-app/auth-shell'
+import { PasswordInput } from '@/components/ui-app/password-input'
+import { ErrorMessage } from '@/components/ui-app/page-state'
 
-function Register({ onRegister }) {
+function Register() {
     const [formData, setFormData] = useState({
         email: '',
         password: '',
-        fullName: ''
-    });
-    const [showPassword, setShowPassword] = useState(false);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
-    const [loading, setLoading] = useState(false);
-    const navigate = useNavigate();
+        fullName: '',
+    })
+    const [error, setError] = useState('')
+    const [success, setSuccess] = useState('')
+    const [loading, setLoading] = useState(false)
+    const navigate = useNavigate()
 
     const handleChange = (e) => {
         setFormData({
             ...formData,
-            [e.target.name]: e.target.value
-        });
-    };
+            [e.target.name]: e.target.value,
+        })
+    }
 
     // Валидация пароля
     const validatePassword = (password) => {
-        const hasDigit = /\d/.test(password);
-        const hasSpecialChar = /[%$*]/.test(password);
+        const hasDigit = /\d/.test(password)
+        const hasSpecialChar = /[%$*]/.test(password)
 
         if (!hasDigit) {
-            return 'Пароль должен содержать хотя бы одну цифру';
+            return 'Пароль должен содержать хотя бы одну цифру'
         }
         if (!hasSpecialChar) {
-            return 'Пароль должен содержать хотя бы один спецсимвол (% $ *)';
+            return 'Пароль должен содержать хотя бы один спецсимвол (% $ *)'
         }
         if (password.length < 6) {
-            return 'Пароль должен содержать минимум 6 символов';
+            return 'Пароль должен содержать минимум 6 символов'
         }
-        return null;
-    };
+        return null
+    }
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
+        e.preventDefault()
 
         // Валидация пароля перед отправкой
-        const passwordError = validatePassword(formData.password);
+        const passwordError = validatePassword(formData.password)
         if (passwordError) {
-            setError(passwordError);
-            return;
+            setError(passwordError)
+            return
         }
 
-        setError('');
-        setSuccess('');
-        setLoading(true);
+        setError('')
+        setSuccess('')
+        setLoading(true)
 
         try {
-            await api.post('/auth/register', formData, { _skipErrorToast: true });
-            setSuccess('Регистрация успешна! Проверьте почту для подтверждения.');
+            await api.post('/auth/register', formData, { _skipErrorToast: true })
+            setSuccess('Регистрация успешна! Проверьте почту для подтверждения.')
             setTimeout(() => {
-                navigate('/login');
-            }, 2000);
+                navigate('/login')
+            }, 2000)
         } catch (err) {
-            setError(err.response?.data?.message || 'Ошибка регистрации');
+            setError(err.response?.data?.message || 'Ошибка регистрации')
         } finally {
-            setLoading(false);
+            setLoading(false)
         }
-    };
+    }
 
     return (
-        <div className="login-container">
-            <div className="login-card">
-                <h1>Твой личный банк</h1>
-                <h2>Регистрация</h2>
-
-                {error && <div className="error-message">{error}</div>}
-                {success && <div className="success-message">{success}</div>}
-
-                <form onSubmit={handleSubmit}>
-                    <div className="form-group">
-                        <label>Email</label>
-                        <input
-                            type="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            required
-                            placeholder="your@email.com"
-                        />
-                    </div>
-
-                    <div className="form-group password-group">
-                        <label>Пароль</label>
-                        <div className="password-input-wrapper">
-                            <input
-                                type={showPassword ? 'text' : 'password'}
-                                name="password"
-                                value={formData.password}
-                                onChange={handleChange}
-                                required
-                                minLength={6}
-                                placeholder="минимум 6 символов"
-                            />
-                            <button
-                                type="button"
-                                className="eye-button"
-                                onClick={() => setShowPassword(!showPassword)}
-                            >
-                                {showPassword ? '👁️' : '👁️‍🗨️'}
-                            </button>
-                        </div>
-                        <small className="password-hint">
-                            Пароль должен содержать цифру и спецсимвол (% $ *)
-                        </small>
-                    </div>
-
-                    <div className="form-group">
-                        <label>Полное имя</label>
-                        <input
-                            type="text"
-                            name="fullName"
-                            value={formData.fullName}
-                            onChange={handleChange}
-                            required
-                            placeholder="Иван Иванов"
-                        />
-                    </div>
-
-                    <button type="submit" disabled={loading}>
-                        {loading ? 'Регистрация...' : 'Зарегистрироваться'}
-                    </button>
-                </form>
-
-                <div className="register-link">
-                    Уже есть аккаунт? <Link to="/login">Войти</Link>
+        <AuthShell
+            title="Регистрация"
+            footer={
+                <>
+                    Уже есть аккаунт?{' '}
+                    <Link to="/login" className="text-primary hover:underline">
+                        Войти
+                    </Link>
+                </>
+            }
+        >
+            <ErrorMessage>{error}</ErrorMessage>
+            {success && (
+                <div
+                    role="status"
+                    className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success"
+                >
+                    {success}
                 </div>
-            </div>
-        </div>
-    );
+            )}
+
+            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+                <Field>
+                    <FieldLabel htmlFor="register-email">Email</FieldLabel>
+                    <Input
+                        id="register-email"
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required
+                        placeholder="your@email.com"
+                        autoComplete="email"
+                    />
+                </Field>
+
+                <Field>
+                    <FieldLabel htmlFor="register-password">Пароль</FieldLabel>
+                    <PasswordInput
+                        id="register-password"
+                        name="password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        required
+                        minLength={6}
+                        placeholder="минимум 6 символов"
+                    />
+                    <FieldDescription>
+                        Пароль должен содержать цифру и спецсимвол (% $ *)
+                    </FieldDescription>
+                </Field>
+
+                <Field>
+                    <FieldLabel htmlFor="register-full-name">Полное имя</FieldLabel>
+                    <Input
+                        id="register-full-name"
+                        type="text"
+                        name="fullName"
+                        value={formData.fullName}
+                        onChange={handleChange}
+                        required
+                        placeholder="Иван Иванов"
+                    />
+                </Field>
+
+                <Button type="submit" disabled={loading}>
+                    {loading && <Spinner />}
+                    {loading ? 'Регистрация...' : 'Зарегистрироваться'}
+                </Button>
+            </form>
+        </AuthShell>
+    )
 }
 
-export default Register;
+export default Register
