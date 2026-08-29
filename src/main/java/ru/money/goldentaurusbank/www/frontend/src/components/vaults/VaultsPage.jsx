@@ -259,7 +259,7 @@ function VaultsPage() {
                                     sortOrder={sortOrder}
                                     onSort={toggleSort}
                                 />
-                                <TableHead>Описание</TableHead>
+                                <TableHead className="w-full">Описание</TableHead>
                                 {hasAnyActions && (
                                     <TableHead className="w-28 text-right">Действия</TableHead>
                                 )}
@@ -345,8 +345,10 @@ function VaultsPage() {
                                             <TableCell className="tabular-nums">
                                                 {vault.interestRate}%
                                             </TableCell>
-                                            <TableCell className="max-w-xs text-muted-foreground">
-                                                {vault.description || ''}
+                                            <TableCell className="w-full whitespace-normal text-muted-foreground">
+                                                <div className="max-w-xs break-words">
+                                                    {vault.description || ''}
+                                                </div>
                                             </TableCell>
                                             {hasAnyActions && (
                                                 <TableCell className="text-right">

@@ -92,7 +92,7 @@ function CreditCardHistoryModal({ isOpen, card, onClose, onRolledBack }) {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Дата</TableHead>
-                                <TableHead>Операция</TableHead>
+                                <TableHead className="w-full">Операция</TableHead>
                                 <TableHead className="text-right">Сумма</TableHead>
                                 <TableHead className="text-right">Долг после</TableHead>
                                 <TableHead />
@@ -107,12 +107,12 @@ function CreditCardHistoryModal({ isOpen, card, onClose, onRolledBack }) {
                                     <TableCell className="whitespace-nowrap">
                                         {formatDateTime(operation.dateOperation)}
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="w-full whitespace-normal">
                                         <div>
                                             {OPERATION_LABELS[operation.operation] || operation.operation}
                                         </div>
                                         {operation.comment && (
-                                            <div className="text-xs text-muted-foreground">
+                                            <div className="max-w-xs break-words text-xs text-muted-foreground">
                                                 {operation.comment}
                                             </div>
                                         )}
@@ -131,7 +131,7 @@ function CreditCardHistoryModal({ isOpen, card, onClose, onRolledBack }) {
                                     <TableCell className="text-right tabular-nums">
                                         {formatAmount(operation.debtAfter)} ₽
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="w-0 text-right">
                                         {operation.canRollback ? (
                                             <Button
                                                 variant="ghost"

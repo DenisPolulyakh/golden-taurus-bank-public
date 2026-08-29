@@ -230,7 +230,7 @@ const TransactionHistoryPage = () => {
                                     <TableHead>Дата</TableHead>
                                     <TableHead>Тип</TableHead>
                                     <TableHead className="text-right">Сумма</TableHead>
-                                    <TableHead>Описание</TableHead>
+                                    <TableHead className="w-full">Описание</TableHead>
                                     <TableHead className="text-right">Действия</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -263,10 +263,14 @@ const TransactionHistoryPage = () => {
                                         >
                                             {formatCurrency(tx.amount)}
                                         </TableCell>
-                                        <TableCell className="max-w-md">
-                                            {renderDescription(tx)}
+                                        {/* Базовый TableCell — whitespace-nowrap, поэтому длинное
+                                            описание раздвигало таблицу и наезжало на «Действия» */}
+                                        <TableCell className="w-full whitespace-normal">
+                                            <div className="max-w-[34rem] break-words">
+                                                {renderDescription(tx)}
+                                            </div>
                                         </TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="w-0 text-right">
                                             {tx.canRollback ? (
                                                 <Button
                                                     variant="ghost"
