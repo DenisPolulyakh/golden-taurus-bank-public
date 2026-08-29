@@ -1,10 +1,4 @@
-/* Tailwind v4 подключён БЕЗ preflight. Обычный `@import "tailwindcss"` тянет за
-   собой сброс браузерных стилей, а он немедленно ломает все ещё не переписанные
-   экраны со старым CSS: гасит оформление кнопок, обнуляет поля и списки.
-   На этапе 10, когда старых .css не останется, эти две строки заменяются на
-   одну — `@import "tailwindcss";`. См. plans/PLAN_SHADCN_UI.md, п. 3.3. */
-@import "tailwindcss/theme.css" layer(theme);
-@import "tailwindcss/utilities.css" layer(utilities);
+@import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
@@ -160,19 +154,11 @@
 }
 
 @layer base {
-    /* ВРЕМЕННО, снести на этапе 10 вместе с включением preflight.
-       Старые .css рассчитывают на этот сброс, а preflight пока выключен.
-       Лежит именно в @layer base: без слоя эти правила перебивали бы
-       утилиты Tailwind (p-4, m-2 и прочие просто перестали бы работать). */
     * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
+        @apply border-border outline-ring/50;
     }
 
     body {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background-color: var(--background);
-        color: var(--foreground);
+        @apply bg-background text-foreground;
     }
 }

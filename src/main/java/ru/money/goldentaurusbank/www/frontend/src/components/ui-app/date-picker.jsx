@@ -50,6 +50,10 @@ export function DatePicker({
                         defaultMonth={date || undefined}
                         locale={ru}
                         captionLayout="dropdown"
+                        // Без явных границ выпадающий список годов упирается в
+                        // прошлое, а даты закрытия вкладов и платежей — в будущем
+                        startMonth={new Date(2000, 0)}
+                        endMonth={new Date(new Date().getFullYear() + 30, 11)}
                         onSelect={(selected) => {
                             onChange(selected ? format(selected, 'yyyy-MM-dd') : '')
                             setOpen(false)
