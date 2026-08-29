@@ -72,7 +72,7 @@ ${prefix} [data-chart=${id}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
     const color =
-      itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ??
+      itemConfig.theme?.[theme] ??
       itemConfig.color
     return color ? `  --color-${key}: ${color};` : null
   })
@@ -303,17 +303,17 @@ function getPayloadConfigFromPayload(
 
   if (
     key in payload &&
-    typeof payload[key as keyof typeof payload] === "string"
+    typeof payload[key] === "string"
   ) {
-    configLabelKey = payload[key as keyof typeof payload] as string
+    configLabelKey = payload[key]
   } else if (
     payloadPayload &&
     key in payloadPayload &&
-    typeof payloadPayload[key as keyof typeof payloadPayload] === "string"
+    typeof payloadPayload[key] === "string"
   ) {
     configLabelKey = payloadPayload[
-      key as keyof typeof payloadPayload
-    ] as string
+      key
+    ]
   }
 
   return configLabelKey in config ? config[configLabelKey] : config[key]

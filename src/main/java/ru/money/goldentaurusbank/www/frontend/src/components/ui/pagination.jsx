@@ -37,8 +37,6 @@ function PaginationItem({ ...props }) {
   return <li data-slot="pagination-item" {...props} />
 }
 
-  React.ComponentProps<"a">
-
 function PaginationLink({
   className,
   isActive,
