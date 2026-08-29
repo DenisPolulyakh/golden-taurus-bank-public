@@ -1,11 +1,29 @@
 // components/Dashboard/SavingsChart.jsx
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react'
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid,
-    Tooltip, ResponsiveContainer, Line, ComposedChart,
-    Cell
-} from 'recharts';
-import api from '../../api/axios.js';
+    Bar, XAxis, YAxis, CartesianGrid,
+    Tooltip, Line, ComposedChart, Cell
+} from 'recharts'
+import api from '@/api/axios'
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
+import { ChartContainer } from '@/components/ui/chart'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui-app/page-state'
+
+// Цвета серий берём из токенов темы, а не хексами по месту
+const CHART_CONFIG = {
+    savings: { label: 'Накопления', color: 'var(--chart-1)' },
+    debtBar: { label: 'Задолженность', color: 'var(--destructive)' },
+    trend: { label: 'Тренд', color: 'var(--chart-2)' },
+}
 
 const SavingsChart = ({ refreshKey }) => {
     const [data, setData] = useState([]);
@@ -90,7 +108,7 @@ const SavingsChart = ({ refreshKey }) => {
                     // Задолженность рисуется вниз, поэтому в график уходит с минусом
                     debtBar: -debt,
                     change: item.netChange || 0,
-                    barColor: savings >= 0 ? '#667eea' : '#e53e3e',
+                    barColor: savings >= 0 ? 'var(--chart-1)' : 'var(--destructive)',
                     barOpacity: isFuture ? 0.35 : (isCurrentMonth ? 0.7 : 1)
                 };
             });
@@ -136,7 +154,7 @@ const SavingsChart = ({ refreshKey }) => {
                     // Задолженность рисуется вниз, поэтому в график уходит с минусом
                     debtBar: -debt,
                     change: item.dailyChange || 0,
-                    barColor: savings >= 0 ? '#667eea' : '#e53e3e',
+                    barColor: savings >= 0 ? 'var(--chart-1)' : 'var(--destructive)',
                     barOpacity: isFuture ? 0.35 : (isToday ? 0.7 : 1)
                 };
             }));
@@ -192,28 +210,22 @@ const SavingsChart = ({ refreshKey }) => {
             const changeLabel = viewMode === 'year'
                 ? 'к прошлому месяцу'
                 : 'к прошлому дню';
-            const changeColor = change > 0 ? '#48bb78' : (change < 0 ? '#e53e3e' : '#718096');
+            const changeClass = change > 0
+                ? 'text-success'
+                : (change < 0 ? 'text-destructive' : 'text-muted-foreground');
             const changeSign = change > 0 ? '+' : '';
             return (
-                <div style={{
-                    background: 'white',
-                    padding: '12px 16px',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                    border: '1px solid #e2e8f0',
-                    minWidth: '180px'
-                }}>
-                    <p style={{ margin: '0 0 8px 0', fontWeight: 600, color: '#2d3748' }}>
-                        {label}
-                    </p>
-                    <p style={{ margin: '4px 0', color: '#667eea', fontWeight: 600, fontSize: '18px' }}>
+                <div className="min-w-45 rounded-lg border bg-popover px-4 py-3 text-popover-foreground shadow-md">
+                    <p className="font-semibold">{label}</p>
+                    <p className="mt-2 text-lg font-semibold text-primary">
                         {formatCurrency(savings)}
                     </p>
-                    <p style={{ margin: '4px 0 0 0', color: changeColor, fontWeight: 500, fontSize: '13px' }}>
-                        {changeSign}{formatCurrency(change)} <span style={{ color: '#a0aec0' }}>{changeLabel}</span>
+                    <p className={`mt-1 text-sm font-medium ${changeClass}`}>
+                        {changeSign}{formatCurrency(change)}{' '}
+                        <span className="text-muted-foreground">{changeLabel}</span>
                     </p>
                     {debt > 0 && (
-                        <p style={{ margin: '8px 0 0 0', color: '#c53030', fontWeight: 600, fontSize: '14px' }}>
+                        <p className="mt-2 text-sm font-semibold text-destructive">
                             Долг по картам: {formatCurrency(debt)}
                         </p>
                     )}
@@ -224,15 +236,11 @@ const SavingsChart = ({ refreshKey }) => {
     };
 
     if (loading) {
-        return <div style={{ textAlign: 'center', padding: '40px', color: '#718096' }}>Загрузка графика...</div>;
+        return <Skeleton className="h-[380px] w-full" />;
     }
 
     if (!data || data.length === 0) {
-        return (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#a0aec0' }}>
-                Нет данных для отображения
-            </div>
-        );
+        return <EmptyState className="border-0" title="Нет данных для отображения" />;
     }
 
     const isYearView = viewMode === 'year';
@@ -240,113 +248,87 @@ const SavingsChart = ({ refreshKey }) => {
     const hasDebt = data.some(item => Number(item.debt || 0) > 0);
 
     return (
-        <div>
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '20px',
-                flexWrap: 'wrap',
-                gap: '10px'
-            }}>
+        <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h3 style={{ margin: 0, color: '#2d3748' }}>💰 Накопления</h3>
-                    <p style={{ margin: '4px 0 0 0', color: '#718096', fontSize: '14px' }}>
-                        Общая сумма: <span style={{ fontWeight: 600, color: '#667eea' }}>
+                    <h3 className="font-semibold">Накопления</h3>
+                    <p className="text-sm text-muted-foreground">
+                        Общая сумма:{' '}
+                        <span className="font-semibold text-primary">
                             {formatCurrency(totalSavings)}
                         </span>
                         {totalDebt > 0 && (
                             <>
-                                {' · '}Долг по картам: <span style={{ fontWeight: 600, color: '#c53030' }}>
+                                {' · '}Долг по картам:{' '}
+                                <span className="font-semibold text-destructive">
                                     {formatCurrency(totalDebt)}
                                 </span>
                             </>
                         )}
                     </p>
                 </div>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', gap: '4px', background: '#f1f4f9', borderRadius: '8px', padding: '4px' }}>
-                        <button
+
+                <div className="flex flex-wrap items-center gap-2">
+                    <ButtonGroup>
+                        <Button
+                            size="sm"
+                            variant={isYearView ? 'default' : 'outline'}
                             onClick={() => handleViewModeChange('year')}
-                            style={{
-                                padding: '6px 16px',
-                                border: 'none',
-                                borderRadius: '6px',
-                                background: viewMode === 'year' ? '#667eea' : 'transparent',
-                                color: viewMode === 'year' ? 'white' : '#4a5568',
-                                cursor: 'pointer',
-                                fontWeight: 500,
-                                fontSize: '13px',
-                                transition: 'all 0.3s ease'
-                            }}
                         >
                             Год
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant={!isYearView ? 'default' : 'outline'}
                             onClick={() => handleViewModeChange('month')}
-                            style={{
-                                padding: '6px 16px',
-                                border: 'none',
-                                borderRadius: '6px',
-                                background: viewMode === 'month' ? '#667eea' : 'transparent',
-                                color: viewMode === 'month' ? 'white' : '#4a5568',
-                                cursor: 'pointer',
-                                fontWeight: 500,
-                                fontSize: '13px',
-                                transition: 'all 0.3s ease'
-                            }}
                         >
                             Месяц
-                        </button>
-                    </div>
+                        </Button>
+                    </ButtonGroup>
 
-                    <select
-                        value={selectedYear || ''}
-                        onChange={(e) => handleYearChange(Number(e.target.value))}
-                        style={{
-                            padding: '6px 12px',
-                            borderRadius: '8px',
-                            border: '1px solid #e2e8f0',
-                            background: 'white',
-                            fontSize: '13px',
-                            cursor: 'pointer'
-                        }}
+                    <Select
+                        value={selectedYear ? String(selectedYear) : ''}
+                        onValueChange={(value) => handleYearChange(Number(value))}
                     >
-                        {years.map(year => (
-                            <option key={year} value={year}>{year}</option>
-                        ))}
-                    </select>
+                        <SelectTrigger size="sm" className="w-28">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {years.map(year => (
+                                <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
 
                     {!isYearView && (
-                        <select
-                            value={selectedMonth || ''}
-                            onChange={(e) => handleMonthChange(Number(e.target.value))}
-                            style={{
-                                padding: '6px 12px',
-                                borderRadius: '8px',
-                                border: '1px solid #e2e8f0',
-                                background: 'white',
-                                fontSize: '13px',
-                                cursor: 'pointer'
-                            }}
+                        <Select
+                            value={selectedMonth ? String(selectedMonth) : ''}
+                            onValueChange={(value) => handleMonthChange(Number(value))}
                         >
-                            {monthNames.map((name, index) => (
-                                <option key={index + 1} value={index + 1}>{name}</option>
-                            ))}
-                        </select>
+                            <SelectTrigger size="sm" className="w-28">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {monthNames.map((name, index) => (
+                                    <SelectItem key={index + 1} value={String(index + 1)}>
+                                        {name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     )}
                 </div>
             </div>
 
-            <ResponsiveContainer width="100%" height={380}>
+            <ChartContainer config={CHART_CONFIG} className="h-[380px] w-full">
                 {/* stackOffset="sign" — иначе стек копит сумму и долг откладывается
                     вниз от вершины синего столбца, а не от нулевой линии */}
                 <ComposedChart data={data} stackOffset="sign"
                                margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis
                         dataKey={isYearView ? 'monthLabel' : 'date'}
-                        stroke="#718096"
+                        stroke="var(--muted-foreground)"
                         interval={isYearView ? 0 : Math.floor(data.length / 15)}
                     />
                     <YAxis
@@ -370,7 +352,7 @@ const SavingsChart = ({ refreshKey }) => {
                         {data.map((entry, index) => (
                             <Cell
                                 key={`cell-${index}`}
-                                fill={entry.barColor || '#667eea'}
+                                fill={entry.barColor || 'var(--chart-1)'}
                                 opacity={entry.barOpacity !== undefined ? entry.barOpacity : 1}
                             />
                         ))}
@@ -381,7 +363,7 @@ const SavingsChart = ({ refreshKey }) => {
                         <Bar
                             dataKey="debtBar"
                             name="Задолженность"
-                            fill="#c53030"
+                            fill="var(--destructive)"
                             stackId="savingsDebt"
                             maxBarSize={56}
                             radius={[0, 0, 6, 6]}
@@ -392,17 +374,17 @@ const SavingsChart = ({ refreshKey }) => {
                             type="monotone"
                             dataKey="debtBar"
                             name="Долг"
-                            stroke="#ecc94b"
+                            stroke="var(--chart-4)"
                             strokeWidth={3}
-                            dot={{ r: 4, fill: '#ecc94b', stroke: 'white', strokeWidth: 2 }}
-                            activeDot={{ r: 7, fill: '#ecc94b', stroke: '#fff', strokeWidth: 3 }}
+                            dot={{ r: 4, fill: 'var(--chart-4)', stroke: 'var(--background)', strokeWidth: 2 }}
+                            activeDot={{ r: 7, fill: 'var(--chart-4)', stroke: 'var(--background)', strokeWidth: 3 }}
                         />
                     )}
                     <Line
                         type="monotone"
                         dataKey="savings"
                         name="Тренд"
-                        stroke="#48bb78"
+                        stroke="var(--chart-2)"
                         strokeWidth={3.5}
                         dot={(props) => {
                             const { cx, cy, payload } = props;
@@ -412,50 +394,39 @@ const SavingsChart = ({ refreshKey }) => {
                                     cx={cx}
                                     cy={cy}
                                     r={5}
-                                    fill="#48bb78"
+                                    fill="var(--chart-2)"
                                     opacity={isFuture ? 0.35 : 1}
-                                    stroke="white"
+                                    stroke="var(--background)"
                                     strokeWidth={2}
-                                    style={{
-                                        filter: 'drop-shadow(0 2px 6px rgba(72, 187, 120, 0.3))'
-                                    }}
                                 />
                             );
                         }}
                         activeDot={{
                             r: 9,
-                            fill: '#48bb78',
-                            stroke: '#fff',
+                            fill: 'var(--chart-2)',
+                            stroke: 'var(--background)',
                             strokeWidth: 3,
-                            style: {
-                                filter: 'drop-shadow(0 4px 12px rgba(72, 187, 120, 0.5))'
-                            }
                         }}
                     />
                 </ComposedChart>
-            </ResponsiveContainer>
+            </ChartContainer>
 
-            <div style={{
-                textAlign: 'center',
-                marginTop: '12px',
-                color: '#a0aec0',
-                fontSize: '13px'
-            }}>
+            <p className="text-center text-sm text-muted-foreground">
                 {isYearView
-                    ? '📊 Накопления по месяцам'
-                    : `📊 Дневная динамика за ${monthNames[selectedMonth - 1]} ${selectedYear}`
+                    ? 'Накопления по месяцам'
+                    : `Дневная динамика за ${monthNames[selectedMonth - 1]} ${selectedYear}`
                 }
                 {!isYearView && selectedYear === currentYear && selectedMonth === currentMonth && (
-                    <span style={{ marginLeft: '12px', color: '#667eea' }}>
-                        🔵 Полупрозрачные столбцы — будущие дни
+                    <span className="ml-3 text-primary">
+                        Полупрозрачные столбцы — будущие дни
                     </span>
                 )}
                 {hasDebt && (
-                    <span style={{ marginLeft: '12px', color: '#c53030' }}>
-                        🔴 Столбцы вниз — задолженность по кредитным картам
+                    <span className="ml-3 text-destructive">
+                        Столбцы вниз — задолженность по кредитным картам
                     </span>
                 )}
-            </div>
+            </p>
         </div>
     );
 };
