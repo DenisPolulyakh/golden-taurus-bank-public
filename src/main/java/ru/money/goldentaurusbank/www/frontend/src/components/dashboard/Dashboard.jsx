@@ -21,6 +21,42 @@ const QUICK_ACTIONS = [
     { to: '/transactions', label: 'История операций', icon: History },
 ]
 
+const formatDateTime = (date) => {
+    const dateStr = date.toLocaleDateString('ru-RU', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    })
+    const timeStr = date.toLocaleTimeString('ru-RU', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    })
+    return `${dateStr}, ${timeStr}`
+}
+
+/**
+ * Часы живут отдельным компонентом. Пока они сидели в состоянии дашборда, тик
+ * раз в секунду перерисовывал заодно и графики, а recharts на каждой перерисовке
+ * заново запускает вступительную анимацию — её id завязан на объект пропсов.
+ * Анимация не доигрывала до конца, и подписи на диаграмме не появлялись вовсе.
+ */
+function CurrentDateTime() {
+    const [now, setNow] = useState(new Date())
+
+    useEffect(() => {
+        const timerId = setInterval(() => setNow(new Date()), 1000)
+        return () => clearInterval(timerId)
+    }, [])
+
+    return (
+        <p className="text-sm text-muted-foreground first-letter:uppercase">
+            {formatDateTime(now)}
+        </p>
+    )
+}
+
 function Dashboard({ user, onLogout }) {
     const [userData, setUserData] = useState(user)
     const [loading, setLoading] = useState(true)
@@ -30,21 +66,12 @@ function Dashboard({ user, onLogout }) {
     const [countBullions, setCountBullions] = useState(0)
     const [bullionDistribution, setBullionDistribution] = useState([])
     const [refreshKey] = useState(0)
-    const [currentDateTime, setCurrentDateTime] = useState(new Date())
     const navigate = useNavigate()
 
     useEffect(() => {
         fetchUserData()
         fetchDashboardData()
     }, [refreshKey])
-
-    // Обновляем текущие дату и время каждую секунду
-    useEffect(() => {
-        const timerId = setInterval(() => {
-            setCurrentDateTime(new Date())
-        }, 1000)
-        return () => clearInterval(timerId)
-    }, [])
 
     const fetchUserData = async () => {
         try {
@@ -101,21 +128,6 @@ function Dashboard({ user, onLogout }) {
         }
     }
 
-    const formatDateTime = (date) => {
-        const dateStr = date.toLocaleDateString('ru-RU', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
-        })
-        const timeStr = date.toLocaleTimeString('ru-RU', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-        })
-        return `${dateStr}, ${timeStr}`
-    }
-
     const hasChartData = bullionDistribution.length > 0 &&
         bullionDistribution.some(item => item.amount > 0)
 
@@ -134,9 +146,7 @@ function Dashboard({ user, onLogout }) {
                             Добро пожаловать, {userData?.fullName}!
                         </h1>
                         <p className="text-sm text-muted-foreground">{userData?.email}</p>
-                        <p className="text-sm text-muted-foreground first-letter:uppercase">
-                            {formatDateTime(currentDateTime)}
-                        </p>
+                        <CurrentDateTime />
                     </div>
 
                     <StatGrid>

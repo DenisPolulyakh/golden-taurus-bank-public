@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts'
+import { Cell, Pie, PieChart, ResponsiveContainer, Sector } from 'recharts'
 import { EmptyState } from '@/components/ui-app/page-state'
 import { cn } from '@/lib/utils'
 
@@ -23,15 +23,32 @@ const PieChartComponent = ({ data, formatAmount }) => {
 
     const toggle = (index) => setActiveIndex(activeIndex === index ? null : index)
 
+    const RADIAN = Math.PI / 180
+    // Выбранный кусок выезжает из круга — как на прежней самописной диаграмме
+    const SELECTED_OFFSET = 12
+
+    const offsetFor = (index, midAngle) => {
+        const distance = activeIndex === index ? SELECTED_OFFSET : 0
+        return {
+            dx: distance * Math.cos(-midAngle * RADIAN),
+            dy: distance * Math.sin(-midAngle * RADIAN),
+        }
+    }
+
+    const renderSector = ({ isActive, ...props }) => {
+        const { dx, dy } = offsetFor(props.index, props.midAngle)
+        return <Sector {...props} cx={props.cx + dx} cy={props.cy + dy} />
+    }
+
     // Процент пишем прямо в сектор, но только там, где он помещается:
     // на узких кусках подпись налезала бы на соседние
     const renderPercentLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
         if (percent * 100 <= 5) return null
 
-        const radian = Math.PI / 180
         const radius = innerRadius + (outerRadius - innerRadius) * 0.55
-        const x = cx + radius * Math.cos(-midAngle * radian)
-        const y = cy + radius * Math.sin(-midAngle * radian)
+        const { dx, dy } = offsetFor(index, midAngle)
+        const x = cx + dx + radius * Math.cos(-midAngle * RADIAN)
+        const y = cy + dy + radius * Math.sin(-midAngle * RADIAN)
 
         return (
             <text
@@ -66,12 +83,17 @@ const PieChartComponent = ({ data, formatAmount }) => {
                             cx="50%"
                             cy="50%"
                             innerRadius={55}
-                            outerRadius={120}
+                            outerRadius={112}
                             paddingAngle={1}
                             startAngle={90}
                             endAngle={-270}
                             label={renderPercentLabel}
                             labelLine={false}
+                            shape={renderSector}
+                            // Проценты recharts рисует только при showLabels, а это
+                            // `!isAnimating`; вступительная анимация нам не нужна,
+                            // зато из-за неё подписи не появлялись вовсе
+                            isAnimationActive={false}
                             onClick={(_, index) => toggle(index)}
                         >
                             {data.map((item, index) => (
@@ -81,7 +103,7 @@ const PieChartComponent = ({ data, formatAmount }) => {
                                     stroke="var(--background)"
                                     strokeWidth={2}
                                     opacity={activeIndex === null || activeIndex === index ? 1 : 0.35}
-                                    className="cursor-pointer outline-none transition-opacity"
+                                    className="cursor-pointer outline-none transition-all"
                                 />
                             ))}
                         </Pie>
