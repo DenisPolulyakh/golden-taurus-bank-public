@@ -1,12 +1,32 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { toast } from 'sonner';
-import api from '../../api/axios';
-import CreditCardModal from './CreditCardModal';
-import CreditCardOperationModal from './CreditCardOperationModal';
-import CreditCardHistoryModal from './CreditCardHistoryModal';
-import { formatAmount, formatSigned, formatDate, graceClass, graceText, limitUsage, usageClass, usageText } from './creditCardFormat';
-import './CreditCards.css';
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
+import { toast } from 'sonner'
+import { CreditCard as CreditCardIcon, History, Minus, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
+import api from '@/api/axios'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { PageContainer, PageHeader } from '@/components/ui-app/page-header'
+import { SearchInput } from '@/components/ui-app/search-input'
+import { SortButton } from '@/components/ui-app/data-table'
+import { EmptyState, ErrorMessage, PageLoading } from '@/components/ui-app/page-state'
+import { StatCard, StatGrid } from '@/components/ui-app/stat-card'
+import { useConfirm } from '@/components/ui-app/confirm-dialog'
+import { cn } from '@/lib/utils'
+import CreditCardModal from './CreditCardModal'
+import CreditCardOperationModal from './CreditCardOperationModal'
+import CreditCardHistoryModal from './CreditCardHistoryModal'
+import {
+    formatAmount,
+    formatSigned,
+    formatDate,
+    graceClass,
+    graceText,
+    limitUsage,
+    usageClass,
+    usageText,
+} from './creditCardFormat'
 
 function CreditCardsPage() {
     const [cards, setCards] = useState([]);
@@ -26,6 +46,7 @@ function CreditCardsPage() {
     const [historyCard, setHistoryCard] = useState(null);
 
     const navigate = useNavigate();
+    const { confirm, confirmDialog } = useConfirm();
     const timeoutRef = useRef(null);
     const isInitialMount = useRef(true);
 
@@ -101,21 +122,23 @@ function CreditCardsPage() {
         await reload();
     };
 
-    const handleDeleteCard = async (card) => {
-        if (!window.confirm(`Удалить карту "${card.name}"? История операций сохранится.`)) {
-            return;
-        }
-
-        setActionLoading(true);
-        try {
-            await api.delete(`/credit-cards/${card.id}`);
-            toast.success('Кредитная карта удалена');
-            await reload();
-        } catch (err) {
-            console.error('Ошибка удаления карты:', err);
-        } finally {
-            setActionLoading(false);
-        }
+    const handleDeleteCard = (card) => {
+        confirm({
+            title: 'Удаление карты',
+            description: `Удалить карту "${card.name}"? История операций сохранится.`,
+            onConfirm: async () => {
+                setActionLoading(true);
+                try {
+                    await api.delete(`/credit-cards/${card.id}`);
+                    toast.success('Кредитная карта удалена');
+                    await reload();
+                } catch (err) {
+                    console.error('Ошибка удаления карты:', err);
+                } finally {
+                    setActionLoading(false);
+                }
+            },
+        });
     };
 
     const handleOperation = async ({ amount, comment, dateOperation }) => {
@@ -130,223 +153,283 @@ function CreditCardsPage() {
     };
 
     if (loading) {
-        return <div className="credit-cards-container">Загрузка...</div>;
+        return (
+            <PageContainer>
+                <PageLoading />
+            </PageContainer>
+        )
     }
 
-    const usage = limitUsage(totalDebt, totalLimit);
+    const usage = limitUsage(totalDebt, totalLimit)
 
     return (
-        <div className="credit-cards-container">
-            <div className="credit-cards-content">
-                <div className="bullions-header">
-                    <h1>💳 Кредитные карты</h1>
-                    <div className="header-actions">
-                        <button onClick={() => navigate('/dashboard')} className="back-btn">
-                            ← Назад
-                        </button>
-                        <button
-                            onClick={() => { setEditingCard(null); setModalOpen(true); }}
-                            className="add-bullion-btn"
-                        >
-                            + Добавить карту
-                        </button>
-                    </div>
-                </div>
+        <PageContainer>
+            <PageHeader title="Кредитные карты" onBack={() => navigate('/dashboard')}>
+                <Button
+                    onClick={() => {
+                        setEditingCard(null)
+                        setModalOpen(true)
+                    }}
+                >
+                    <Plus />
+                    Добавить карту
+                </Button>
+            </PageHeader>
 
-                <div className="stats-cards">
-                    <div className="stat-card">
-                        <div className="stat-label">💸 Текущий долг</div>
-                        <div className="stat-value total-debt-value">{formatAmount(totalDebt)} ₽</div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-label">💳 Общий лимит</div>
-                        <div className="stat-value total-limit-value">{formatAmount(totalLimit)} ₽</div>
-                        <div className="limit-usage">
+            <StatGrid className="lg:grid-cols-3">
+                <StatCard
+                    icon={Minus}
+                    label="Текущий долг"
+                    value={`${formatAmount(totalDebt)} ₽`}
+                    tone="destructive"
+                />
+                <StatCard
+                    icon={Wallet}
+                    label="Общий лимит"
+                    value={`${formatAmount(totalLimit)} ₽`}
+                    tone="brand"
+                    hint={
+                        <span>
                             Лимит использован на:{' '}
-                            <span className={`limit-usage-value ${usageClass(usage)}`}>{usageText(usage)}</span>
-                        </div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-label">💳 Количество кредитных карт</div>
-                        <div className="stat-value">{count}</div>
-                    </div>
-                </div>
+                            <span className={cn('font-medium', usageClass(usage))}>
+                                {usageText(usage)}
+                            </span>
+                        </span>
+                    }
+                />
+                <StatCard
+                    icon={CreditCardIcon}
+                    label="Количество кредитных карт"
+                    value={count}
+                    tone="info"
+                />
+            </StatGrid>
 
-                <div className="controls-bar">
-                    <div className="search-bar">
-                        <input
-                            type="text"
-                            placeholder="🔍 Поиск по названию или последним 4 цифрам..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                    <div className="sort-buttons">
-                        <SortButton label="По остатку дней" field="grace" sortConfig={sortConfig} onSort={handleSort} />
-                        <SortButton label="По задолженности" field="debt" sortConfig={sortConfig} onSort={handleSort} />
-                        <SortButton label="По лимиту" field="limit" sortConfig={sortConfig} onSort={handleSort} />
-                        <SortButton label="По остатку" field="remainder" sortConfig={sortConfig} onSort={handleSort} />
-                    </div>
-                </div>
-
-                {error && <div className="error-message">{error}</div>}
-
-                <div className="credit-cards-grid">
-                    {cards.length === 0 ? (
-                        <div className="empty-state">
-                            {searchTerm ? 'Ничего не найдено' : 'Нет кредитных карт. Добавьте первую!'}
-                        </div>
-                    ) : (
-                        cards.map(card => (
-                            <CreditCard
-                                key={card.id}
-                                card={card}
-                                disabled={actionLoading}
-                                onSpend={() => setOperation({ type: 'spend', card })}
-                                onRepay={() => setOperation({ type: 'repay', card })}
-                                onHistory={() => setHistoryCard(card)}
-                                onEdit={() => { setEditingCard(card); setModalOpen(true); }}
-                                onDelete={() => handleDeleteCard(card)}
-                            />
-                        ))
-                    )}
-                </div>
-
-                {modalOpen && (
-                    <CreditCardModal
-                        isOpen={modalOpen}
-                        card={editingCard}
-                        onClose={() => { setModalOpen(false); setEditingCard(null); }}
-                        onSave={handleSaveCard}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <SearchInput
+                    value={searchTerm}
+                    onChange={setSearchTerm}
+                    placeholder="Поиск по названию или последним 4 цифрам..."
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                    <SortButton
+                        label="По остатку дней"
+                        field="grace"
+                        sortField={sortConfig.field}
+                        sortOrder={sortConfig.order}
+                        onSort={handleSort}
                     />
-                )}
-
-                {operation && (
-                    <CreditCardOperationModal
-                        isOpen={!!operation}
-                        card={operation.card}
-                        type={operation.type}
-                        onClose={() => setOperation(null)}
-                        onSave={handleOperation}
+                    <SortButton
+                        label="По задолженности"
+                        field="debt"
+                        sortField={sortConfig.field}
+                        sortOrder={sortConfig.order}
+                        onSort={handleSort}
                     />
-                )}
-
-                {historyCard && (
-                    <CreditCardHistoryModal
-                        isOpen={!!historyCard}
-                        card={historyCard}
-                        onClose={() => setHistoryCard(null)}
-                        onRolledBack={reload}
+                    <SortButton
+                        label="По лимиту"
+                        field="limit"
+                        sortField={sortConfig.field}
+                        sortOrder={sortConfig.order}
+                        onSort={handleSort}
                     />
-                )}
+                    <SortButton
+                        label="По остатку"
+                        field="remainder"
+                        sortField={sortConfig.field}
+                        sortOrder={sortConfig.order}
+                        onSort={handleSort}
+                    />
+                </div>
             </div>
-        </div>
-    );
+
+            <ErrorMessage>{error}</ErrorMessage>
+
+            {cards.length === 0 ? (
+                <EmptyState
+                    icon={Wallet}
+                    title={searchTerm ? 'Ничего не найдено' : 'Нет кредитных карт'}
+                    description={searchTerm ? 'Попробуйте изменить запрос' : 'Добавьте первую карту'}
+                />
+            ) : (
+                <div className="grid gap-4 lg:grid-cols-2">
+                    {cards.map((card) => (
+                        <CreditCard
+                            key={card.id}
+                            card={card}
+                            disabled={actionLoading}
+                            onSpend={() => setOperation({ type: 'spend', card })}
+                            onRepay={() => setOperation({ type: 'repay', card })}
+                            onHistory={() => setHistoryCard(card)}
+                            onEdit={() => {
+                                setEditingCard(card)
+                                setModalOpen(true)
+                            }}
+                            onDelete={() => handleDeleteCard(card)}
+                        />
+                    ))}
+                </div>
+            )}
+
+            {modalOpen && (
+                <CreditCardModal
+                    isOpen={modalOpen}
+                    card={editingCard}
+                    onClose={() => {
+                        setModalOpen(false)
+                        setEditingCard(null)
+                    }}
+                    onSave={handleSaveCard}
+                />
+            )}
+
+            {operation && (
+                <CreditCardOperationModal
+                    isOpen={!!operation}
+                    card={operation.card}
+                    type={operation.type}
+                    onClose={() => setOperation(null)}
+                    onSave={handleOperation}
+                />
+            )}
+
+            {historyCard && (
+                <CreditCardHistoryModal
+                    isOpen={!!historyCard}
+                    card={historyCard}
+                    onClose={() => setHistoryCard(null)}
+                    onRolledBack={reload}
+                />
+            )}
+
+            {confirmDialog}
+        </PageContainer>
+    )
 }
 
-const SortButton = ({ label, field, sortConfig, onSort }) => {
-    const isActive = sortConfig.field === field;
-    const arrow = isActive ? (sortConfig.order === 'asc' ? '↑' : '↓') : '';
-
-    return (
-        <button className={`sort-btn ${isActive ? 'active' : ''}`} onClick={() => onSort(field)}>
-            {label} {arrow}
-        </button>
-    );
-};
-
 const CreditCard = ({ card, disabled, onSpend, onRepay, onHistory, onEdit, onDelete }) => {
-    const imbalance = Number(card.imbalance || 0);
-    const accumulators = card.accumulators || [];
+    const accumulators = card.accumulators || []
 
     return (
-        <div className="bullion-card credit-card">
-            <div className="card-header">
-                <h3>💳 {card.name}</h3>
-            </div>
-            <div className="card-body">
-                <div className="card-stats">
-                    <div className="stat">
-                        <span className="stat-name">Номер карты:</span>
-                        <span className="stat-description card-number">{card.maskedNumber}</span>
-                    </div>
-                    <div className="stat">
-                        <span className="stat-name">Ближайший платёж:</span>
-                        <span className="stat-description">
-                            {card.gracePeriodDate ? formatDate(card.gracePeriodDate) : '—'}
-                        </span>
-                    </div>
-                    <div className="stat">
-                        <span className="stat-name">Осталось:</span>
-                        <span className={`stat-description grace-left ${graceClass(card.graceDaysLeft)}`}>
-                            {graceText(card.graceDaysLeft)}
-                        </span>
-                    </div>
-                    <div className="stat">
-                        <span className="stat-name">Лимит:</span>
-                        <span className="stat-description">{formatAmount(card.limit)} ₽</span>
-                    </div>
-                    <div className="stat">
-                        <span className="stat-name">Задолженность:</span>
-                        <span className="stat-description debt-value">{formatAmount(card.debt)} ₽</span>
-                    </div>
-                    <div className="stat">
-                        <span className="stat-name">Остаток:</span>
-                        <span className="stat-description">{formatAmount(card.remainder)} ₽</span>
-                    </div>
-                    <div className="stat">
-                        <span className="stat-name">Дисбаланс:</span>
-                        <span className={`stat-description imbalance ${imbalance < 0 ? 'imbalance-negative' : 'imbalance-positive'}`}>
-                            {formatSigned(card.imbalance)} ₽
-                        </span>
-                    </div>
+        <Card className="gap-4 transition-shadow hover:shadow-md">
+            <CardHeader>
+                <CardTitle className="text-base">{card.name}</CardTitle>
+            </CardHeader>
 
-                    <div className="accumulators">
-                        <span className="stat-name">Накопитель:</span>
-                        {accumulators.length === 0 ? (
-                            <div className="accumulator-empty">
-                                Необходимо выбрать слиток для накопления
-                            </div>
-                        ) : (
-                            <div className="accumulator-list">
-                                {accumulators.map(item => (
-                                    <span key={item.bullionId} className="accumulator-item">
+            <CardContent className="flex flex-col gap-1.5 text-sm">
+                <Row label="Номер карты" value={card.maskedNumber} />
+                <Row
+                    label="Ближайший платёж"
+                    value={card.gracePeriodDate ? formatDate(card.gracePeriodDate) : '—'}
+                />
+                <Row
+                    label="Осталось"
+                    value={graceText(card.graceDaysLeft)}
+                    valueClassName={graceClass(card.graceDaysLeft)}
+                />
+                <Row label="Лимит" value={`${formatAmount(card.limit)} ₽`} />
+                <Row
+                    label="Задолженность"
+                    value={`${formatAmount(card.debt)} ₽`}
+                    valueClassName="text-destructive"
+                />
+                <Row label="Остаток" value={`${formatAmount(card.remainder)} ₽`} />
+                <Row
+                    label="Дисбаланс"
+                    value={`${formatSigned(card.imbalance)} ₽`}
+                    valueClassName={
+                        Number(card.imbalance || 0) < 0 ? 'text-destructive' : 'text-success'
+                    }
+                />
+
+                <div className="flex flex-col gap-1 pt-1">
+                    <span className="text-muted-foreground">Накопитель</span>
+                    {accumulators.length === 0 ? (
+                        <span className="text-muted-foreground">
+                            Необходимо выбрать слиток для накопления
+                        </span>
+                    ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                            {accumulators.map((item) => (
+                                <Badge key={item.bullionId} variant="outline" asChild>
+                                    <Link to={`/vaults/${item.vaultId}`}>
                                         <span
-                                            className="accumulator-bullion"
-                                            style={item.bullionNameColor ? { color: item.bullionNameColor } : undefined}
+                                            style={
+                                                item.bullionNameColor
+                                                    ? { color: item.bullionNameColor }
+                                                    : undefined
+                                            }
                                         >
                                             {item.bullionNameTitle}
                                         </span>
-                                        {' | '}
-                                        <Link to={`/vaults/${item.vaultId}`} className="accumulator-vault">
-                                            {item.vaultName}
-                                        </Link>
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                                        <span className="text-muted-foreground">
+                                            | {item.vaultName}
+                                        </span>
+                                    </Link>
+                                </Badge>
+                            ))}
+                        </div>
+                    )}
                 </div>
-            </div>
-            <div className="card-actions-horizontal">
-                <button className="withdraw-btn" onClick={onSpend} disabled={disabled}>
-                    💸 Списание
-                </button>
-                <button className="refill-btn" onClick={onRepay} disabled={disabled || Number(card.debt) <= 0}>
-                    💰 Погашение
-                </button>
-                <button className="history-btn" onClick={onHistory} disabled={disabled}>
-                    📜 История
-                </button>
-                <button className="edit-vault-btn" onClick={onEdit} disabled={disabled}>
-                    ✏️ Редактировать
-                </button>
-                <button className="delete-vault-btn" onClick={onDelete} disabled={disabled}>
-                    🗑️ Удалить
-                </button>
-            </div>
-        </div>
-    );
-};
+            </CardContent>
 
-export default CreditCardsPage;
+            <CardContent>
+                <ButtonGroup className="flex-wrap">
+                    <Button
+                        className="text-warning hover:text-warning"
+                        variant="outline"
+                        size="sm"
+                        onClick={onSpend}
+                        disabled={disabled}
+                    >
+                        <Minus />
+                        Списание
+                    </Button>
+                    <Button
+                        className="text-success hover:text-success"
+                        variant="outline"
+                        size="sm"
+                        onClick={onRepay}
+                        disabled={disabled || Number(card.debt) <= 0}
+                    >
+                        <Plus />
+                        Погашение
+                    </Button>
+                    <Button
+                        className="text-info hover:text-info"
+                        variant="outline"
+                        size="sm"
+                        onClick={onHistory}
+                        disabled={disabled}
+                    >
+                        <History />
+                        История
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={onEdit} disabled={disabled}>
+                        <Pencil />
+                        Редактировать
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={onDelete}
+                        disabled={disabled}
+                    >
+                        <Trash2 />
+                        Удалить
+                    </Button>
+                </ButtonGroup>
+            </CardContent>
+        </Card>
+    )
+}
+
+const Row = ({ label, value, valueClassName }) => (
+    <div className="flex justify-between gap-3">
+        <span className="text-muted-foreground">{label}</span>
+        <span className={cn('text-right font-medium tabular-nums', valueClassName)}>{value}</span>
+    </div>
+)
+
+export default CreditCardsPage

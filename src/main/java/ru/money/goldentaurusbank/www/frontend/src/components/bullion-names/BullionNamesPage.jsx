@@ -1,341 +1,300 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
-import api from '../../api/axios';
-import BullionNameModal from './BullionNameModal';
-import './BullionNames.css';
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { FileDown, FileUp, FolderTree, Pencil, Plus, Trash2 } from 'lucide-react'
+import api from '@/api/axios'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Spinner } from '@/components/ui/spinner'
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { PageContainer, PageHeader } from '@/components/ui-app/page-header'
+import { SearchInput } from '@/components/ui-app/search-input'
+import { SortableHead, TablePager } from '@/components/ui-app/data-table'
+import { EmptyState, ErrorMessage, PageLoading } from '@/components/ui-app/page-state'
+import { useConfirm } from '@/components/ui-app/confirm-dialog'
+import { useExcelPort } from '@/components/ui-app/use-excel-port'
+import BullionNameModal from './BullionNameModal'
+
+const ITEMS_PER_PAGE = 10
 
 function BullionNamesPage() {
-    const [bullionNames, setBullionNames] = useState([]);
-    const [filteredBullionNames, setFilteredBullionNames] = useState([]);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [modalOpen, setModalOpen] = useState(false);
-    const [editingBullionName, setEditingBullionName] = useState(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(10);
-    const [importing, setImporting] = useState(false);
-
-    const fileInputRef = useRef(null);
+    const [bullionNames, setBullionNames] = useState([])
+    const [filteredBullionNames, setFilteredBullionNames] = useState([])
+    const [searchTerm, setSearchTerm] = useState('')
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState('')
+    const [modalOpen, setModalOpen] = useState(false)
+    const [editingBullionName, setEditingBullionName] = useState(null)
+    const [currentPage, setCurrentPage] = useState(1)
 
     // Сортировка
-    const [sortOrder, setSortOrder] = useState('asc');
+    const [sortOrder, setSortOrder] = useState('asc')
 
-    const navigate = useNavigate();
+    const navigate = useNavigate()
+    const { confirm, confirmDialog } = useConfirm()
+
+    const { importing, handleExport, handleImportClick, fileInputProps } = useExcelPort({
+        basePath: '/bullion-names',
+        fileName: 'bullion-names.xlsx',
+        exportErrorText: 'Не удалось экспортировать наименования',
+        onImported: () => fetchBullionNames(),
+    })
 
     useEffect(() => {
-        fetchBullionNames();
-    }, []);
+        fetchBullionNames()
+    }, [])
 
     useEffect(() => {
-        let filtered = [...bullionNames];
+        let filtered = [...bullionNames]
 
         if (searchTerm) {
-            filtered = filtered.filter(bn =>
+            filtered = filtered.filter((bn) =>
                 bn.title.toLowerCase().includes(searchTerm.toLowerCase())
-            );
+            )
         }
 
-        filtered.sort((a, b) => {
-            if (sortOrder === 'asc') {
-                return a.title.localeCompare(b.title, 'ru');
-            } else {
-                return b.title.localeCompare(a.title, 'ru');
-            }
-        });
+        filtered.sort((a, b) =>
+            sortOrder === 'asc'
+                ? a.title.localeCompare(b.title, 'ru')
+                : b.title.localeCompare(a.title, 'ru')
+        )
 
-        setFilteredBullionNames(filtered);
-        setCurrentPage(1);
-    }, [searchTerm, bullionNames, sortOrder]);
+        setFilteredBullionNames(filtered)
+        setCurrentPage(1)
+    }, [searchTerm, bullionNames, sortOrder])
 
     const fetchBullionNames = async () => {
         try {
-            const response = await api.get('/bullion-names');
-            setBullionNames(response.data.data || []);
+            const response = await api.get('/bullion-names')
+            setBullionNames(response.data.data || [])
         } catch (err) {
-            console.error('Ошибка загрузки наименований:', err);
-            setError('Не удалось загрузить наименования');
+            console.error('Ошибка загрузки наименований:', err)
+            setError('Не удалось загрузить наименования')
         } finally {
-            setLoading(false);
+            setLoading(false)
         }
-    };
+    }
 
     const handleAddBullionName = () => {
-        setEditingBullionName(null);
-        setModalOpen(true);
-    };
+        setEditingBullionName(null)
+        setModalOpen(true)
+    }
 
     const handleEditBullionName = (bullionName) => {
-        setEditingBullionName(bullionName);
-        setModalOpen(true);
-    };
+        setEditingBullionName(bullionName)
+        setModalOpen(true)
+    }
 
     const handleSaveBullionName = async (title, color) => {
         try {
             if (editingBullionName) {
                 const response = await api.put(`/bullion-names/${editingBullionName.id}`, {
                     title,
-                    color
-                });
-                setBullionNames(prev => prev.map(bn =>
-                    bn.id === editingBullionName.id ? response.data.data : bn
-                ));
+                    color,
+                })
+                setBullionNames((prev) =>
+                    prev.map((bn) => (bn.id === editingBullionName.id ? response.data.data : bn))
+                )
             } else {
-                const response = await api.post('/bullion-names', {
-                    title,
-                    color
-                });
-                setBullionNames(prev => [...prev, response.data.data]);
+                const response = await api.post('/bullion-names', { title, color })
+                setBullionNames((prev) => [...prev, response.data.data])
             }
-            setModalOpen(false);
-            setEditingBullionName(null);
+            setModalOpen(false)
+            setEditingBullionName(null)
         } catch (err) {
-            console.error('Ошибка сохранения наименования:', err);
-            throw err;
+            console.error('Ошибка сохранения наименования:', err)
+            throw err
         }
-    };
+    }
 
-    const handleDeleteBullionName = async (id, title) => {
-        if (window.confirm(`Удалить наименование "${title}"?`)) {
-            try {
-                await api.delete(`/bullion-names/${id}`);
-                setBullionNames(prev => prev.filter(bn => bn.id !== id));
-            } catch (err) {
-                console.error('Ошибка удаления наименования:', err);
-            }
-        }
-    };
-
-    // Экспорт в Excel
-    const handleExport = async () => {
-        try {
-            const response = await api.get('/bullion-names/export', {
-                responseType: 'blob',
-                _skipErrorToast: true  // тело ответа — blob, message не прочитать, показываем свой тост
-            });
-
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', 'bullion-names.xlsx');
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
-        } catch (err) {
-            console.error('Ошибка экспорта:', err);
-            toast.error('Не удалось экспортировать наименования');
-        }
-    };
-
-    // Импорт из Excel
-    const handleImportClick = () => {
-        fileInputRef.current.click();
-    };
-
-    const handleFileChange = async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const fileExt = file.name.split('.').pop().toLowerCase();
-        if (!['xlsx', 'xls'].includes(fileExt)) {
-            toast.error('Пожалуйста, выберите файл с расширением .xlsx или .xls');
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        setImporting(true);
-
-        try {
-            const response = await api.post('/bullion-names/import', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            });
-
-            const result = response.data.data;
-
-            let description = `Добавлено: ${result.added}, пропущено (дубликаты): ${result.skipped}`;
-            if (result.errors && result.errors.length > 0) {
-                description += `\nОшибки (${result.errors.length}): ${result.errors.slice(0, 5).join('; ')}`;
-                if (result.errors.length > 5) {
-                    description += ` ...и еще ${result.errors.length - 5}`;
+    const handleDeleteBullionName = (id, title) => {
+        confirm({
+            title: 'Удаление наименования',
+            description: `Удалить наименование "${title}"?`,
+            onConfirm: async () => {
+                try {
+                    await api.delete(`/bullion-names/${id}`)
+                    setBullionNames((prev) => prev.filter((bn) => bn.id !== id))
+                } catch (err) {
+                    console.error('Ошибка удаления наименования:', err)
                 }
-                toast.warning('Импорт завершён с ошибками', { description });
-            } else {
-                toast.success('Импорт завершён', { description });
-            }
-
-            await fetchBullionNames();
-        } catch (err) {
-            console.error('Ошибка импорта:', err);
-            toast.error('Ошибка при импорте файла: ' + (err.response?.data?.message || err.message));
-        } finally {
-            setImporting(false);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
-    };
+            },
+        })
+    }
 
     const toggleSortOrder = () => {
-        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    };
+        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    }
 
-    const indexOfLastItem = currentPage * itemsPerPage;
-    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentItems = filteredBullionNames.slice(indexOfFirstItem, indexOfLastItem);
-    const totalPages = Math.ceil(filteredBullionNames.length / itemsPerPage);
-
-    const paginate = (pageNumber) => setCurrentPage(pageNumber);
+    const indexOfLastItem = currentPage * ITEMS_PER_PAGE
+    const currentItems = filteredBullionNames.slice(
+        indexOfLastItem - ITEMS_PER_PAGE,
+        indexOfLastItem
+    )
+    const totalPages = Math.ceil(filteredBullionNames.length / ITEMS_PER_PAGE)
 
     if (loading) {
-        return <div className="bullionNames-container">Загрузка...</div>;
+        return (
+            <PageContainer>
+                <PageLoading />
+            </PageContainer>
+        )
     }
 
     return (
-        <div className="bullionNames-container">
-            <div className="bullionNames-content">
-                <div className="bullionNames-header">
-                    <h1>📁 Управление наименованиями</h1>
-                    <div className="header-actions">
-                        <button onClick={() => navigate('/dashboard')} className="back-btn">
-                            ← Назад
-                        </button>
-                        <button onClick={handleExport} className="export-btn">
-                            📎 Экспорт Excel
-                        </button>
-                        <button onClick={handleImportClick} className="import-btn" disabled={importing}>
-                            📂 Импорт Excel
-                        </button>
-                        <button onClick={handleAddBullionName} className="add-bullionName-btn">
-                            + Добавить наименование
-                        </button>
-                    </div>
-                </div>
+        <TooltipProvider>
+            <PageContainer>
+                <PageHeader
+                    title="Управление наименованиями"
+                    onBack={() => navigate('/dashboard')}
+                >
+                    <Button variant="outline" onClick={handleExport}>
+                        <FileDown />
+                        Экспорт Excel
+                    </Button>
+                    <Button variant="outline" onClick={handleImportClick} disabled={importing}>
+                        {importing ? <Spinner /> : <FileUp />}
+                        {importing ? 'Импорт данных...' : 'Импорт Excel'}
+                    </Button>
+                    <Button onClick={handleAddBullionName}>
+                        <Plus />
+                        Добавить наименование
+                    </Button>
+                </PageHeader>
 
-                <div className="search-bar">
-                    <input
-                        type="text"
-                        placeholder="🔍 Поиск наименований..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-
-                {error && <div className="error-message">{error}</div>}
-
-                {/* Скрытый input для выбора файла */}
-                <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    accept=".xlsx,.xls"
-                    style={{ display: 'none' }}
+                <SearchInput
+                    value={searchTerm}
+                    onChange={setSearchTerm}
+                    placeholder="Поиск наименований..."
                 />
 
-                {/* Индикатор импорта */}
-                {importing && (
-                    <div className="import-progress">
-                        <div className="spinner"></div>
-                        <span>Импорт данных...</span>
-                    </div>
-                )}
+                <ErrorMessage>{error}</ErrorMessage>
 
-                <div className="bullionNames-table-wrapper">
-                    <table className="bullionNames-table">
-                        <thead>
-                        <tr>
-                            <th className="sortable-header" onClick={toggleSortOrder}>
-                                Название наименования
-                                <span className="sort-indicator">
-                                    {sortOrder === 'asc' ? ' ↑' : ' ↓'}
-                                </span>
-                            </th>
-                            <th>Действия</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {currentItems.length === 0 ? (
-                            <tr>
-                                <td colSpan="2" className="empty-row">
-                                    {searchTerm ? 'Ничего не найдено' : 'Нет наименований. Добавьте первое или импортируйте из Excel!'}
-                                </td>
-                            </tr>
-                        ) : (
-                            currentItems.map((bullionName) => (
-                                <tr key={bullionName.id}>
-                                    <td>
-                                        <div className="bullionName-name-with-color">
-                                            <span
-                                                className="bullionName-color-dot"
-                                                style={{ backgroundColor: bullionName.color || '#cccccc' }}
-                                            />
-                                            <span className="bullionName-name">{bullionName.title}</span>
-                                        </div>
-                                    </td>
-                                    <td className="actions">
-                                        <button
-                                            onClick={() => handleEditBullionName(bullionName)}
-                                            className="edit-btn"
-                                            title="Редактировать"
-                                        >
-                                            ✏️
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeleteBullionName(bullionName.id, bullionName.title)}
-                                            className="delete-btn"
-                                            title="Удалить"
-                                        >
-                                            🗑️
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))
+                {/* Скрытый input для выбора файла */}
+                <input {...fileInputProps} />
+
+                {currentItems.length === 0 ? (
+                    <EmptyState
+                        icon={FolderTree}
+                        title={searchTerm ? 'Ничего не найдено' : 'Нет наименований'}
+                        description={
+                            searchTerm
+                                ? 'Попробуйте изменить запрос'
+                                : 'Добавьте первое наименование или импортируйте список из Excel'
+                        }
+                    >
+                        {!searchTerm && (
+                            <Button onClick={handleAddBullionName}>
+                                <Plus />
+                                Добавить наименование
+                            </Button>
                         )}
-                        </tbody>
-                    </table>
-                </div>
-
-                {totalPages > 1 && (
-                    <div className="pagination">
-                        <button
-                            onClick={() => paginate(currentPage - 1)}
-                            disabled={currentPage === 1}
-                            className="page-btn"
-                        >
-                            ← Назад
-                        </button>
-                        <span className="page-info">
-                            Страница {currentPage} из {totalPages}
-                        </span>
-                        <button
-                            onClick={() => paginate(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                            className="page-btn"
-                        >
-                            Вперёд →
-                        </button>
-                    </div>
+                    </EmptyState>
+                ) : (
+                    <Card className="overflow-hidden py-0">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <SortableHead
+                                        className="w-full"
+                                        label="Название наименования"
+                                        field="title"
+                                        sortField="title"
+                                        sortOrder={sortOrder}
+                                        onSort={toggleSortOrder}
+                                    />
+                                    <TableHead className="w-0 text-right">Действия</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {currentItems.map((bullionName) => (
+                                    <TableRow key={bullionName.id}>
+                                        <TableCell className="whitespace-normal">
+                                            <span className="flex items-center gap-2 font-medium break-words">
+                                                <span
+                                                    className="inline-block size-3 shrink-0 rounded-full border"
+                                                    style={{
+                                                        backgroundColor:
+                                                            bullionName.color || '#cccccc',
+                                                    }}
+                                                />
+                                                {bullionName.title}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell className="w-0 text-right">
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon-sm"
+                                                        onClick={() =>
+                                                            handleEditBullionName(bullionName)
+                                                        }
+                                                        aria-label="Редактировать"
+                                                    >
+                                                        <Pencil />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>Редактировать</TooltipContent>
+                                            </Tooltip>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon-sm"
+                                                        className="text-destructive hover:text-destructive"
+                                                        onClick={() =>
+                                                            handleDeleteBullionName(
+                                                                bullionName.id,
+                                                                bullionName.title
+                                                            )
+                                                        }
+                                                        aria-label="Удалить"
+                                                    >
+                                                        <Trash2 />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>Удалить</TooltipContent>
+                                            </Tooltip>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </Card>
                 )}
+
+                <TablePager
+                    page={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    total={filteredBullionNames.length}
+                    totalLabel="Всего наименований:"
+                />
 
                 <BullionNameModal
                     isOpen={modalOpen}
                     onClose={() => {
-                        setModalOpen(false);
-                        setEditingBullionName(null);
+                        setModalOpen(false)
+                        setEditingBullionName(null)
                     }}
                     onSave={handleSaveBullionName}
                     initialTitle={editingBullionName?.title || ''}
                     initialColor={editingBullionName?.color || ''}
                     isEditing={!!editingBullionName}
                 />
-            </div>
-        </div>
-    );
+
+                {confirmDialog}
+            </PageContainer>
+        </TooltipProvider>
+    )
 }
 
-export default BullionNamesPage;
+export default BullionNamesPage

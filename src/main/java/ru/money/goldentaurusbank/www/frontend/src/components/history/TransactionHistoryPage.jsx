@@ -1,8 +1,61 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { toast } from 'sonner';
-import api from '../../api/axios';
-import './TransactionHistoryPage.css';
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
+import { ChevronDown, CreditCard, RefreshCw, SlidersHorizontal, Undo2 } from 'lucide-react'
+import api from '@/api/axios'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { DatePicker } from '@/components/ui-app/date-picker'
+import { PageContainer, PageHeader } from '@/components/ui-app/page-header'
+import { TablePager } from '@/components/ui-app/data-table'
+import { EmptyState, PageLoading } from '@/components/ui-app/page-state'
+import { useConfirm } from '@/components/ui-app/confirm-dialog'
+import { formatCurrency, formatDateTime } from '@/lib/format'
+import { cn } from '@/lib/utils'
+
+// Radix Select не умеет пустую строку значением пункта — «все типы» ездит сторожевым
+const ALL_KINDS = 'all'
+
+// Вид операции выводится бэкендом из того, какие ноги заполнены.
+const KIND_LABELS = {
+    DEPOSIT: 'Пополнение',
+    WITHDRAWAL: 'Списание',
+    TRANSFER: 'Перевод',
+    OPENING_BALANCE: 'Начальный остаток',
+}
+
+// Перевод и начальный остаток накопления не двигают — красим их нейтрально.
+const KIND_AMOUNT_CLASS = {
+    DEPOSIT: 'text-success',
+    WITHDRAWAL: 'text-destructive',
+    TRANSFER: 'text-primary',
+    OPENING_BALANCE: 'text-muted-foreground',
+}
+
+const KIND_BADGE_VARIANT = {
+    DEPOSIT: 'success',
+    WITHDRAWAL: 'danger',
+    TRANSFER: 'info',
+    OPENING_BALANCE: 'outline',
+}
 
 const TransactionHistoryPage = () => {
     const [transactions, setTransactions] = useState([]);
@@ -16,6 +69,9 @@ const TransactionHistoryPage = () => {
         toDate: ''
     });
     const [showFilters, setShowFilters] = useState(false);
+
+    const navigate = useNavigate();
+    const { confirm, confirmDialog } = useConfirm();
 
     useEffect(() => {
         fetchTransactions();
@@ -44,57 +100,24 @@ const TransactionHistoryPage = () => {
         }
     };
 
-    const handleRollback = async (id) => {
-        if (!window.confirm('Вы уверены, что хотите откатить эту транзакцию?')) return;
-        try {
-            await api.post(`/transactions/${id}/rollback`);
-            toast.success('Транзакция откачена');
-            fetchTransactions();
-        } catch (err) {
-            console.error('Rollback failed:', err);
-        }
-    };
-
-    // Вид операции выводится бэкендом из того, какие ноги заполнены.
-    const KIND_LABELS = {
-        DEPOSIT: 'Пополнение',
-        WITHDRAWAL: 'Списание',
-        TRANSFER: 'Перевод',
-        OPENING_BALANCE: 'Начальный остаток'
-    };
-
-    // Перевод и начальный остаток накопления не двигают — красим их нейтрально.
-    const KIND_AMOUNT_CLASS = {
-        DEPOSIT: 'income',
-        WITHDRAWAL: 'expense',
-        TRANSFER: 'transfer',
-        OPENING_BALANCE: 'neutral'
+    const handleRollback = (id) => {
+        confirm({
+            title: 'Откат транзакции',
+            description: 'Вы уверены, что хотите откатить эту транзакцию?',
+            confirmText: 'Откатить',
+            onConfirm: async () => {
+                try {
+                    await api.post(`/transactions/${id}/rollback`);
+                    toast.success('Транзакция откачена');
+                    fetchTransactions();
+                } catch (err) {
+                    console.error('Rollback failed:', err);
+                }
+            },
+        });
     };
 
     const getKindLabel = (kind) => KIND_LABELS[kind] || kind || '—';
-
-    const getKindClass = (kind) => (kind ? `type-${kind.toLowerCase()}` : 'type-unknown');
-
-    const formatDate = (date) => {
-        if (!date) return '-';
-        const d = new Date(date);
-        const day = String(d.getDate()).padStart(2, '0');
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const year = d.getFullYear();
-        const hour = String(d.getHours()).padStart(2, '0');
-        const minute = String(d.getMinutes()).padStart(2, '0');
-        return `${day}.${month}.${year} ${hour}:${minute}`;
-    };
-
-    const formatAmount = (amount) => {
-        if (!amount) return '0 ₽';
-        return new Intl.NumberFormat('ru-RU', {
-            style: 'currency',
-            currency: 'RUB',
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        }).format(amount);
-    };
 
     const renderDescription = (tx) => {
         const segments = tx.descriptionSegments;
@@ -103,7 +126,7 @@ const TransactionHistoryPage = () => {
             return segments.map((seg, i) => (
                 <span
                     key={i}
-                    className={seg.archived ? 'segment-archived' : undefined}
+                    className={seg.archived ? 'opacity-50 line-through' : undefined}
                     title={seg.archived ? 'Хранилище удалено' : undefined}
                     style={seg.color ? { color: seg.color, fontWeight: 600 } : undefined}
                 >
@@ -115,159 +138,187 @@ const TransactionHistoryPage = () => {
     };
 
     if (loading && page === 0) {
-        return <div className="history-loading">Загрузка истории...</div>;
+        return (
+            <PageContainer>
+                <PageLoading />
+            </PageContainer>
+        )
     }
 
     return (
-        <div className="history-page">
-            <div className="history-header">
-                <div className="history-header-left">
-                    <Link to="/dashboard" className="back-btn">
-                        ← Назад
-                    </Link>
-                    <h1>📜 История операций</h1>
-                </div>
-                <div className="history-header-right">
-                    <button
-                        onClick={() => setShowFilters(!showFilters)}
-                        className="filter-toggle-btn"
-                    >
-                        {showFilters ? '🔽 Скрыть фильтры' : '🔼 Показать фильтры'}
-                    </button>
-                    <button
+        <TooltipProvider>
+            <PageContainer>
+                <PageHeader title="История операций" onBack={() => navigate('/dashboard')}>
+                    <Button
+                        variant="outline"
                         onClick={() => {
-                            setFilters({ kind: '', fromDate: '', toDate: '' });
-                            setPage(0);
+                            setFilters({ kind: '', fromDate: '', toDate: '' })
+                            setPage(0)
                         }}
-                        className="reset-btn"
                     >
                         Сбросить
-                    </button>
-                    <button
-                        onClick={fetchTransactions}
-                        className="refresh-btn"
-                    >
-                        🔄 Обновить
-                    </button>
-                </div>
-            </div>
+                    </Button>
+                    <Button variant="outline" onClick={fetchTransactions}>
+                        <RefreshCw />
+                        Обновить
+                    </Button>
+                </PageHeader>
 
-            {showFilters && (
-                <div className="filters-panel">
-                    <select
-                        value={filters.kind}
-                        onChange={(e) => setFilters({ ...filters, kind: e.target.value })}
-                        className="filter-select"
-                    >
-                        <option value="">Все типы</option>
-                        <option value="DEPOSIT">Пополнение</option>
-                        <option value="WITHDRAWAL">Списание</option>
-                        <option value="TRANSFER">Перевод</option>
-                        <option value="OPENING_BALANCE">Начальный остаток</option>
-                    </select>
+                <Collapsible open={showFilters} onOpenChange={setShowFilters}>
+                    <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                            <SlidersHorizontal />
+                            Фильтры
+                            <ChevronDown
+                                className={cn('transition-transform', showFilters && 'rotate-180')}
+                            />
+                        </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                        <div className="mt-3 flex flex-wrap items-center gap-3">
+                            <Select
+                                value={filters.kind || ALL_KINDS}
+                                onValueChange={(value) => {
+                                    setFilters({ ...filters, kind: value === ALL_KINDS ? '' : value })
+                                    setPage(0)
+                                }}
+                            >
+                                <SelectTrigger className="w-56">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={ALL_KINDS}>Все типы</SelectItem>
+                                    {Object.entries(KIND_LABELS).map(([value, label]) => (
+                                        <SelectItem key={value} value={value}>
+                                            {label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
 
-                    <input
-                        type="date"
-                        value={filters.fromDate}
-                        onChange={(e) => setFilters({ ...filters, fromDate: e.target.value })}
-                        className="filter-input"
-                    />
-                    <input
-                        type="date"
-                        value={filters.toDate}
-                        onChange={(e) => setFilters({ ...filters, toDate: e.target.value })}
-                        className="filter-input"
-                    />
-                </div>
-            )}
+                            <DatePicker
+                                value={filters.fromDate}
+                                onChange={(value) => {
+                                    setFilters({ ...filters, fromDate: value })
+                                    setPage(0)
+                                }}
+                                placeholder="Дата с"
+                                clearable
+                                className="w-auto"
+                            />
+                            <DatePicker
+                                value={filters.toDate}
+                                onChange={(value) => {
+                                    setFilters({ ...filters, toDate: value })
+                                    setPage(0)
+                                }}
+                                placeholder="Дата по"
+                                clearable
+                                className="w-auto"
+                            />
+                        </div>
+                    </CollapsibleContent>
+                </Collapsible>
 
-            <div className="history-table-wrapper">
-                <table className="history-table">
-                    <thead>
-                    <tr>
-                        <th>Дата</th>
-                        <th>Тип</th>
-                        <th>Сумма</th>
-                        <th>Описание</th>
-                        <th>Действия</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {transactions.map((tx, index) => (
-                        <tr key={tx.id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
-                            <td>{formatDate(tx.dateOperation)}</td>
-                            <td>
-                                <span className={`type-badge ${getKindClass(tx.kind)}`}>
-                                    {getKindLabel(tx.kind)}
-                                </span>
-                                {tx.reversalOfId && (
-                                    <span className="reversal-label" title={`Откат операции #${tx.reversalOfId}`}>
-                                        откат
-                                    </span>
-                                )}
-                            </td>
-                            <td className={`amount-cell ${KIND_AMOUNT_CLASS[tx.kind] || ''}`}>
-                                {formatAmount(tx.amount)}
-                            </td>
-                            <td className="description-cell">{renderDescription(tx)}</td>
-                            <td className="actions-cell">
-                                {tx.canRollback ? (
-                                    <button
-                                        onClick={() => handleRollback(tx.id)}
-                                        className="rollback-btn"
-                                        title="Откатить"
-                                    >
-                                        ↩️ Откатить
-                                    </button>
-                                ) : tx.lockedByCard ? (
-                                    // Нога погашения по карте: откат только целиком, из истории карты
-                                    <span
-                                        className="rolled-back-label"
-                                        title="Операция входит в погашение по кредитной карте — откатывайте её из истории карты"
-                                    >
-                                        💳 откат из карты
-                                    </span>
-                                ) : (
-                                    <span className="rolled-back-label">Откачена</span>
-                                )}
-                            </td>
-                        </tr>
-                    ))}
-                    </tbody>
-                </table>
-            </div>
+                {transactions.length === 0 ? (
+                    <EmptyState title="Нет транзакций" description="По выбранным фильтрам ничего не найдено" />
+                ) : (
+                    <Card className="overflow-hidden py-0">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Дата</TableHead>
+                                    <TableHead>Тип</TableHead>
+                                    <TableHead className="text-right">Сумма</TableHead>
+                                    <TableHead className="w-full">Описание</TableHead>
+                                    <TableHead className="text-right">Действия</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {transactions.map((tx) => (
+                                    <TableRow key={tx.id}>
+                                        <TableCell className="whitespace-nowrap">
+                                            {formatDateTime(tx.dateOperation)}
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="flex flex-wrap items-center gap-1.5">
+                                                <Badge variant={KIND_BADGE_VARIANT[tx.kind] || 'outline'}>
+                                                    {getKindLabel(tx.kind)}
+                                                </Badge>
+                                                {tx.reversalOfId && (
+                                                    <Badge
+                                                        variant="outline"
+                                                        title={`Откат операции #${tx.reversalOfId}`}
+                                                    >
+                                                        откат
+                                                    </Badge>
+                                                )}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell
+                                            className={cn(
+                                                'text-right font-medium tabular-nums',
+                                                KIND_AMOUNT_CLASS[tx.kind]
+                                            )}
+                                        >
+                                            {formatCurrency(tx.amount)}
+                                        </TableCell>
+                                        {/* Базовый TableCell — whitespace-nowrap, поэтому длинное
+                                            описание раздвигало таблицу и наезжало на «Действия» */}
+                                        <TableCell className="w-full whitespace-normal">
+                                            <div className="max-w-[34rem] break-words">
+                                                {renderDescription(tx)}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="w-0 text-right">
+                                            {tx.canRollback ? (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleRollback(tx.id)}
+                                                >
+                                                    <Undo2 />
+                                                    Откатить
+                                                </Button>
+                                            ) : tx.lockedByCard ? (
+                                                // Нога погашения по карте: откат только целиком, из истории карты
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Badge variant="outline">
+                                                            <CreditCard />
+                                                            откат из карты
+                                                        </Badge>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        Операция входит в погашение по кредитной карте —
+                                                        откатывайте её из истории карты
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            ) : (
+                                                <span className="text-sm text-muted-foreground">
+                                                    Откачена
+                                                </span>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </Card>
+                )}
 
-            {transactions.length === 0 && (
-                <div className="no-data">Нет транзакций</div>
-            )}
+                <TablePager
+                    page={page + 1}
+                    totalPages={totalPages}
+                    onPageChange={(next) => setPage(next - 1)}
+                    total={totalElements}
+                    totalLabel="Всего транзакций:"
+                />
 
-            {totalPages > 1 && (
-                <div className="pagination">
-                    <button
-                        onClick={() => setPage(Math.max(0, page - 1))}
-                        disabled={page === 0}
-                        className="page-btn"
-                    >
-                        ← Назад
-                    </button>
-                    <span className="page-info">
-            {page + 1} / {totalPages}
-          </span>
-                    <button
-                        onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-                        disabled={page === totalPages - 1}
-                        className="page-btn"
-                    >
-                        Вперед →
-                    </button>
-                </div>
-            )}
+                {confirmDialog}
+            </PageContainer>
+        </TooltipProvider>
+    )
+}
 
-            <div className="total-info">
-                Всего: {totalElements} транзакций
-            </div>
-        </div>
-    );
-};
-
-export default TransactionHistoryPage;
+export default TransactionHistoryPage

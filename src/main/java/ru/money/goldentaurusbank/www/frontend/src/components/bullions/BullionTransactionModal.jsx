@@ -1,23 +1,15 @@
-import { useState, useEffect } from 'react';
-import Select from 'react-select';
-import './Bullions.css';
-
-const formatAmount = (amount) => {
-    if (!amount && amount !== 0) return '0';
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    if (isNaN(num)) return '0';
-    const parts = num.toFixed(2).split('.');
-    const integerPart = parts[0];
-    const decimalPart = parts[1];
-    const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-    if (decimalPart && decimalPart !== '00') {
-        const trimmedDecimal = decimalPart.replace(/0+$/, '');
-        if (trimmedDecimal) {
-            return `${formattedInteger}.${trimmedDecimal}`;
-        }
-    }
-    return formattedInteger;
-};
+import { useState, useEffect } from 'react'
+import { TriangleAlert } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Textarea } from '@/components/ui/textarea'
+import { Combobox } from '@/components/ui-app/combobox'
+import { FormDialog } from '@/components/ui-app/form-dialog'
+import { ErrorMessage } from '@/components/ui-app/page-state'
+import { formatAmount } from '@/lib/format'
 
 // Кнопки быстрого ввода: прибавляются к текущей сумме
 const QUICK_AMOUNTS = [100, 500, 1000, 2000, 3000, 5000, 10000];
@@ -28,7 +20,6 @@ function BullionTransactionModal({
                                      onSave,
                                      title,
                                      buttonText,
-                                     buttonClass,
                                      bullionName,
                                      showVaultSelector = false,
                                      vaults = [],
@@ -309,27 +300,29 @@ function BullionTransactionModal({
     };
 
     const renderQuickAmounts = () => (
-        <div className="quick-amount-row">
+        <div className="flex flex-wrap gap-1.5">
             {QUICK_AMOUNTS.map(preset => (
-                <button
+                <Button
                     key={preset}
                     type="button"
-                    className="quick-amount-btn"
+                    variant="outline"
+                    size="xs"
                     onClick={() => handleQuickAdd(preset)}
                     disabled={quickAmountsDisabled}
                 >
                     {formatAmount(preset)}
-                </button>
+                </Button>
             ))}
             {showAllButton && (
-                <button
+                <Button
                     type="button"
-                    className="quick-amount-btn quick-amount-btn-all"
+                    variant="secondary"
+                    size="xs"
                     onClick={() => applyAmount(getAvailableBalance())}
                     disabled={quickAmountsDisabled}
                 >
                     Всё
-                </button>
+                </Button>
             )}
         </div>
     );
@@ -471,305 +464,272 @@ function BullionTransactionModal({
         }
     };
 
-    if (!isOpen) return null;
+    // Строка списка у слитков одна и та же: наименование, хранилище, сумма
+    const renderBullionOption = (option) => (
+        <span className="flex items-center justify-between gap-3">
+            <span className="truncate">{option.data?.bullionNameTitle}</span>
+            <span className="truncate text-xs text-muted-foreground">
+                {option.data?.vaultName}
+            </span>
+            <span className="font-medium tabular-nums">
+                {formatAmount(option.data?.amount)} ₽
+            </span>
+        </span>
+    )
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className={`modal-content transaction-modal ${isTransferModal ? 'transfer-modal-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
-                    <h2>{title}</h2>
-                    <button className="modal-close" onClick={onClose}>×</button>
+        <FormDialog
+            open={isOpen}
+            onOpenChange={(open) => !open && onClose()}
+            title={title}
+            onSubmit={handleSubmit}
+            saving={saving}
+            submitText={buttonText}
+            savingText="Обработка..."
+            submitVariant={isDeleteModal ? 'destructive' : 'default'}
+            submitDisabled={isSubmitDisabled()}
+            className={isTransferModal ? 'sm:max-w-2xl' : undefined}
+        >
+            {bullionName && !isConfirm && !isTransferModal && (
+                <div className="flex flex-wrap items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Слиток:</span>
+                    <span className="font-medium">{bullionName}</span>
                 </div>
+            )}
 
-                <form onSubmit={handleSubmit} className="modal-form">
-                    <div className="modal-body-scrollable">
-                        {bullionName && !isConfirm && !isTransferModal && (
-                            <div className="transaction-bullion-info">
-                                <span className="info-label">Слиток:</span>
-                                <span className="info-value">{bullionName}</span>
-                            </div>
+            {isTransferModal && selectedFromOption && (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-muted px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Откуда:</span>
+                    <span className="font-medium">
+                        {selectedFromOption.data?.bullionNameTitle} | {selectedFromOption.data?.vaultName}
+                    </span>
+                    <span className="text-muted-foreground">
+                        Доступно: {formatAmount(maxTransferAmount)} ₽
+                    </span>
+                </div>
+            )}
+
+            {isConfirm && confirmMessage && <p className="text-sm">{confirmMessage}</p>}
+
+            {isTransferModal && (
+                <>
+                    {fromBullions && fromBullions.length > 0 && (
+                        <Field>
+                            <FieldLabel>Откуда переводим *</FieldLabel>
+                            <Combobox
+                                options={fromBullionOptions}
+                                value={selectedFromOption?.value}
+                                onChange={(value, option) => handleFromSelect(option)}
+                                placeholder="Выберите слиток-отправитель..."
+                                emptyText="Нет доступных слитков в этом наименовании"
+                                clearable
+                                renderOption={renderBullionOption}
+                            />
+                            <FieldDescription>
+                                Выберите слиток, с которого будут переведены средства
+                            </FieldDescription>
+                        </Field>
+                    )}
+
+                    <Field>
+                        <FieldLabel htmlFor="transfer-amount">Сумма перевода * (₽)</FieldLabel>
+                        <Input
+                            id="transfer-amount"
+                            type="text"
+                            value={amountDisplay}
+                            onChange={handleAmountChange}
+                            onBlur={handleAmountBlur}
+                            onFocus={handleAmountFocus}
+                            placeholder="0.00"
+                            required
+                            inputMode="decimal"
+                            autoFocus
+                            aria-invalid={!isAmountValid && !!amountError}
+                            disabled={!selectedFromOption}
+                        />
+                        {renderQuickAmounts()}
+                        {amountError && (
+                            <FieldDescription className="flex items-center gap-1.5 text-destructive">
+                                <TriangleAlert className="size-3.5 shrink-0" />
+                                {amountError}
+                            </FieldDescription>
                         )}
+                        <FieldDescription>
+                            Максимальная сумма: {formatAmount(maxTransferAmount)} ₽
+                        </FieldDescription>
+                    </Field>
 
-                        {isTransferModal && selectedFromOption && (
-                            <div className="transaction-bullion-info">
-                                <span className="info-label">📤 Откуда:</span>
-                                <span className="info-value">{selectedFromOption.data?.bullionNameTitle} | {selectedFromOption.data?.vaultName}</span>
-                                <span className="info-label" style={{ marginLeft: '16px' }}>
-                                    Доступно: {formatAmount(maxTransferAmount)} ₽
+                    <Field>
+                        <FieldLabel>Куда перевести *</FieldLabel>
+                        <Combobox
+                            options={transferTargetOptions}
+                            value={selectedTargetOption?.value}
+                            onChange={(value, option) => handleTargetSelect(option)}
+                            placeholder="Выберите слиток-получатель..."
+                            emptyText="Нет доступных слитков для перевода"
+                            clearable
+                            renderOption={renderBullionOption}
+                        />
+                        <FieldDescription>
+                            Выберите слиток, на который будут переведены средства
+                        </FieldDescription>
+                    </Field>
+
+                    {selectedTargetOption && selectedFromOption &&
+                        selectedTargetOption.value !== selectedFromOption.value && (
+                        <div className="flex flex-col gap-1.5 rounded-md border bg-muted/50 px-3 py-2 text-sm">
+                            <div className="font-medium">Выбран получатель</div>
+                            <div className="flex justify-between gap-2">
+                                <span className="text-muted-foreground">Наименование</span>
+                                <span>{selectedTargetOption.data?.bullionNameTitle}</span>
+                            </div>
+                            <div className="flex justify-between gap-2">
+                                <span className="text-muted-foreground">Хранилище</span>
+                                <span>{selectedTargetOption.data?.vaultName}</span>
+                            </div>
+                            <div className="flex justify-between gap-2">
+                                <span className="text-muted-foreground">Текущий баланс</span>
+                                <span className="tabular-nums">
+                                    {formatAmount(selectedTargetOption.data?.amount)} ₽
                                 </span>
                             </div>
-                        )}
-
-                        {isConfirm && confirmMessage && (
-                            <div className="confirm-message">
-                                <p>{confirmMessage}</p>
+                            <div className="flex justify-between gap-2 border-t pt-1.5">
+                                <span className="text-muted-foreground">Будет после перевода</span>
+                                <span className="font-semibold tabular-nums text-primary">
+                                    {formatAmount(
+                                        (selectedTargetOption.data?.amount || 0) + parseFloat(amount || 0)
+                                    )}{' '}
+                                    ₽
+                                </span>
                             </div>
-                        )}
-
-                        {isTransferModal && (
-                            <>
-                                {fromBullions && fromBullions.length > 0 && (
-                                    <div className="form-group">
-                                        <label>📤 Откуда переводим *</label>
-                                        <Select
-                                            options={fromBullionOptions}
-                                            value={selectedFromOption}
-                                            onChange={handleFromSelect}
-                                            placeholder="Выберите слиток-отправитель..."
-                                            isClearable
-                                            noOptionsMessage={() => "Нет доступных слитков в этом наименовании"}
-                                            className="react-select-container"
-                                            classNamePrefix="react-select"
-                                            formatOptionLabel={(option) => (
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                    <span>{option.data?.bullionNameTitle}</span>
-                                                    <span style={{ color: '#718096', fontSize: '13px' }}>
-                                                        {option.data?.vaultName}
-                                                    </span>
-                                                    <span style={{ fontWeight: 600, color: '#2d3748' }}>
-                                                        {formatAmount(option.data?.amount)} ₽
-                                                    </span>
-                                                </div>
-                                            )}
-                                        />
-                                        <small className="input-hint">
-                                            Выберите слиток, с которого будут переведены средства
-                                        </small>
-                                    </div>
-                                )}
-
-                                <div className="form-group">
-                                    <label>Сумма перевода * (₽)</label>
-                                    <input
-                                        type="text"
-                                        value={amountDisplay}
-                                        onChange={handleAmountChange}
-                                        onBlur={handleAmountBlur}
-                                        onFocus={handleAmountFocus}
-                                        placeholder="0.00"
-                                        required
-                                        inputMode="decimal"
-                                        autoFocus
-                                        className={!isAmountValid && amountError ? 'input-error' : ''}
-                                        disabled={!selectedFromOption}
-                                    />
-                                    {renderQuickAmounts()}
-                                    {amountError && (
-                                        <div className="amount-warning">
-                                            ⚠️ {amountError}
-                                        </div>
-                                    )}
-                                    <small className="input-hint">
-                                        Максимальная сумма: {formatAmount(maxTransferAmount)} ₽
-                                    </small>
-                                </div>
-
-                                <div className="form-group">
-                                    <label>📥 Куда перевести *</label>
-                                    <Select
-                                        options={transferTargetOptions}
-                                        value={selectedTargetOption}
-                                        onChange={handleTargetSelect}
-                                        placeholder="Выберите слиток-получатель..."
-                                        isClearable
-                                        noOptionsMessage={() => "Нет доступных слитков для перевода"}
-                                        className="react-select-container"
-                                        classNamePrefix="react-select"
-                                        formatOptionLabel={(option) => (
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <span>{option.data?.bullionNameTitle}</span>
-                                                <span style={{ color: '#718096', fontSize: '13px' }}>
-                                                    {option.data?.vaultName}
-                                                </span>
-                                                <span style={{ fontWeight: 600, color: '#2d3748' }}>
-                                                    {formatAmount(option.data?.amount)} ₽
-                                                </span>
-                                            </div>
-                                        )}
-                                    />
-                                    <small className="input-hint">
-                                        Выберите слиток, на который будут переведены средства
-                                    </small>
-                                </div>
-
-                                {selectedTargetOption && selectedFromOption && selectedTargetOption.value !== selectedFromOption.value && (
-                                    <div className="transfer-target-info">
-                                        <div className="target-info-title">📥 Выбран получатель:</div>
-                                        <div className="target-info-details">
-                                            <div className="target-info-row">
-                                                <span className="target-info-label">Наименование:</span>
-                                                <span className="target-info-value">{selectedTargetOption.data?.bullionNameTitle}</span>
-                                            </div>
-                                            <div className="target-info-row">
-                                                <span className="target-info-label">Хранилище:</span>
-                                                <span className="target-info-value">{selectedTargetOption.data?.vaultName}</span>
-                                            </div>
-                                            <div className="target-info-row">
-                                                <span className="target-info-label">Текущий баланс:</span>
-                                                <span className="target-info-value">{formatAmount(selectedTargetOption.data?.amount)} ₽</span>
-                                            </div>
-                                            <div className="target-info-row highlight">
-                                                <span className="target-info-label">Будет после перевода:</span>
-                                                <span className="target-info-value highlight-amount">
-                                                    {formatAmount((selectedTargetOption.data?.amount || 0) + parseFloat(amount || 0))} ₽
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {selectedTargetOption && selectedFromOption && selectedTargetOption.value === selectedFromOption.value && (
-                                    <div className="error-message">Нельзя перевести в тот же слиток</div>
-                                )}
-
-                                <div className="form-group">
-                                    <label>📝 Комментарий</label>
-                                    <textarea
-                                        value={description}
-                                        onChange={(e) => setDescription(e.target.value)}
-                                        placeholder="Комментарий к переводу (необязательно)..."
-                                        rows={3}
-                                        className="transaction-textarea"
-                                    />
-                                </div>
-                            </>
-                        )}
-
-                        {isDeleteModal && showVaultSelector && vaults.length > 0 && (
-                            <>
-                                <div className="form-group">
-                                    <label>Куда перенести остатки?</label>
-                                    <div className="radio-group">
-                                        <label className="radio-label">
-                                            <input
-                                                type="radio"
-                                                name="transferOption"
-                                                checked={toLiquidityVault === true}
-                                                onChange={() => setToLiquidityVault(true)}
-                                            />
-                                            <span>💰 Ликвидный резерв</span>
-                                        </label>
-                                        <label className="radio-label">
-                                            <input
-                                                type="radio"
-                                                name="transferOption"
-                                                checked={toLiquidityVault === false}
-                                                onChange={() => setToLiquidityVault(false)}
-                                            />
-                                            <span>🏦 Выбрать хранилище</span>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                {!toLiquidityVault && (
-                                    <div className="form-group">
-                                        <label>Хранилище для переноса *</label>
-                                        <Select
-                                            options={vaultOptions}
-                                            value={vaultOptions.find(v => v.value === parseInt(selectedVaultId)) || null}
-                                            onChange={handleVaultSelect}
-                                            placeholder="Поиск хранилища..."
-                                            isClearable
-                                            noOptionsMessage={() => "Хранилища не найдены"}
-                                            className="react-select-container"
-                                            classNamePrefix="react-select"
-                                        />
-                                        <small className="input-hint">
-                                            Начните вводить название для поиска
-                                        </small>
-                                    </div>
-                                )}
-                            </>
-                        )}
-
-                        {!isDeleteModal && !isTransferModal && showVaultSelector && vaults.length > 0 && (
-                            <div className="form-group">
-                                <label>{vaultSelectorLabel} *</label>
-                                <Select
-                                    options={vaultOptions}
-                                    value={vaultOptions.find(v => v.value === parseInt(selectedVaultId)) || null}
-                                    onChange={handleVaultSelect}
-                                    placeholder="Поиск хранилища..."
-                                    isClearable
-                                    noOptionsMessage={() => "Хранилища не найдены"}
-                                    className="react-select-container"
-                                    classNamePrefix="react-select"
-                                />
-                                {vaultOptions.length === 0 && (
-                                    <small className="input-hint" style={{ color: '#e53e3e' }}>
-                                        ⚠️ Нет доступных хранилищ
-                                    </small>
-                                )}
-                            </div>
-                        )}
-
-                        {showAmount && !isConfirm && !isTransferModal && (
-                            <div className="form-group">
-                                <label>Сумма * (₽)</label>
-                                <input
-                                    type="text"
-                                    value={amountDisplay}
-                                    onChange={handleAmountChange}
-                                    onBlur={handleAmountBlur}
-                                    onFocus={handleAmountFocus}
-                                    placeholder="0.00"
-                                    required
-                                    inputMode="decimal"
-                                    autoFocus
-                                />
-                                {renderQuickAmounts()}
-                                <small className="input-hint">
-                                    Используйте точку или запятую для копеек
-                                </small>
-                            </div>
-                        )}
-
-                        {showDescription && !isConfirm && !isTransferModal && (
-                            <div className="form-group">
-                                <label>{descriptionLabel}</label>
-                                <textarea
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    placeholder={descriptionPlaceholder}
-                                    rows={3}
-                                    className="transaction-textarea"
-                                />
-                                <small className="input-hint">
-                                    Необязательное поле
-                                </small>
-                            </div>
-                        )}
-
-                        <div className="form-group">
-                            <label>Дата и время операции *</label>
-                            <input
-                                type="datetime-local"
-                                value={dateOperation}
-                                onChange={(e) => setDateOperation(e.target.value)}
-                                max={`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}T${String(new Date().getHours()).padStart(2,'0')}:${String(new Date().getMinutes()).padStart(2,'0')}`}
-                                required
-                            />
                         </div>
+                    )}
 
-                        {error && <div className="error-message">{error}</div>}
-                    </div>
+                    {selectedTargetOption && selectedFromOption &&
+                        selectedTargetOption.value === selectedFromOption.value && (
+                        <ErrorMessage>Нельзя перевести в тот же слиток</ErrorMessage>
+                    )}
 
-                    <div className="modal-footer">
-                        <button type="button" onClick={onClose} className="cancel-btn">
-                            Отмена
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={isSubmitDisabled()}
-                            className={`save-btn ${buttonClass} ${!isSubmitDisabled() ? '' : 'disabled-btn'}`}
+                    <Field>
+                        <FieldLabel htmlFor="transfer-comment">Комментарий</FieldLabel>
+                        <Textarea
+                            id="transfer-comment"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Комментарий к переводу (необязательно)..."
+                            rows={3}
+                        />
+                    </Field>
+                </>
+            )}
+
+            {isDeleteModal && showVaultSelector && vaults.length > 0 && (
+                <>
+                    <Field>
+                        <FieldLabel>Куда перенести остатки?</FieldLabel>
+                        <RadioGroup
+                            value={toLiquidityVault ? 'liquidity' : 'vault'}
+                            onValueChange={(value) => setToLiquidityVault(value === 'liquidity')}
                         >
-                            {saving ? 'Обработка...' : buttonText}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
+                            <Label htmlFor="transfer-liquidity" className="font-normal">
+                                <RadioGroupItem id="transfer-liquidity" value="liquidity" />
+                                Ликвидный резерв
+                            </Label>
+                            <Label htmlFor="transfer-vault" className="font-normal">
+                                <RadioGroupItem id="transfer-vault" value="vault" />
+                                Выбрать хранилище
+                            </Label>
+                        </RadioGroup>
+                    </Field>
+
+                    {!toLiquidityVault && (
+                        <Field>
+                            <FieldLabel>Хранилище для переноса *</FieldLabel>
+                            <Combobox
+                                options={vaultOptions}
+                                value={selectedVaultId}
+                                onChange={(value, option) => handleVaultSelect(option)}
+                                placeholder="Поиск хранилища..."
+                                emptyText="Хранилища не найдены"
+                                clearable
+                            />
+                            <FieldDescription>
+                                Начните вводить название для поиска
+                            </FieldDescription>
+                        </Field>
+                    )}
+                </>
+            )}
+
+            {!isDeleteModal && !isTransferModal && showVaultSelector && vaults.length > 0 && (
+                <Field>
+                    <FieldLabel>{vaultSelectorLabel} *</FieldLabel>
+                    <Combobox
+                        options={vaultOptions}
+                        value={selectedVaultId}
+                        onChange={(value, option) => handleVaultSelect(option)}
+                        placeholder="Поиск хранилища..."
+                        emptyText="Хранилища не найдены"
+                        clearable
+                    />
+                    {vaultOptions.length === 0 && (
+                        <FieldDescription className="flex items-center gap-1.5 text-destructive">
+                            <TriangleAlert className="size-3.5 shrink-0" />
+                            Нет доступных хранилищ
+                        </FieldDescription>
+                    )}
+                </Field>
+            )}
+
+            {showAmount && !isConfirm && !isTransferModal && (
+                <Field>
+                    <FieldLabel htmlFor="transaction-amount">Сумма * (₽)</FieldLabel>
+                    <Input
+                        id="transaction-amount"
+                        type="text"
+                        value={amountDisplay}
+                        onChange={handleAmountChange}
+                        onBlur={handleAmountBlur}
+                        onFocus={handleAmountFocus}
+                        placeholder="0.00"
+                        required
+                        inputMode="decimal"
+                        autoFocus
+                    />
+                    {renderQuickAmounts()}
+                    <FieldDescription>Используйте точку или запятую для копеек</FieldDescription>
+                </Field>
+            )}
+
+            {showDescription && !isConfirm && !isTransferModal && (
+                <Field>
+                    <FieldLabel htmlFor="transaction-description">{descriptionLabel}</FieldLabel>
+                    <Textarea
+                        id="transaction-description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder={descriptionPlaceholder}
+                        rows={3}
+                    />
+                    <FieldDescription>Необязательное поле</FieldDescription>
+                </Field>
+            )}
+
+            <Field>
+                <FieldLabel htmlFor="transaction-date">Дата и время операции *</FieldLabel>
+                <Input
+                    id="transaction-date"
+                    type="datetime-local"
+                    value={dateOperation}
+                    onChange={(e) => setDateOperation(e.target.value)}
+                    max={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}T${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`}
+                    required
+                />
+            </Field>
+
+            <ErrorMessage>{error}</ErrorMessage>
+        </FormDialog>
+    )
 }
 
-export default BullionTransactionModal;
+export default BullionTransactionModal

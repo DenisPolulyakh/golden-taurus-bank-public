@@ -1,95 +1,95 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import api, { setAccessToken } from '../api/axios';
-import './Login.css';
+import { useState } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
+import api from '@/api/axios'
+import { Button } from '@/components/ui/button'
+import { Field, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
+import { AuthShell } from '@/components/ui-app/auth-shell'
+import { PasswordInput } from '@/components/ui-app/password-input'
+import { ErrorMessage } from '@/components/ui-app/page-state'
 
 function Login({ onLogin }) {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
-    const navigate = useNavigate();
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
+    const [error, setError] = useState('')
+    const [loading, setLoading] = useState(false)
+    const navigate = useNavigate()
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
+        e.preventDefault()
+        setError('')
+        setLoading(true)
 
         try {
-            const response = await api.post('/auth/login', { email, password }, { _skipErrorToast: true });
+            const response = await api.post('/auth/login', { email, password }, { _skipErrorToast: true })
 
             if (response.data && response.data.code === 0 && response.data.data) {
-                const { token, id, email: userEmail, fullName, role } = response.data.data;
+                const { token, id, email: userEmail, fullName, role } = response.data.data
 
                 // ✅ Только передаём токен в onLogin, НЕ сохраняем в localStorage
                 if (onLogin) {
-                    onLogin({ id, email: userEmail, fullName, role }, token);
+                    onLogin({ id, email: userEmail, fullName, role }, token)
                 }
 
-                navigate('/dashboard');
+                navigate('/dashboard')
             } else {
-                setError('Неожиданный формат ответа от сервера');
+                setError('Неожиданный формат ответа от сервера')
             }
         } catch (err) {
-            console.error('Login error:', err);
-            setError(err.response?.data?.message || 'Ошибка входа');
+            console.error('Login error:', err)
+            setError(err.response?.data?.message || 'Ошибка входа')
         } finally {
-            setLoading(false);
+            setLoading(false)
         }
-    };
+    }
 
     return (
-        <div className="login-container">
-            <div className="login-card">
-                <h1>Твой личный банк</h1>
-                <h2>Вход в личный кабинет</h2>
+        <AuthShell
+            title="Вход в личный кабинет"
+            footer={
+                <>
+                    Нет аккаунта?{' '}
+                    <Link to="/register" className="text-primary hover:underline">
+                        Зарегистрироваться
+                    </Link>
+                </>
+            }
+        >
+            <ErrorMessage>{error}</ErrorMessage>
 
-                {error && <div className="error-message">{error}</div>}
+            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+                <Field>
+                    <FieldLabel htmlFor="login-email">Email</FieldLabel>
+                    <Input
+                        id="login-email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        placeholder="your@email.com"
+                        autoComplete="email"
+                    />
+                </Field>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="form-group">
-                        <label>Email</label>
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                            placeholder="your@email.com"
-                        />
-                    </div>
+                <Field>
+                    <FieldLabel htmlFor="login-password">Пароль</FieldLabel>
+                    <PasswordInput
+                        id="login-password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        placeholder="••••••"
+                    />
+                </Field>
 
-                    <div className="form-group password-group">
-                        <label>Пароль</label>
-                        <div className="password-input-wrapper">
-                            <input
-                                type={showPassword ? 'text' : 'password'}
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                placeholder="••••••"
-                            />
-                            <button
-                                type="button"
-                                className="eye-button"
-                                onClick={() => setShowPassword(!showPassword)}
-                            >
-                                {showPassword ? '👁️' : '👁️‍🗨️'}
-                            </button>
-                        </div>
-                    </div>
-
-                    <button type="submit" disabled={loading}>
-                        {loading ? 'Вход...' : 'Войти'}
-                    </button>
-                </form>
-
-                <div className="register-link">
-                    Нет аккаунта? <Link to="/register">Зарегистрироваться</Link>
-                </div>
-            </div>
-        </div>
-    );
+                <Button type="submit" disabled={loading}>
+                    {loading && <Spinner />}
+                    {loading ? 'Вход...' : 'Войти'}
+                </Button>
+            </form>
+        </AuthShell>
+    )
 }
 
-export default Login;
+export default Login

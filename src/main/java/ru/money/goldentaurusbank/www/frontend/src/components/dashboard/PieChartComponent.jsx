@@ -1,213 +1,163 @@
-import React, { useState } from 'react';
+import { useState } from 'react'
+import { Cell, Pie, PieChart, ResponsiveContainer, Sector } from 'recharts'
+import { EmptyState } from '@/components/ui-app/page-state'
+import { cn } from '@/lib/utils'
 
+/**
+ * Распределение по наименованиям. Цвета берём не из палитры графиков, а из
+ * самих наименований: у каждого свой цвет в справочнике.
+ *
+ * Раньше круг рисовался вручную — сотня строк математики с дугами и inline-стилями.
+ */
 const PieChartComponent = ({ data, formatAmount }) => {
-    const [activeIndex, setActiveIndex] = useState(null);
+    const [activeIndex, setActiveIndex] = useState(null)
 
-    const getTotalDistributionAmount = () => {
-        return data.reduce((sum, item) => sum + item.amount, 0);
-    };
+    const total = data.reduce((sum, item) => sum + item.amount, 0)
+    const percentage = (amount) => (total === 0 ? 0 : (amount / total) * 100)
 
-    const getPercentage = (amount) => {
-        const total = getTotalDistributionAmount();
-        if (total === 0) return 0;
-        return (amount / total) * 100;
-    };
-
-    const getArcLength = (percentage) => {
-        return (percentage / 100) * 360;
-    };
-
-    const hasData = data.length > 0 && data.some(item => item.amount > 0);
+    const hasData = data.length > 0 && data.some((item) => item.amount > 0)
 
     if (!hasData) {
-        return (
-            <div className="pie-chart-empty">
-                <p style={{ color: '#a0aec0' }}>Нет данных для отображения</p>
-            </div>
-        );
+        return <EmptyState className="border-0" title="Нет данных для отображения" />
     }
 
-    const PieChart = () => {
-        const radius = 120;
-        const centerX = 150;
-        const centerY = 150;
-        const total = getTotalDistributionAmount();
-        let currentAngle = -90;
+    const toggle = (index) => setActiveIndex(activeIndex === index ? null : index)
 
-        if (total === 0 || data.length === 0) {
-            return null;
+    const RADIAN = Math.PI / 180
+    // Выбранный кусок выезжает из круга — как на прежней самописной диаграмме
+    const SELECTED_OFFSET = 12
+
+    const offsetFor = (index, midAngle) => {
+        const distance = activeIndex === index ? SELECTED_OFFSET : 0
+        return {
+            dx: distance * Math.cos(-midAngle * RADIAN),
+            dy: distance * Math.sin(-midAngle * RADIAN),
         }
+    }
+
+    const renderSector = ({ isActive, ...props }) => {
+        const { dx, dy } = offsetFor(props.index, props.midAngle)
+        return <Sector {...props} cx={props.cx + dx} cy={props.cy + dy} />
+    }
+
+    // Процент пишем прямо в сектор, но только там, где он помещается:
+    // на узких кусках подпись налезала бы на соседние
+    const renderPercentLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+        if (percent * 100 <= 5) return null
+
+        const radius = innerRadius + (outerRadius - innerRadius) * 0.55
+        const { dx, dy } = offsetFor(index, midAngle)
+        const x = cx + dx + radius * Math.cos(-midAngle * RADIAN)
+        const y = cy + dy + radius * Math.sin(-midAngle * RADIAN)
 
         return (
-            <svg width="300" height="300" viewBox="0 0 300 300">
-                {data.map((item, index) => {
-                    const percentage = getPercentage(item.amount);
-                    const arcLength = getArcLength(percentage);
-                    const endAngle = currentAngle + arcLength;
-
-                    const startRad = (currentAngle * Math.PI) / 180;
-                    const endRad = (endAngle * Math.PI) / 180;
-
-                    const offset = activeIndex === index ? 20 : 0;
-                    const offsetAngle = (startRad + endRad) / 2;
-                    const offsetX = offset * Math.cos(offsetAngle);
-                    const offsetY = offset * Math.sin(offsetAngle);
-
-                    const cX = centerX + offsetX;
-                    const cY = centerY + offsetY;
-
-                    const x1 = cX + radius * Math.cos(startRad);
-                    const y1 = cY + radius * Math.sin(startRad);
-                    const x2 = cX + radius * Math.cos(endRad);
-                    const y2 = cY + radius * Math.sin(endRad);
-
-                    const largeArc = arcLength > 180 ? 1 : 0;
-
-                    const pathData = `
-                        M ${cX} ${cY}
-                        L ${x1} ${y1}
-                        A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}
-                        Z
-                    `;
-
-                    const midAngle = (currentAngle + arcLength / 2) * Math.PI / 180;
-                    const textRadius = radius * 0.65;
-                    const textX = cX + textRadius * Math.cos(midAngle);
-                    const textY = cY + textRadius * Math.sin(midAngle);
-
-                    const itemColor = item.color || '#CCCCCC';
-                    const strokeWidth = activeIndex === index ? 4 : 2;
-                    const strokeColor = activeIndex === index ? '#000' : 'white';
-                    const opacity = activeIndex === null ? 1 : (activeIndex === index ? 1 : 0.4);
-
-                    const result = (
-                        <g
-                            key={index}
-                            onClick={() => {
-                                if (activeIndex === index) {
-                                    setActiveIndex(null);
-                                } else {
-                                    setActiveIndex(index);
-                                }
-                            }}
-                            style={{ cursor: 'pointer' }}
-                        >
-                            <path
-                                d={pathData}
-                                fill={itemColor}
-                                stroke={strokeColor}
-                                strokeWidth={strokeWidth}
-                                opacity={opacity}
-                                style={{ transition: 'all 0.3s ease' }}
-                            />
-                            {percentage > 5 && (
-                                <text
-                                    x={textX}
-                                    y={textY}
-                                    textAnchor="middle"
-                                    fill="white"
-                                    fontSize="12"
-                                    fontWeight="bold"
-                                    opacity={opacity}
-                                    style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}
-                                >
-                                    {Math.round(percentage)}%
-                                </text>
-                            )}
-                        </g>
-                    );
-
-                    currentAngle = endAngle;
-                    return result;
-                })}
-                <circle cx="150" cy="150" r="50" fill="white" opacity="0.9" />
-                <text x="150" y="145" textAnchor="middle" fontSize="14" fill="#333" fontWeight="bold">
-                    {formatAmount(getTotalDistributionAmount())}
-                </text>
-                <text x="150" y="165" textAnchor="middle" fontSize="11" fill="#666">
-                    Всего ₽
-                </text>
-            </svg>
-        );
-    };
+            <text
+                x={x}
+                y={y}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill="#fff"
+                fontSize={12}
+                fontWeight={600}
+                opacity={activeIndex === null || activeIndex === index ? 1 : 0.35}
+                // обводка цветом сектора: белые цифры на светлой заливке иначе теряются
+                stroke="oklch(0 0 0 / 35%)"
+                strokeWidth={2.5}
+                paintOrder="stroke"
+                className="pointer-events-none select-none"
+            >
+                {Math.round(percent * 100)}%
+            </text>
+        )
+    }
 
     return (
-        <div className="pie-chart-wrapper" style={{ flexDirection: 'column', gap: '30px' }}>
-            <PieChart />
+        <div className="flex flex-col items-center gap-6">
+            <div className="relative h-[300px] w-full max-w-[320px]">
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <Pie
+                            data={data}
+                            dataKey="amount"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={55}
+                            outerRadius={112}
+                            paddingAngle={1}
+                            startAngle={90}
+                            endAngle={-270}
+                            label={renderPercentLabel}
+                            labelLine={false}
+                            shape={renderSector}
+                            // Проценты recharts рисует только при showLabels, а это
+                            // `!isAnimating`; вступительная анимация нам не нужна,
+                            // зато из-за неё подписи не появлялись вовсе
+                            isAnimationActive={false}
+                            onClick={(_, index) => toggle(index)}
+                        >
+                            {data.map((item, index) => (
+                                <Cell
+                                    key={item.bullionNameId ?? index}
+                                    fill={item.color || 'var(--muted-foreground)'}
+                                    stroke="var(--background)"
+                                    strokeWidth={2}
+                                    opacity={activeIndex === null || activeIndex === index ? 1 : 0.35}
+                                    className="cursor-pointer outline-none transition-all"
+                                />
+                            ))}
+                        </Pie>
+                    </PieChart>
+                </ResponsiveContainer>
 
-            {/* Легенда в 3 колонки */}
-            <div className="pie-legend-grid">
+                {/* Итог в центре бублика: у recharts для этого нет своего слота */}
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-sm font-semibold tabular-nums">
+                        {formatAmount(total)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">Всего ₽</span>
+                </div>
+            </div>
+
+            <div className="grid w-full gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {data.map((item, index) => {
-                    const isActive = activeIndex === index;
+                    const isActive = activeIndex === index
                     return (
-                        <div
-                            key={index}
-                            className={`legend-item ${isActive ? 'active' : ''}`}
-                            onClick={() => {
-                                if (activeIndex === index) {
-                                    setActiveIndex(null);
-                                } else {
-                                    setActiveIndex(index);
-                                }
-                            }}
-                            style={{
-                                cursor: 'pointer',
-                                background: isActive ? '#e0e7ff' : '#f8f9fa',
-                                border: isActive ? '2px solid #667eea' : '2px solid transparent',
-                                transition: 'all 0.3s ease',
-                                borderRadius: '8px',
-                                padding: '6px 12px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px'
-                            }}
+                        <button
+                            key={item.bullionNameId ?? index}
+                            type="button"
+                            onClick={() => toggle(index)}
+                            className={cn(
+                                'flex items-center gap-2 rounded-md border px-3 py-1.5 text-left text-sm transition-colors',
+                                isActive
+                                    ? 'border-primary bg-primary/10'
+                                    : 'border-transparent bg-muted hover:bg-accent'
+                            )}
                         >
                             <span
-                                className="legend-color"
-                                style={{
-                                    backgroundColor: item.color || '#CCCCCC',
-                                    opacity: isActive ? 1 : 0.7,
-                                    width: '14px',
-                                    height: '14px',
-                                    borderRadius: '4px',
-                                    flexShrink: 0,
-                                    border: '1px solid rgba(0,0,0,0.1)'
-                                }}
+                                className="size-3 shrink-0 rounded-sm border"
+                                style={{ backgroundColor: item.color || '#cccccc' }}
                             />
-                            <span className="legend-name" style={{
-                                fontSize: '13px',
-                                fontWeight: isActive ? 700 : 500,
-                                color: isActive ? '#667eea' : '#333',
-                                flex: 1,
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                            }}>
+                            <span
+                                className={cn(
+                                    'min-w-0 flex-1 truncate',
+                                    isActive ? 'font-semibold text-primary' : 'font-medium'
+                                )}
+                            >
                                 {item.name}
                             </span>
-                            <span className="legend-amount" style={{
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#495057',
-                                whiteSpace: 'nowrap'
-                            }}>
+                            <span className="shrink-0 tabular-nums">
                                 {formatAmount(item.amount)} ₽
                             </span>
-                            <span className="legend-percentage" style={{
-                                fontSize: '11px',
-                                color: '#868e96',
-                                fontWeight: 500,
-                                minWidth: '40px',
-                                textAlign: 'right'
-                            }}>
-                                ({Math.round(getPercentage(item.amount))}%)
+                            <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                                ({Math.round(percentage(item.amount))}%)
                             </span>
-                        </div>
-                    );
+                        </button>
+                    )
                 })}
             </div>
         </div>
-    );
-};
+    )
+}
 
-export default PieChartComponent;
+export default PieChartComponent

@@ -1,32 +1,22 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import api from '../../api/axios';
-import BullionModal from './BullionModal';
-import BullionTypeStamp from './BullionTypeStamp';
-import BullionTransactionModal from './BullionTransactionModal';
-import CreditCardOperationModal from '../credit-cards/CreditCardOperationModal';
-import { notifyAmountChange } from './bullionAmount';
-import './Bullions.css';
-import '../credit-cards/CreditCards.css';
-
-const formatAmount = (amount) => {
-    if (!amount && amount !== 0) return '0';
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    if (isNaN(num)) return '0';
-
-    const parts = num.toFixed(2).split('.');
-    const integerPart = parts[0];
-    const decimalPart = parts[1];
-    const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-
-    if (decimalPart && decimalPart !== '00') {
-        const trimmedDecimal = decimalPart.replace(/0+$/, '');
-        if (trimmedDecimal) {
-            return `${formattedInteger}.${trimmedDecimal}`;
-        }
-    }
-    return formattedInteger;
-};
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { Coins, CreditCard, Minus, Pencil, Plus, Repeat, Trash2, TrendingUp, Wallet } from 'lucide-react'
+import api from '@/api/axios'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { PageContainer, PageHeader } from '@/components/ui-app/page-header'
+import { SearchInput } from '@/components/ui-app/search-input'
+import { SortButton } from '@/components/ui-app/data-table'
+import { EmptyState, ErrorMessage, PageLoading } from '@/components/ui-app/page-state'
+import { StatCard, StatGrid } from '@/components/ui-app/stat-card'
+import { formatAmount, formatDate } from '@/lib/format'
+import BullionModal from './BullionModal'
+import BullionTypeStamp from './BullionTypeStamp'
+import BullionTransactionModal from './BullionTransactionModal'
+import CreditCardOperationModal from '../credit-cards/CreditCardOperationModal'
+import { notifyAmountChange } from './bullionAmount'
 
 function VaultBullionsPage() {
     const { vaultId } = useParams();
@@ -461,23 +451,23 @@ function VaultBullionsPage() {
 
     if (loading) {
         return (
-            <div className="bullions-container">
-                <div className="loading-spinner">Загрузка...</div>
-            </div>
-        );
+            <PageContainer>
+                <PageLoading />
+            </PageContainer>
+        )
     }
 
     if (!vault) {
         return (
-            <div className="bullions-container">
-                <div className="bullions-content">
-                    <div className="error-message">Хранилище не найдено</div>
-                    <button onClick={handleGoBack} className="back-btn">
-                        ← Назад
-                    </button>
+            <PageContainer>
+                <ErrorMessage>Хранилище не найдено</ErrorMessage>
+                <div>
+                    <Button variant="outline" onClick={handleGoBack}>
+                        Назад
+                    </Button>
                 </div>
-            </div>
-        );
+            </PageContainer>
+        )
     }
 
     const totalAmount = vaultSummary?.totalAmount || 0;
@@ -495,7 +485,6 @@ function VaultBullionsPage() {
         refill: {
             title: `Пополнение слитка "${transactionModal.bullion?.bullionNameTitle}"`,
             buttonText: 'Внести',
-            buttonClass: 'refill-btn',
             handler: handleRefill,
             showVaultSelector: false,
             showAmount: true,
@@ -508,7 +497,6 @@ function VaultBullionsPage() {
         withdraw: {
             title: `Списание со слитка "${transactionModal.bullion?.bullionNameTitle}"`,
             buttonText: 'Снять',
-            buttonClass: 'withdraw-btn',
             handler: handleWithdraw,
             showVaultSelector: false,
             showAmount: true,
@@ -521,7 +509,6 @@ function VaultBullionsPage() {
         delete: {
             title: `Удаление слитка "${transactionModal.bullion?.bullionNameTitle}"`,
             buttonText: 'Удалить и перенести',
-            buttonClass: 'delete-btn',
             handler: handleDeleteWithTransfer,
             showVaultSelector: true,
             showAmount: false,
@@ -539,321 +526,308 @@ function VaultBullionsPage() {
     const currentTransaction = transactionModal.type ? transactionConfig[transactionModal.type] : null;
 
     return (
-        <div className="bullions-container">
-            <div className="bullions-content">
-                <div className="bullions-header">
-                    <h1>🏦 {vault.name}</h1>
-                    <div className="header-actions">
-                        <button
-                            onClick={handleGoBack}
-                            className="back-btn"
-                            disabled={actionLoading}
-                        >
-                            ← Назад
-                        </button>
-                        <button
-                            onClick={handleAddBullion}
-                            className="add-bullion-btn"
-                            disabled={actionLoading || !allowedIncome}
-                            title={!allowedIncome ? 'Хранилище заблокировано' : ''}
-                        >
-                            + Добавить слиток
-                        </button>
-                    </div>
-                </div>
+        <PageContainer>
+            <PageHeader title={vault.name} onBack={handleGoBack}>
+                <Button
+                    onClick={handleAddBullion}
+                    disabled={actionLoading || !allowedIncome}
+                    title={!allowedIncome ? 'Хранилище заблокировано' : ''}
+                >
+                    <Plus />
+                    Добавить слиток
+                </Button>
+            </PageHeader>
 
-                <div className="stats-cards">
-                    <StatCard label="Общая сумма в хранилище" value={`${formatAmount(totalAmount)} ₽`} />
-                    <StatCard label="Количество наименований" value={bullionsCount} />
-                    <StatCard label="Процентная ставка" value={`${vault.interestRate || 0}%`} />
-                </div>
-
-                <div className="controls-bar">
-                    <div className="search-bar">
-                        <input
-                            type="text"
-                            placeholder="🔍 Поиск по наименованию..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            disabled={actionLoading}
-                        />
-                    </div>
-                    <div className="sort-buttons">
-                        <SortButton
-                            label="По сумме"
-                            field="amount"
-                            currentField={sortConfig.field}
-                            currentOrder={sortConfig.order}
-                            onSort={handleSort}
-                            disabled={actionLoading}
-                        />
-                        <SortButton
-                            label="По наименованию"
-                            field="bullionNameTitle"
-                            currentField={sortConfig.field}
-                            currentOrder={sortConfig.order}
-                            onSort={handleSort}
-                            disabled={actionLoading}
-                        />
-                    </div>
-                </div>
-
-                {error && <div className="error-message">{error}</div>}
-
-                <div className="bullions-grid">
-                    {filteredAndSortedBullions.length === 0 ? (
-                        <div className="empty-state">
-                            {searchTerm ? 'Ничего не найдено' : 'Нет слитков в этом хранилище. Добавьте первый!'}
-                        </div>
-                    ) : (
-                        filteredAndSortedBullions.map((bullion) => (
-                            <BullionCard
-                                key={bullion.id}
-                                bullion={bullion}
-                                onEdit={() => handleEditBullion(bullion)}
-                                onDelete={() => handleOpenDelete(bullion)}
-                                onRefill={() => handleOpenRefill(bullion)}
-                                onWithdraw={() => handleOpenWithdraw(bullion)}
-                                onTransfer={() => handleOpenTransfer(bullion)}
-                                onRepayCard={() => handleOpenRepayCard(bullion)}
-                                disabled={actionLoading}
-                                vaultFlags={{
-                                    allowedIncome,
-                                    allowedExpense,
-                                    allowedTransferOut
-                                }}
-                            />
-                        ))
-                    )}
-                </div>
-
-                <BullionModal
-                    isOpen={modalOpen}
-                    onClose={closeModal}
-                    onSave={editingBullion
-                        ? (bullionNameId, vaultIdParam, amount, description, dateOperation, userComment, bullionType) =>
-                            handleUpdateBullion(editingBullion.id, bullionNameId, vaultIdParam, amount, description, dateOperation, userComment, bullionType)
-                        : (bullionNameId, vaultIdParam, amount, description, dateOperation, userComment, bullionType) =>
-                            handleSaveBullion(bullionNameId, vaultIdParam, amount, description, dateOperation, bullionType)
-                    }
-                    initialBullionNameId={editingBullion?.bullionNameId}
-                    initialBullionNameTitle={editingBullion?.bullionNameTitle}
-                    initialVaultId={parseInt(vaultId)}
-                    initialAmount={editingBullion?.amount}
-                    initialDescription={editingBullion?.description}
-                    initialDateOperation={editingBullion?.dateOperation}
-                    initialBullionType={editingBullion?.bullionType}
-                    isEditing={!!editingBullion}
-                    allowedChangeAmount={allowedChangeAmount}
-                    allowedIncome={allowedIncome}
-                    allowedExpense={allowedExpense}
+            <StatGrid className="lg:grid-cols-3">
+                <StatCard
+                    icon={Wallet}
+                    label="Общая сумма в хранилище"
+                    value={`${formatAmount(totalAmount)} ₽`}
+                    tone="brand"
                 />
+                <StatCard
+                    icon={Coins}
+                    label="Количество наименований"
+                    value={bullionsCount}
+                    tone="info"
+                />
+                <StatCard
+                    icon={TrendingUp}
+                    label="Процентная ставка"
+                    value={`${vault.interestRate || 0}%`}
+                    tone="success"
+                />
+            </StatGrid>
 
-                {currentTransaction && transactionModal.bullion && (
-                    <BullionTransactionModal
-                        isOpen={transactionModal.isOpen}
-                        onClose={closeTransactionModal}
-                        onSave={currentTransaction.handler}
-                        title={currentTransaction.title}
-                        buttonText={currentTransaction.buttonText}
-                        buttonClass={currentTransaction.buttonClass}
-                        bullionName={transactionModal.bullion?.bullionNameTitle}
-                        showVaultSelector={currentTransaction.showVaultSelector}
-                        vaults={currentTransaction.vaults || []}
-                        initialVaultId={currentTransaction.initialVaultId}
-                        initialAmount={currentTransaction.showAmount ? '' : undefined}
-                        initialDescription={currentTransaction.showDescription ? '' : undefined}
-                        showAmount={currentTransaction.showAmount}
-                        showDescription={currentTransaction.showDescription}
-                        isConfirm={currentTransaction.isConfirm || false}
-                        confirmMessage={currentTransaction.confirmMessage}
-                        descriptionPlaceholder={currentTransaction.descriptionPlaceholder}
-                        descriptionLabel={currentTransaction.descriptionLabel}
-                        vaultSelectorLabel={currentTransaction.vaultSelectorLabel}
-                        type={currentTransaction.type || null}
-                        initialDateOperation={transactionModal.dateOperation}
-                        availableAmount={transactionModal.bullion?.amount}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <SearchInput
+                    value={searchTerm}
+                    onChange={setSearchTerm}
+                    placeholder="Поиск по наименованию..."
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                    <SortButton
+                        label="По сумме"
+                        field="amount"
+                        sortField={sortConfig.field}
+                        sortOrder={sortConfig.order}
+                        onSort={handleSort}
                     />
-                )}
-
-                {repayModal.isOpen && (
-                    <CreditCardOperationModal
-                        isOpen={repayModal.isOpen}
-                        card={repayModal.card}
-                        bullion={repayModal.bullion}
-                        type="repay-bullion"
-                        onClose={() => setRepayModal({ isOpen: false, bullion: null, card: null })}
-                        onSave={handleRepayCard}
+                    <SortButton
+                        label="По наименованию"
+                        field="bullionNameTitle"
+                        sortField={sortConfig.field}
+                        sortOrder={sortConfig.order}
+                        onSort={handleSort}
                     />
-                )}
-
-                {transferModal.isOpen && (
-                    <BullionTransactionModal
-                        isOpen={transferModal.isOpen}
-                        onClose={closeTransferModal}
-                        onSave={handleTransfer}
-                        title="Перевод между слитками"
-                        buttonText="Перевести"
-                        buttonClass="transfer-btn"
-                        bullionName=""
-                        type="transfer"
-                        maxTransferAmount={transferModal.fromAmount}
-                        transferTargets={transferTargets}
-                        fromBullionId={transferModal.fromBullionId}
-                        showAmount={true}
-                        showDescription={true}
-                        descriptionLabel="📝 Комментарий"
-                        descriptionPlaceholder="Комментарий к переводу (необязательно)..."
-                        fromBullions={getFromBullions()}
-                        onSelectFromBullion={handleSelectFromBullion}
-                        selectedFromBullionId={transferModal.fromBullionId}
-                        initialDateOperation={transferModal.dateOperation}
-                    />
-                )}
+                </div>
             </div>
-        </div>
-    );
+
+            <ErrorMessage>{error}</ErrorMessage>
+
+            {filteredAndSortedBullions.length === 0 ? (
+                <EmptyState
+                    icon={Coins}
+                    title={searchTerm ? 'Ничего не найдено' : 'Нет слитков в этом хранилище'}
+                    description={searchTerm ? 'Попробуйте изменить запрос' : 'Добавьте первый слиток'}
+                />
+            ) : (
+                <div className="grid gap-4 lg:grid-cols-2">
+                    {filteredAndSortedBullions.map((bullion) => (
+                        <BullionCard
+                            key={bullion.id}
+                            bullion={bullion}
+                            onEdit={() => handleEditBullion(bullion)}
+                            onDelete={() => handleOpenDelete(bullion)}
+                            onRefill={() => handleOpenRefill(bullion)}
+                            onWithdraw={() => handleOpenWithdraw(bullion)}
+                            onTransfer={() => handleOpenTransfer(bullion)}
+                            onRepayCard={() => handleOpenRepayCard(bullion)}
+                            disabled={actionLoading}
+                            vaultFlags={{
+                                allowedIncome,
+                                allowedExpense,
+                                allowedTransferOut,
+                            }}
+                        />
+                    ))}
+                </div>
+            )}
+
+            <BullionModal
+                isOpen={modalOpen}
+                onClose={closeModal}
+                onSave={editingBullion
+                    ? (bullionNameId, vaultIdParam, amount, description, dateOperation, userComment, bullionType) =>
+                        handleUpdateBullion(editingBullion.id, bullionNameId, vaultIdParam, amount, description, dateOperation, userComment, bullionType)
+                    : (bullionNameId, vaultIdParam, amount, description, dateOperation, userComment, bullionType) =>
+                        handleSaveBullion(bullionNameId, vaultIdParam, amount, description, dateOperation, bullionType)
+                }
+                initialBullionNameId={editingBullion?.bullionNameId}
+                initialBullionNameTitle={editingBullion?.bullionNameTitle}
+                initialVaultId={parseInt(vaultId)}
+                initialAmount={editingBullion?.amount}
+                initialDescription={editingBullion?.description}
+                initialDateOperation={editingBullion?.dateOperation}
+                initialBullionType={editingBullion?.bullionType}
+                isEditing={!!editingBullion}
+                allowedChangeAmount={allowedChangeAmount}
+                allowedIncome={allowedIncome}
+                allowedExpense={allowedExpense}
+            />
+
+            {currentTransaction && transactionModal.bullion && (
+                <BullionTransactionModal
+                    isOpen={transactionModal.isOpen}
+                    onClose={closeTransactionModal}
+                    onSave={currentTransaction.handler}
+                    title={currentTransaction.title}
+                    buttonText={currentTransaction.buttonText}
+                    bullionName={transactionModal.bullion?.bullionNameTitle}
+                    showVaultSelector={currentTransaction.showVaultSelector}
+                    vaults={currentTransaction.vaults || []}
+                    initialVaultId={currentTransaction.initialVaultId}
+                    initialAmount={currentTransaction.showAmount ? '' : undefined}
+                    initialDescription={currentTransaction.showDescription ? '' : undefined}
+                    showAmount={currentTransaction.showAmount}
+                    showDescription={currentTransaction.showDescription}
+                    isConfirm={currentTransaction.isConfirm || false}
+                    confirmMessage={currentTransaction.confirmMessage}
+                    descriptionPlaceholder={currentTransaction.descriptionPlaceholder}
+                    descriptionLabel={currentTransaction.descriptionLabel}
+                    vaultSelectorLabel={currentTransaction.vaultSelectorLabel}
+                    type={currentTransaction.type || null}
+                    initialDateOperation={transactionModal.dateOperation}
+                    availableAmount={transactionModal.bullion?.amount}
+                />
+            )}
+
+            {repayModal.isOpen && (
+                <CreditCardOperationModal
+                    isOpen={repayModal.isOpen}
+                    card={repayModal.card}
+                    bullion={repayModal.bullion}
+                    type="repay-bullion"
+                    onClose={() => setRepayModal({ isOpen: false, bullion: null, card: null })}
+                    onSave={handleRepayCard}
+                />
+            )}
+
+            {transferModal.isOpen && (
+                <BullionTransactionModal
+                    isOpen={transferModal.isOpen}
+                    onClose={closeTransferModal}
+                    onSave={handleTransfer}
+                    title="Перевод между слитками"
+                    buttonText="Перевести"
+                    bullionName=""
+                    type="transfer"
+                    maxTransferAmount={transferModal.fromAmount}
+                    transferTargets={transferTargets}
+                    fromBullionId={transferModal.fromBullionId}
+                    showAmount={true}
+                    showDescription={true}
+                    descriptionLabel="📝 Комментарий"
+                    descriptionPlaceholder="Комментарий к переводу (необязательно)..."
+                    fromBullions={getFromBullions()}
+                    onSelectFromBullion={handleSelectFromBullion}
+                    selectedFromBullionId={transferModal.fromBullionId}
+                    initialDateOperation={transferModal.dateOperation}
+                />
+            )}
+        </PageContainer>
+    )
 }
 
-const StatCard = ({ label, value }) => (
-    <div className="stat-card">
-        <div className="stat-label">{label}</div>
-        <div className="stat-value">{value}</div>
-    </div>
-);
-
-const SortButton = ({ label, field, currentField, currentOrder, onSort, disabled }) => {
-    const isActive = currentField === field;
-    const arrow = isActive ? (currentOrder === 'asc' ? '↑' : '↓') : '';
-
-    return (
-        <button
-            className={`sort-btn ${isActive ? 'active' : ''}`}
-            onClick={() => onSort(field)}
-            disabled={disabled}
-        >
-            {label} {arrow}
-        </button>
-    );
-};
-
 const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransfer, onRepayCard, disabled, vaultFlags }) => {
-    const formatDate = (dateString) => {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('ru-RU', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-    };
-
     const {
         allowedIncome = true,
         allowedExpense = true,
-        allowedTransferOut = true
-    } = vaultFlags || {};
+        allowedTransferOut = true,
+    } = vaultFlags || {}
 
     // Кнопки всегда видны, но disabled если флаг false или общий disabled.
     // Правка и удаление слитка галочками не ограничены: галочки про движение денег
-    const isDisabled = (flag) => disabled || !flag;
+    const isDisabled = (flag) => disabled || !flag
 
     return (
-        <div className="bullion-card vault-card">
-            <div className="card-header">
-                <h3>📁 {bullion.bullionNameTitle}</h3>
-            </div>
-            <div className="card-body">
-                <div className="card-stats">
-                    <div className="stat">
-                        <span className="stat-name">💰 Сумма:</span>
-                        <span className="stat-value amount-value">{formatAmount(bullion.amount)} ₽</span>
-                    </div>
+        <Card className="gap-4 transition-shadow hover:shadow-md">
+            <CardHeader>
+                <CardTitle className="text-base">{bullion.bullionNameTitle}</CardTitle>
+                <CardAction>
+                    <BullionTypeStamp type={bullion.bullionType} />
+                </CardAction>
+            </CardHeader>
 
-                    <div className="bullion-stamps">
-                        <BullionTypeStamp type={bullion.bullionType} />
-                    </div>
-
-                    {bullion.creditCardId && (
-                        <div className="credit-card-badge" title="Слиток копит деньги на погашение этой карты">
-                            💳 Накопитель карты {bullion.creditCardMasked}
-                        </div>
-                    )}
-
-                    {bullion.description && (
-                        <div className="stat">
-                            <span className="stat-name">📝 Описание:</span>
-                            <span className="stat-description">{bullion.description}</span>
-                        </div>
-                    )}
-
-                    {bullion.createdAt && (
-                        <div className="stat">
-                            <span className="stat-name">📅 Дата создания:</span>
-                            <span className="stat-description">{formatDate(bullion.createdAt)}</span>
-                        </div>
-                    )}
-                    {bullion.updatedAt && bullion.updatedAt !== bullion.createdAt && (
-                        <div className="stat">
-                            <span className="stat-name">🔄 Последнее изменение:</span>
-                            <span className="stat-description">{formatDate(bullion.updatedAt)}</span>
-                        </div>
-                    )}
+            <CardContent className="flex flex-col gap-2 text-sm">
+                <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">Сумма</span>
+                    <span className="text-lg font-semibold tabular-nums">
+                        {formatAmount(bullion.amount)} ₽
+                    </span>
                 </div>
-            </div>
-            <div className="card-actions-horizontal">
-                <button
-                    className="refill-btn"
-                    onClick={onRefill}
-                    disabled={isDisabled(allowedIncome)}
-                >
-                    💰 Внести
-                </button>
-                <button
-                    className="withdraw-btn"
-                    onClick={onWithdraw}
-                    disabled={isDisabled(allowedExpense)}
-                >
-                    💸 Снять
-                </button>
-                <button
-                    className="edit-vault-btn"
-                    onClick={onEdit}
-                    disabled={disabled}
-                >
-                    ✏️ Редактировать
-                </button>
-                {/* Перевод отсюда - это снятие: нет галочки «Можно снимать», нет и перевода */}
-                <button
-                    className="transfer-btn"
-                    onClick={onTransfer}
-                    disabled={isDisabled(allowedTransferOut)}
-                >
-                    🔄 Перевод
-                </button>
-                {/* Погашение — тоже снятие со слитка, поэтому и оно под галочкой */}
-                {bullion.creditCardId && (
-                    <button
-                        className="repay-card-btn"
-                        onClick={onRepayCard}
-                        disabled={isDisabled(allowedExpense) || !(Number(bullion.creditCardDebt) > 0)}
-                        title={Number(bullion.creditCardDebt) > 0
-                            ? 'Списать со слитка и погасить долг карты'
-                            : 'Задолженность по карте уже нулевая'}
-                    >
-                        💳 Погашение
-                    </button>
-                )}
-                <button
-                    className="delete-vault-btn"
-                    onClick={onDelete}
-                    disabled={disabled}
-                >
-                    🗑️ Удалить
-                </button>
-            </div>
-        </div>
-    );
-};
 
-export default VaultBullionsPage;
+                {bullion.creditCardId && (
+                    <Badge
+                        variant="secondary"
+                        className="w-fit"
+                        title="Слиток копит деньги на погашение этой карты"
+                    >
+                        <CreditCard />
+                        Накопитель карты {bullion.creditCardMasked}
+                    </Badge>
+                )}
+
+                {bullion.description && (
+                    <div className="flex justify-between gap-3">
+                        <span className="text-muted-foreground">Описание</span>
+                        <span className="text-right">{bullion.description}</span>
+                    </div>
+                )}
+
+                {bullion.createdAt && (
+                    <div className="flex justify-between gap-3">
+                        <span className="text-muted-foreground">Дата создания</span>
+                        <span>{formatDate(bullion.createdAt)}</span>
+                    </div>
+                )}
+                {bullion.updatedAt && bullion.updatedAt !== bullion.createdAt && (
+                    <div className="flex justify-between gap-3">
+                        <span className="text-muted-foreground">Последнее изменение</span>
+                        <span>{formatDate(bullion.updatedAt)}</span>
+                    </div>
+                )}
+            </CardContent>
+
+            <CardContent>
+                <ButtonGroup className="flex-wrap">
+                    <Button
+                        className="text-success hover:text-success"
+                        variant="outline"
+                        size="sm"
+                        onClick={onRefill}
+                        disabled={isDisabled(allowedIncome)}
+                    >
+                        <Plus />
+                        Внести
+                    </Button>
+                    <Button
+                        className="text-warning hover:text-warning"
+                        variant="outline"
+                        size="sm"
+                        onClick={onWithdraw}
+                        disabled={isDisabled(allowedExpense)}
+                    >
+                        <Minus />
+                        Снять
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={onEdit} disabled={disabled}>
+                        <Pencil />
+                        Редактировать
+                    </Button>
+                    {/* Перевод отсюда - это снятие: нет галочки «Можно снимать», нет и перевода */}
+                    <Button
+                        className="text-primary hover:text-primary"
+                        variant="outline"
+                        size="sm"
+                        onClick={onTransfer}
+                        disabled={isDisabled(allowedTransferOut)}
+                    >
+                        <Repeat />
+                        Перевод
+                    </Button>
+                    {/* Погашение — тоже снятие со слитка, поэтому и оно под галочкой */}
+                    {bullion.creditCardId && (
+                        <Button
+                            className="text-success hover:text-success"
+                            variant="outline"
+                            size="sm"
+                            onClick={onRepayCard}
+                            disabled={isDisabled(allowedExpense) || !(Number(bullion.creditCardDebt) > 0)}
+                            title={
+                                Number(bullion.creditCardDebt) > 0
+                                    ? 'Списать со слитка и погасить долг карты'
+                                    : 'Задолженность по карте уже нулевая'
+                            }
+                        >
+                            <CreditCard />
+                            Погашение
+                        </Button>
+                    )}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={onDelete}
+                        disabled={disabled}
+                    >
+                        <Trash2 />
+                        Удалить
+                    </Button>
+                </ButtonGroup>
+            </CardContent>
+        </Card>
+    )
+}
+
+export default VaultBullionsPage

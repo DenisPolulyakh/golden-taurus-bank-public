@@ -1,7 +1,20 @@
-import { useState, useEffect } from 'react';
-import api from '../../api/axios';
-import { formatAmount, toCents } from './bullionAmount';
-import './Bullions.css';
+import { useState, useEffect } from 'react'
+import { TriangleAlert } from 'lucide-react'
+import api from '@/api/axios'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { FormDialog } from '@/components/ui-app/form-dialog'
+import { ErrorMessage } from '@/components/ui-app/page-state'
+import { formatAmount, toCents } from '@/lib/format'
+import { cn } from '@/lib/utils'
 
 function BullionModal({
                           isOpen,
@@ -282,181 +295,173 @@ function BullionModal({
         return vault?.name || 'Загрузка...';
     };
 
-    if (!isOpen) return null;
-
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
-                    <h2>{isEditing ? 'Редактирование слитка' : 'Добавление слитка'}</h2>
-                    <button className="modal-close" onClick={onClose}>×</button>
-                </div>
+        <FormDialog
+            open={isOpen}
+            onOpenChange={(open) => !open && onClose()}
+            title={isEditing ? 'Редактирование слитка' : 'Добавление слитка'}
+            onSubmit={handleSubmit}
+            saving={saving}
+        >
+            {isEditing ? (
+                <>
+                    <Field>
+                        <FieldLabel htmlFor="bullion-name-title">Наименование</FieldLabel>
+                        <Input
+                            id="bullion-name-title"
+                            value={initialBullionNameTitle || ''}
+                            disabled
+                            readOnly
+                        />
+                        <FieldDescription>Наименование нельзя изменить</FieldDescription>
+                    </Field>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="modal-body">
-                        {isEditing ? (
-                            <>
-                                <div className="form-group">
-                                    <label>Наименование</label>
-                                    <input
-                                        type="text"
-                                        value={initialBullionNameTitle || ''}
-                                        disabled
-                                        className="disabled-input"
-                                    />
-                                    <small className="input-hint">Наименование нельзя изменить</small>
-                                </div>
+                    <Field>
+                        <FieldLabel htmlFor="bullion-vault-name">Хранилище</FieldLabel>
+                        <Input id="bullion-vault-name" value={getVaultName()} disabled readOnly />
+                        <FieldDescription>Хранилище нельзя изменить</FieldDescription>
+                    </Field>
+                </>
+            ) : (
+                <>
+                    <Field>
+                        <FieldLabel htmlFor="bullion-name-select">Наименование *</FieldLabel>
+                        <Select value={String(bullionNameId || '')} onValueChange={setBullionNameId}>
+                            <SelectTrigger id="bullion-name-select">
+                                <SelectValue placeholder="Выберите наименование" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {bullionNames.map((bn) => (
+                                    <SelectItem key={bn.id} value={String(bn.id)}>
+                                        {bn.title}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </Field>
 
-                                <div className="form-group">
-                                    <label>Хранилище</label>
-                                    <input
-                                        type="text"
-                                        value={getVaultName()}
-                                        disabled
-                                        className="disabled-input"
-                                    />
-                                    <small className="input-hint">Хранилище нельзя изменить</small>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <div className="form-group">
-                                    <label>Наименование *</label>
-                                    <select
-                                        value={bullionNameId}
-                                        onChange={(e) => setBullionNameId(e.target.value)}
-                                        required
-                                    >
-                                        <option value="">Выберите наименование</option>
-                                        {bullionNames.map(bn => (
-                                            <option key={bn.id} value={bn.id}>{bn.title}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                    <Field>
+                        <FieldLabel htmlFor="bullion-vault-select">Хранилище *</FieldLabel>
+                        <Select value={String(vaultId || '')} onValueChange={setVaultId}>
+                            <SelectTrigger id="bullion-vault-select">
+                                <SelectValue placeholder="Выберите хранилище" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {vaults.map((vault) => (
+                                    <SelectItem key={vault.id} value={String(vault.id)}>
+                                        {vault.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                </>
+            )}
 
-                                <div className="form-group">
-                                    <label>Хранилище *</label>
-                                    <select
-                                        value={vaultId}
-                                        onChange={(e) => setVaultId(e.target.value)}
-                                        required
-                                    >
-                                        <option value="">Выберите хранилище</option>
-                                        {vaults.map(vault => (
-                                            <option key={vault.id} value={vault.id}>{vault.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </>
+            {/* Тип менять можно и при правке — в отличие от наименования и хранилища */}
+            <Field>
+                <FieldLabel htmlFor="bullion-type">Тип слитка *</FieldLabel>
+                <Select value={bullionType} onValueChange={setBullionType}>
+                    <SelectTrigger id="bullion-type">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="DEBIT">Дебетовый</SelectItem>
+                        <SelectItem value="CREDIT">Кредитный</SelectItem>
+                    </SelectContent>
+                </Select>
+                <FieldDescription>
+                    Дебетовый — свои накопления, кредитный — заёмные средства
+                </FieldDescription>
+            </Field>
+
+            <Field>
+                <FieldLabel htmlFor="bullion-amount">Сумма * (₽)</FieldLabel>
+                <Input
+                    id="bullion-amount"
+                    type="text"
+                    value={amountDisplay}
+                    onChange={handleAmountChange}
+                    onBlur={handleAmountBlur}
+                    onFocus={handleAmountFocus}
+                    placeholder="0.00"
+                    required
+                    inputMode="decimal"
+                    disabled={amountLocked}
+                />
+                {amountLocked && (
+                    <FieldDescription className="flex items-center gap-1.5 text-destructive">
+                        <TriangleAlert className="size-3.5 shrink-0" />
+                        У хранилища сняты галочки внесения и снятия — сумму не изменить
+                    </FieldDescription>
+                )}
+                {!amountLocked && !isEditing && (
+                    <FieldDescription>Используйте точку или запятую для копеек</FieldDescription>
+                )}
+                {!amountLocked && isEditing && directionError() && (
+                    <FieldDescription className="flex items-center gap-1.5 text-destructive">
+                        <TriangleAlert className="size-3.5 shrink-0" />
+                        {directionError()}
+                    </FieldDescription>
+                )}
+                {!amountLocked && isEditing && !directionError() && !amountIsEmpty && (
+                    <FieldDescription
+                        className={cn(
+                            deltaCents > 0 && 'text-success',
+                            deltaCents < 0 && 'text-destructive'
                         )}
+                    >
+                        {deltaCents > 0 &&
+                            `Будет проведено пополнение на ${formatAmount(deltaCents / 100)} ₽`}
+                        {deltaCents < 0 &&
+                            `Будет проведено снятие на ${formatAmount(-deltaCents / 100)} ₽`}
+                        {deltaCents === 0 && 'Сумма не изменится — операция не создаётся'}
+                    </FieldDescription>
+                )}
+            </Field>
 
-                        {/* Тип менять можно и при правке — в отличие от наименования и хранилища */}
-                        <div className="form-group">
-                            <label>Тип слитка *</label>
-                            <select
-                                value={bullionType}
-                                onChange={(e) => setBullionType(e.target.value)}
-                                required
-                            >
-                                <option value="DEBIT">Дебетовый</option>
-                                <option value="CREDIT">Кредитный</option>
-                            </select>
-                            <small className="input-hint">
-                                Дебетовый — свои накопления, кредитный — заёмные средства
-                            </small>
-                        </div>
+            {isEditing && deltaCents !== 0 && (
+                <Field>
+                    <FieldLabel htmlFor="bullion-user-comment">Комментарий к операции</FieldLabel>
+                    <Input
+                        id="bullion-user-comment"
+                        value={userComment}
+                        onChange={(e) => setUserComment(e.target.value)}
+                        placeholder={deltaCents > 0 ? 'Например: докупил' : 'Например: снял на ремонт'}
+                        maxLength={500}
+                    />
+                    <FieldDescription>
+                        Попадёт в историю операций. Если оставить пустым — подставится стандартный текст
+                    </FieldDescription>
+                </Field>
+            )}
 
-                        <div className="form-group">
-                            <label>Сумма * (₽)</label>
-                            <input
-                                type="text"
-                                value={amountDisplay}
-                                onChange={handleAmountChange}
-                                onBlur={handleAmountBlur}
-                                onFocus={handleAmountFocus}
-                                placeholder="0.00"
-                                required
-                                inputMode="decimal"
-                                disabled={amountLocked}
-                            />
-                            {amountLocked && (
-                                <small className="input-hint" style={{ color: '#e53e3e' }}>
-                                    ⚠️ У хранилища сняты галочки внесения и снятия — сумму не изменить
-                                </small>
-                            )}
-                            {!amountLocked && !isEditing && (
-                                <small className="input-hint">
-                                    Используйте точку или запятую для копеек
-                                </small>
-                            )}
-                            {!amountLocked && isEditing && directionError() && (
-                                <small className="input-hint" style={{ color: '#e53e3e' }}>
-                                    ⚠️ {directionError()}
-                                </small>
-                            )}
-                            {!amountLocked && isEditing && !directionError() && !amountIsEmpty && (
-                                <small className={`input-hint amount-delta${
-                                    deltaCents > 0 ? ' amount-delta-deposit' : deltaCents < 0 ? ' amount-delta-withdrawal' : ''
-                                }`}>
-                                    {deltaCents > 0 && `Будет проведено пополнение на ${formatAmount(deltaCents / 100)} ₽`}
-                                    {deltaCents < 0 && `Будет проведено снятие на ${formatAmount(-deltaCents / 100)} ₽`}
-                                    {deltaCents === 0 && 'Сумма не изменится — операция не создаётся'}
-                                </small>
-                            )}
-                        </div>
+            <Field>
+                <FieldLabel htmlFor="bullion-date">Дата и время операции *</FieldLabel>
+                <Input
+                    id="bullion-date"
+                    type="datetime-local"
+                    value={dateOperation}
+                    onChange={(e) => setDateOperation(e.target.value)}
+                    max={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}T${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`}
+                    required
+                />
+            </Field>
 
-                        {isEditing && deltaCents !== 0 && (
-                            <div className="form-group">
-                                <label>Комментарий к операции</label>
-                                <input
-                                    type="text"
-                                    value={userComment}
-                                    onChange={(e) => setUserComment(e.target.value)}
-                                    placeholder={deltaCents > 0 ? 'Например: докупил' : 'Например: снял на ремонт'}
-                                    maxLength={500}
-                                />
-                                <small className="input-hint">
-                                    Попадёт в историю операций. Если оставить пустым — подставится стандартный текст
-                                </small>
-                            </div>
-                        )}
+            <Field>
+                <FieldLabel htmlFor="bullion-description">Описание</FieldLabel>
+                <Textarea
+                    id="bullion-description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Дополнительная информация..."
+                    rows={3}
+                />
+            </Field>
 
-                        <div className="form-group">
-                            <label>Дата и время операции *</label>
-                            <input
-                                type="datetime-local"
-                                value={dateOperation}
-                                onChange={(e) => setDateOperation(e.target.value)}
-                                max={`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}T${String(new Date().getHours()).padStart(2,'0')}:${String(new Date().getMinutes()).padStart(2,'0')}`}
-                                required
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label>Описание</label>
-                            <textarea
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                placeholder="Дополнительная информация..."
-                                rows={3}
-                            />
-                        </div>
-
-                        {error && <div className="error-message">{error}</div>}
-                    </div>
-
-                    <div className="modal-footer">
-                        <button type="button" onClick={onClose} className="cancel-btn">
-                            Отмена
-                        </button>
-                        <button type="submit" disabled={saving} className="save-btn">
-                            {saving ? 'Сохранение...' : 'Сохранить'}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
+            <ErrorMessage>{error}</ErrorMessage>
+        </FormDialog>
+    )
 }
 
 export default BullionModal;

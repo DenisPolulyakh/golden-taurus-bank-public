@@ -1,5 +1,17 @@
-import { useState, useEffect } from 'react';
-import { formatAmount } from './creditCardFormat';
+import { useState, useEffect } from 'react'
+import { Button } from '@/components/ui/button'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { FormDialog } from '@/components/ui-app/form-dialog'
+import { formatAmount } from '@/lib/format'
 
 /**
  * Списание и погашение по карте, а также погашение из накопителя (тип
@@ -10,163 +22,163 @@ import { formatAmount } from './creditCardFormat';
  * выпадающий список {@code bullionOptions}, и выбор решает, какую карту гасим.
  */
 function CreditCardOperationModal({ isOpen, card, type, bullion, bullionOptions, onSelectBullion, onClose, onSave }) {
-    const [amount, setAmount] = useState('');
-    const [comment, setComment] = useState('');
-    const [dateOperation, setDateOperation] = useState('');
-    const [saving, setSaving] = useState(false);
+    const [amount, setAmount] = useState('')
+    const [comment, setComment] = useState('')
+    const [dateOperation, setDateOperation] = useState('')
+    const [saving, setSaving] = useState(false)
 
     useEffect(() => {
-        if (!isOpen) return;
-        setAmount('');
-        setComment('');
-        const now = new Date();
-        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-        setDateOperation(now.toISOString().slice(0, 16));
-    }, [isOpen]);
+        if (!isOpen) return
+        setAmount('')
+        setComment('')
+        const now = new Date()
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+        setDateOperation(now.toISOString().slice(0, 16))
+    }, [isOpen])
 
     // Смена накопителя меняет и карту, и потолок суммы — введённое до этого
     // число к новому слитку отношения не имеет
     useEffect(() => {
-        setAmount('');
-    }, [bullion?.id]);
+        setAmount('')
+    }, [bullion?.id])
 
-    if (!isOpen || !card) return null;
+    if (!isOpen || !card) return null
 
-    const isSpend = type === 'spend';
-    const fromBullion = type === 'repay-bullion';
+    const isSpend = type === 'spend'
+    const fromBullion = type === 'repay-bullion'
 
     // Потолок суммы: списание упирается в остаток лимита, погашение — в долг,
     // погашение из накопителя — ещё и в сумму самого слитка
     const max = isSpend
         ? Number(card.remainder || 0)
-        : Math.min(Number(card.debt || 0), fromBullion ? Number(bullion?.amount || 0) : Number.MAX_SAFE_INTEGER);
+        : Math.min(Number(card.debt || 0), fromBullion ? Number(bullion?.amount || 0) : Number.MAX_SAFE_INTEGER)
 
     const title = isSpend
         ? `Списание по карте «${card.name}»`
         : fromBullion
             ? `Погашение карты «${card.name}» из накопителя`
-            : `Погашение по карте «${card.name}»`;
+            : `Погашение по карте «${card.name}»`
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
-        setSaving(true);
+        e.preventDefault()
+        setSaving(true)
         try {
-            await onSave({ amount, comment, dateOperation: dateOperation ? `${dateOperation}:00` : null });
+            await onSave({ amount, comment, dateOperation: dateOperation ? `${dateOperation}:00` : null })
         } catch (err) {
-            console.error('Ошибка операции по карте:', err);
+            console.error('Ошибка операции по карте:', err)
         } finally {
-            setSaving(false);
+            setSaving(false)
         }
-    };
+    }
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content transaction-modal" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
-                    <h2>{isSpend ? '💸' : '💰'} {title}</h2>
-                    <button className="modal-close" onClick={onClose}>×</button>
+        <FormDialog
+            open={isOpen}
+            onOpenChange={(open) => !open && onClose()}
+            title={title}
+            onSubmit={handleSubmit}
+            saving={saving}
+            submitText={isSpend ? 'Списать' : 'Погасить'}
+            submitVariant={isSpend ? 'destructive' : 'default'}
+        >
+            {fromBullion && bullionOptions?.length > 0 && (
+                <Field>
+                    <FieldLabel htmlFor="repay-bullion">Гасим со слитка</FieldLabel>
+                    <Select
+                        value={bullion?.id != null ? String(bullion.id) : ''}
+                        onValueChange={(value) => onSelectBullion(Number(value))}
+                    >
+                        <SelectTrigger id="repay-bullion">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {bullionOptions.map((option) => (
+                                <SelectItem key={option.id} value={String(option.id)}>
+                                    {option.vaultName} — {formatAmount(option.amount)} ₽ · карта{' '}
+                                    {option.creditCardMasked}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </Field>
+            )}
+
+            <div className="flex flex-col gap-1.5 rounded-md bg-muted px-3 py-2 text-sm">
+                <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Задолженность</span>
+                    <span className="font-medium tabular-nums">{formatAmount(card.debt)} ₽</span>
                 </div>
-
-                <form onSubmit={handleSubmit}>
-                    <div className="modal-body">
-                        {fromBullion && bullionOptions?.length > 0 && (
-                            <div className="form-group">
-                                <label>💳 Гасим со слитка</label>
-                                <select
-                                    value={bullion?.id ?? ''}
-                                    onChange={(e) => onSelectBullion(Number(e.target.value))}
-                                >
-                                    {bullionOptions.map(option => (
-                                        <option key={option.id} value={option.id}>
-                                            {option.vaultName} — {formatAmount(option.amount)} ₽ · карта {option.creditCardMasked}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
-
-                        <div className="operation-summary">
-                            <div className="stat">
-                                <span className="stat-name">Задолженность:</span>
-                                <span className="stat-description debt-value">{formatAmount(card.debt)} ₽</span>
-                            </div>
-                            <div className="stat">
-                                <span className="stat-name">{isSpend ? 'Доступно по лимиту:' : 'Остаток лимита:'}</span>
-                                <span className="stat-description">{formatAmount(card.remainder)} ₽</span>
-                            </div>
-                            {fromBullion && (
-                                <div className="stat">
-                                    <span className="stat-name">В слитке «{bullion?.bullionNameTitle}»:</span>
-                                    <span className="stat-description">{formatAmount(bullion?.amount)} ₽</span>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="form-group">
-                            <label>💰 Сумма</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                min="0.01"
-                                max={max > 0 ? max : undefined}
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
-                                required
-                                autoFocus
-                            />
-                            <div className="quick-amount-row">
-                                <button
-                                    type="button"
-                                    className="quick-amount-btn quick-amount-btn-all"
-                                    onClick={() => setAmount(String(max))}
-                                    disabled={max <= 0}
-                                >
-                                    {isSpend ? 'Весь остаток' : 'Весь долг'}
-                                </button>
-                            </div>
-                            {fromBullion && (
-                                <span className="input-hint">
-                                    Одной операцией: деньги уйдут со слитка и уменьшат задолженность карты
-                                </span>
-                            )}
-                        </div>
-
-                        <div className="form-group">
-                            <label>📅 Дата операции</label>
-                            <input
-                                type="datetime-local"
-                                value={dateOperation}
-                                onChange={(e) => setDateOperation(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label>📝 Комментарий</label>
-                            <textarea
-                                rows={2}
-                                value={comment}
-                                onChange={(e) => setComment(e.target.value)}
-                                placeholder="Необязательно..."
-                            />
-                        </div>
+                <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">
+                        {isSpend ? 'Доступно по лимиту' : 'Остаток лимита'}
+                    </span>
+                    <span className="font-medium tabular-nums">{formatAmount(card.remainder)} ₽</span>
+                </div>
+                {fromBullion && (
+                    <div className="flex justify-between gap-3">
+                        <span className="text-muted-foreground">
+                            В слитке «{bullion?.bullionNameTitle}»
+                        </span>
+                        <span className="font-medium tabular-nums">
+                            {formatAmount(bullion?.amount)} ₽
+                        </span>
                     </div>
-
-                    <div className="modal-footer">
-                        <button type="button" className="cancel-btn" onClick={onClose}>
-                            Отмена
-                        </button>
-                        <button
-                            type="submit"
-                            className={isSpend ? 'withdraw-btn' : 'refill-btn'}
-                            disabled={saving}
-                        >
-                            {saving ? 'Сохранение...' : (isSpend ? 'Списать' : 'Погасить')}
-                        </button>
-                    </div>
-                </form>
+                )}
             </div>
-        </div>
-    );
+
+            <Field>
+                <FieldLabel htmlFor="operation-amount">Сумма</FieldLabel>
+                <Input
+                    id="operation-amount"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max={max > 0 ? max : undefined}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    required
+                    autoFocus
+                />
+                <div>
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        size="xs"
+                        onClick={() => setAmount(String(max))}
+                        disabled={max <= 0}
+                    >
+                        {isSpend ? 'Весь остаток' : 'Весь долг'}
+                    </Button>
+                </div>
+                {fromBullion && (
+                    <FieldDescription>
+                        Одной операцией: деньги уйдут со слитка и уменьшат задолженность карты
+                    </FieldDescription>
+                )}
+            </Field>
+
+            <Field>
+                <FieldLabel htmlFor="operation-date">Дата операции</FieldLabel>
+                <Input
+                    id="operation-date"
+                    type="datetime-local"
+                    value={dateOperation}
+                    onChange={(e) => setDateOperation(e.target.value)}
+                />
+            </Field>
+
+            <Field>
+                <FieldLabel htmlFor="operation-comment">Комментарий</FieldLabel>
+                <Textarea
+                    id="operation-comment"
+                    rows={2}
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Необязательно..."
+                />
+            </Field>
+        </FormDialog>
+    )
 }
 
-export default CreditCardOperationModal;
+export default CreditCardOperationModal

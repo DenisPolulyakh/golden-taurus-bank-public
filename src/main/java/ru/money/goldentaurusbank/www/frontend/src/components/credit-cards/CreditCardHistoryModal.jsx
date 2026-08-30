@@ -1,127 +1,163 @@
-import { useState, useEffect, useCallback } from 'react';
-import { toast } from 'sonner';
-import api from '../../api/axios';
-import { formatAmount, formatDateTime } from './creditCardFormat';
+import { useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
+import { Undo2 } from 'lucide-react'
+import api from '@/api/axios'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table'
+import { InfoDialog } from '@/components/ui-app/form-dialog'
+import { EmptyState } from '@/components/ui-app/page-state'
+import { useConfirm } from '@/components/ui-app/confirm-dialog'
+import { formatAmount, formatDateTime } from '@/lib/format'
+import { cn } from '@/lib/utils'
 
 const OPERATION_LABELS = {
-    SPEND: '💸 Списание',
-    REPAY: '💰 Погашение',
-    OPENING_DEBT: '📌 Начальный долг'
-};
+    SPEND: 'Списание',
+    REPAY: 'Погашение',
+    OPENING_DEBT: 'Начальный долг',
+}
 
 function CreditCardHistoryModal({ isOpen, card, onClose, onRolledBack }) {
-    const [operations, setOperations] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [rollbackId, setRollbackId] = useState(null);
+    const [operations, setOperations] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [rollbackId, setRollbackId] = useState(null)
+    const { confirm, confirmDialog } = useConfirm()
 
     const fetchHistory = useCallback(async () => {
-        setLoading(true);
+        setLoading(true)
         try {
-            const response = await api.get(`/credit-cards/${card.id}/history`);
-            setOperations(response.data.data || []);
+            const response = await api.get(`/credit-cards/${card.id}/history`)
+            setOperations(response.data.data || [])
         } catch (err) {
-            console.error('Ошибка загрузки истории карты:', err);
+            console.error('Ошибка загрузки истории карты:', err)
         } finally {
-            setLoading(false);
+            setLoading(false)
         }
-    }, [card.id]);
+    }, [card.id])
 
     useEffect(() => {
-        if (isOpen) fetchHistory();
-    }, [isOpen, fetchHistory]);
+        if (isOpen) fetchHistory()
+    }, [isOpen, fetchHistory])
 
-    if (!isOpen) return null;
-
-    const handleRollback = async (operation) => {
+    const handleRollback = (operation) => {
         const extra = operation.bullionTransactionId
             ? ' Деньги вернутся в слиток-накопитель.'
-            : '';
-        if (!window.confirm(`Откатить операцию на ${formatAmount(operation.amount)} ₽?${extra}`)) {
-            return;
-        }
+            : ''
 
-        setRollbackId(operation.id);
-        try {
-            await api.post(`/credit-cards/history/${operation.id}/rollback`);
-            toast.success('Операция откачена');
-            await fetchHistory();
-            if (onRolledBack) onRolledBack();
-        } catch (err) {
-            console.error('Ошибка отката операции:', err);
-        } finally {
-            setRollbackId(null);
-        }
-    };
+        confirm({
+            title: 'Откат операции',
+            description: `Откатить операцию на ${formatAmount(operation.amount)} ₽?${extra}`,
+            confirmText: 'Откатить',
+            onConfirm: async () => {
+                setRollbackId(operation.id)
+                try {
+                    await api.post(`/credit-cards/history/${operation.id}/rollback`)
+                    toast.success('Операция откачена')
+                    await fetchHistory()
+                    if (onRolledBack) onRolledBack()
+                } catch (err) {
+                    console.error('Ошибка отката операции:', err)
+                } finally {
+                    setRollbackId(null)
+                }
+            },
+        })
+    }
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content history-modal" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
-                    <h2>📜 История карты «{card.name}»</h2>
-                    <button className="modal-close" onClick={onClose}>×</button>
-                </div>
-
-                <div className="modal-body modal-body-scrollable">
-                    {loading ? (
-                        <div className="empty-state">Загрузка...</div>
-                    ) : operations.length === 0 ? (
-                        <div className="empty-state">По этой карте ещё не было операций</div>
-                    ) : (
-                        <table className="card-history-table">
-                            <thead>
-                            <tr>
-                                <th>Дата</th>
-                                <th>Операция</th>
-                                <th>Сумма</th>
-                                <th>Долг после</th>
-                                <th></th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            {operations.map(operation => (
-                                <tr key={operation.id} className={operation.reversalOfId ? 'reversal-row' : undefined}>
-                                    <td>{formatDateTime(operation.dateOperation)}</td>
-                                    <td>
-                                        <div>{OPERATION_LABELS[operation.operation] || operation.operation}</div>
+        <>
+            <InfoDialog
+                open={isOpen}
+                onOpenChange={(open) => !open && onClose()}
+                title={`История карты «${card.name}»`}
+            >
+                {loading ? (
+                    <div className="flex flex-col gap-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10" />
+                        ))}
+                    </div>
+                ) : operations.length === 0 ? (
+                    <EmptyState className="border-0" title="По этой карте ещё не было операций" />
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Дата</TableHead>
+                                <TableHead className="w-full">Операция</TableHead>
+                                <TableHead className="text-right">Сумма</TableHead>
+                                <TableHead className="text-right">Долг после</TableHead>
+                                <TableHead />
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {operations.map((operation) => (
+                                <TableRow
+                                    key={operation.id}
+                                    className={cn(operation.reversalOfId && 'text-muted-foreground')}
+                                >
+                                    <TableCell className="whitespace-nowrap">
+                                        {formatDateTime(operation.dateOperation)}
+                                    </TableCell>
+                                    <TableCell className="w-full whitespace-normal">
+                                        <div>
+                                            {OPERATION_LABELS[operation.operation] || operation.operation}
+                                        </div>
                                         {operation.comment && (
-                                            <div className="operation-comment">{operation.comment}</div>
+                                            <div className="max-w-xs break-words text-xs text-muted-foreground">
+                                                {operation.comment}
+                                            </div>
                                         )}
-                                    </td>
-                                    <td className={Number(operation.signedAmount) > 0 ? 'debt-up' : 'debt-down'}>
+                                    </TableCell>
+                                    <TableCell
+                                        className={cn(
+                                            'text-right tabular-nums',
+                                            Number(operation.signedAmount) > 0
+                                                ? 'text-destructive'
+                                                : 'text-success'
+                                        )}
+                                    >
                                         {Number(operation.signedAmount) > 0 ? '+' : '−'}
                                         {formatAmount(operation.amount)} ₽
-                                    </td>
-                                    <td>{formatAmount(operation.debtAfter)} ₽</td>
-                                    <td>
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums">
+                                        {formatAmount(operation.debtAfter)} ₽
+                                    </TableCell>
+                                    <TableCell className="w-0 text-right">
                                         {operation.canRollback ? (
-                                            <button
-                                                className="rollback-btn"
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
                                                 onClick={() => handleRollback(operation)}
                                                 disabled={rollbackId === operation.id}
                                             >
-                                                ↩ Откатить
-                                            </button>
+                                                <Undo2 />
+                                                Откатить
+                                            </Button>
                                         ) : (
-                                            <span className="rollback-done">
+                                            <Badge variant="outline">
                                                 {operation.reversalOfId ? 'откат' : 'откачена'}
-                                            </span>
+                                            </Badge>
                                         )}
-                                    </td>
-                                </tr>
+                                    </TableCell>
+                                </TableRow>
                             ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
+                        </TableBody>
+                    </Table>
+                )}
+            </InfoDialog>
 
-                <div className="modal-footer">
-                    <button type="button" className="cancel-btn" onClick={onClose}>
-                        Закрыть
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
+            {confirmDialog}
+        </>
+    )
 }
 
-export default CreditCardHistoryModal;
+export default CreditCardHistoryModal
