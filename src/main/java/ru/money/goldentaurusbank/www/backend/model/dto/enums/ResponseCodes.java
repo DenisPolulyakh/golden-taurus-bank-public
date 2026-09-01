@@ -62,6 +62,14 @@ public enum ResponseCodes {
     BULLION_NOT_ACCUMULATOR(4028, "Слиток не привязан к кредитной карте", HttpStatus.BAD_REQUEST),
     TRANSACTION_LOCKED_BY_CARD(4029, "Операция входит в погашение по карте — откатывайте её из истории карты", HttpStatus.BAD_REQUEST),
     CREDIT_CARD_LIMIT_BELOW_DEBT(4030, "Лимит не может быть меньше задолженности", HttpStatus.BAD_REQUEST),
+    BUDGET_BULLION_NOT_SET(4031, "Бюджетный слиток не выбран. Выберите его в шапке отчёта", HttpStatus.BAD_REQUEST),
+    BUDGET_SOURCE_NOT_SET(4032, "Слиток-источник финансирования не выбран", HttpStatus.BAD_REQUEST),
+    BUDGET_SAME_BULLION(4033, "Бюджетный слиток и слиток-источник — это один и тот же слиток", HttpStatus.BAD_REQUEST),
+    TRANSACTION_NOT_BUDGET(4034, "Операция не относится к бюджетному слитку", HttpStatus.BAD_REQUEST),
+    BUDGET_PLAN_NOT_SET(4035, "План месяца не задан — укажите сумму финансирования явно", HttpStatus.BAD_REQUEST),
+    BUDGET_ALREADY_FUNDED(4036, "Месяц уже профинансирован по плану. Укажите сумму, если хотите доложить", HttpStatus.BAD_REQUEST),
+    BUDGET_NOTHING_TO_CLOSE(4037, "На бюджетном слитке нет остатка — закрывать нечего", HttpStatus.BAD_REQUEST),
+
 
 
     // Системные ошибки (5xxx)
