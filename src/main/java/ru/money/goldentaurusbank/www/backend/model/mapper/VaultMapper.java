@@ -19,6 +19,7 @@ public interface VaultMapper {
     @Mapping(target = "bankName", source = "bank.name")
     @Mapping(target = "totalAmount", expression = "java(vault.getBullions().stream().map(b -> b.getAmount()).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add))")
     @Mapping(target = "bullionNamesCount", expression = "java(vault.getBullions().size())")
+    @Mapping(target = "emptyBullionsCount", expression = "java((int) vault.getBullions().stream().filter(b -> b.getAmount() != null && b.getAmount().signum() == 0).count())")
     VaultResponse toResponse(Vault vault);
 
 
