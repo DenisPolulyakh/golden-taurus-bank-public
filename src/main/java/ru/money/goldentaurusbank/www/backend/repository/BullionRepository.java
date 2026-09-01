@@ -38,6 +38,16 @@ public interface BullionRepository extends JpaRepository<Bullion, Long> {
 
     List<Bullion> findByCreditCardIdAndArchivedFalse(Long creditCardId);
 
+    /*
+     * Бюджетный слиток и слиток-источник финансирования: активных таких у
+     * пользователя не больше одного, это держат частичные уникальные индексы
+     * uq_bullions_budget_per_user и uq_bullions_budget_source_per_user.
+     */
+
+    Optional<Bullion> findByUserAndBudgetTrueAndArchivedFalse(User user);
+
+    Optional<Bullion> findByUserAndBudgetSourceTrueAndArchivedFalse(User user);
+
     @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bullion b WHERE b.user = :user AND b.archived = false")
     BigDecimal getTotalAmountByUser(@Param("user") User user);
 
