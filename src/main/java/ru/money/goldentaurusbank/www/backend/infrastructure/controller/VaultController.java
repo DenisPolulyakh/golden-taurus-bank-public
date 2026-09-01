@@ -103,6 +103,22 @@ public class VaultController {
         return ResponseEntity.ok(new SuccessResponse<>(summary));
     }
 
+    @DeleteMapping("/{vaultId}/empty-bullions")
+    public ResponseEntity<SuccessResponse<Integer>> deleteEmptyBullions(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long vaultId) {
+
+        User user = getUserFromUserDetails(userDetails);
+        int deleted = vaultService.deleteEmptyBullions(user, vaultId);
+
+        return ResponseEntity.ok(new SuccessResponse<>(
+                0,
+                "Пустые слитки удалены",
+                deleted
+        ));
+    }
+
+
 
     private User getUserFromUserDetails(UserDetails userDetails) {
         String email = userDetails.getUsername();

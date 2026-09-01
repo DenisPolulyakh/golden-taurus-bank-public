@@ -52,6 +52,9 @@ public class VaultResponse {
     @Builder.Default
     private boolean allowedTransferIn = true;
 
+    /** Сколько живых слитков хранилища стоят на нуле — по ним зажигается кнопка уборки */
+    private Integer emptyBullionsCount;
+
     private Settings settings;
 
     @Data

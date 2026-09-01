@@ -228,11 +228,54 @@ class VaultDeleteIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("Слитки резерва удалены руками, затем удаляется и сам резерв")
+    void deleteLiquidityReserveAfterEmptyingBullionsByHand() throws Exception {
+        Long reserveId = createVault("Ликвидный резерв", "LIQUIDITY_BUFFER");
+        Long firstBullionId = createBullion(reserveId, bullionNameId1, "0");
+        Long secondBullionId = createBullion(reserveId, bullionNameId2, "0");
+
+        deleteBullion(firstBullionId).andExpect(status().isOk());
+        deleteBullion(secondBullionId).andExpect(status().isOk());
+
+        deleteVault(reserveId)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0));
+
+        assertThat(vaultArchived(reserveId)).isTrue();
+        assertThat(bullionRow(firstBullionId).get("archived")).isEqualTo(true);
+        assertThat(bullionRow(secondBullionId).get("archived")).isEqualTo(true);
+    }
+
+    @Test
+    @DisplayName("После удаления резерва следующий перенос остатка поднимает новый")
+    void liquidityReserveIsRecreatedAfterDeletion() throws Exception {
+        Long reserveId = createVault("Ликвидный резерв", "LIQUIDITY_BUFFER");
+        deleteVault(reserveId).andExpect(status().isOk());
+        assertThat(activeLiquidityReserveId()).isNull();
+
+        // Остаток переносить некуда - резерв должен завестись заново, а не уронить удаление
+        Long vaultId = createVault("Сбербанк", null);
+        Long bullionId = createBullion(vaultId, bullionNameId1, "700.00");
+
+        deleteVault(vaultId).andExpect(status().isOk());
+
+        Long newReserveId = activeLiquidityReserveId();
+        assertThat(newReserveId).isNotNull().isNotEqualTo(reserveId);
+        assertThat(bullionRow(bullionId).get("archived")).isEqualTo(true);
+        assertThat(amountInVault(newReserveId)).isEqualByComparingTo("700.00");
+    }
+
+    @Test
     @DisplayName("Удаление несуществующего хранилища - ошибка")
     void deleteVaultNotFoundThrowsException() throws Exception {
         deleteVault(99999L)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(4004));
+    }
+
+    private ResultActions deleteBullion(Long bullionId) throws Exception {
+        return mockMvc.perform(delete("/api/bullions/{bullionId}", bullionId)
+                .header("Authorization", "Bearer " + accessToken));
     }
 
     private ResultActions deleteVault(Long vaultId) throws Exception {
@@ -321,6 +364,22 @@ class VaultDeleteIntegrationTest extends IntegrationTestBase {
                 "SELECT id FROM taurus.vaults WHERE user_id = ? AND vault_type = 'LIQUIDITY_BUFFER'",
                 Long.class, userId);
         return ids.isEmpty() ? null : ids.get(0);
+    }
+
+    /** Архивный резерв в БД остаётся, поэтому по типу мало - нужен именно живой. */
+    private Long activeLiquidityReserveId() {
+        List<Long> ids = jdbcTemplate.queryForList(
+                "SELECT id FROM taurus.vaults "
+                        + "WHERE user_id = ? AND vault_type = 'LIQUIDITY_BUFFER' AND NOT archived",
+                Long.class, userId);
+        return ids.isEmpty() ? null : ids.get(0);
+    }
+
+    private BigDecimal amountInVault(Long vaultId) {
+        List<BigDecimal> amounts = jdbcTemplate.queryForList(
+                "SELECT amount FROM taurus.bullions WHERE vault_id = ? AND NOT archived",
+                BigDecimal.class, vaultId);
+        return amounts.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private Map<String, Object> bullionRow(Long bullionId) {

@@ -147,6 +147,24 @@ public class VaultService {
         return vaultMapper.toResponse(vault);
     }
 
+    @Transactional
+    public int deleteEmptyBullions(User user, Long vaultId) {
+        Vault vault = vaultRepository.findByIdAndUserAndArchivedFalse(vaultId, user)
+                .orElseThrow(() -> new ApplicationException(
+                        VAULT_NOT_FOUND.getCode(),
+                        VAULT_NOT_FOUND.getMessage()
+                ));
+
+
+        List<Bullion> empty = List.copyOf(vault.getBullions()).stream()
+                .filter(bullion -> !hasAmount(bullion))
+                .toList();
+
+        empty.forEach(transactionService::archive);
+        log.info("[VaultService.deleteEmptyBullions] vault id = {}, archived = {}", vaultId, empty.size());
+        return empty.size();
+    }
+
 
     @Transactional
     public void deleteVault(User user, Long vaultId) {

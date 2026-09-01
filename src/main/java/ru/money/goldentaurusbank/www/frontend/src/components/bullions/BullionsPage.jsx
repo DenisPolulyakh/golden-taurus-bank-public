@@ -17,7 +17,7 @@ import BullionTypeStamp from './BullionTypeStamp'
 import { useBudgetBullionId } from '@/components/hooks/useBudgetBullion'
 import BullionTransactionModal from './BullionTransactionModal'
 import CreditCardOperationModal from '../credit-cards/CreditCardOperationModal'
-import { notifyAmountChange } from './bullionAmount'
+import { isEmptyBullionAmount, notifyAmountChange } from './bullionAmount'
 
 function BullionsPage() {
     // Галочку «Трата бюджета» показываем только у бюджетного слитка
@@ -220,7 +220,7 @@ function BullionsPage() {
         });
     };
 
-    const handleOpenDelete = (bullionNameId, bullionNameTitle, vaultId, vaultName, bullionId) => {
+    const handleOpenDelete = (bullionNameId, bullionNameTitle, vaultId, vaultName, bullionId, amount) => {
         setTransactionModal({
             isOpen: true,
             type: 'delete',
@@ -228,7 +228,8 @@ function BullionsPage() {
             bullionNameTitle: bullionNameTitle,
             selectedVaultId: vaultId,
             selectedVaultName: vaultName,
-            amount: null,
+            // Сумма нужна форме: у пустого слитка нет переноса остатка
+            amount: amount,
             bullionId: bullionId,
             description: null,
             fromVaultId: vaultId,
@@ -272,16 +273,22 @@ function BullionsPage() {
 
     const handleDeleteWithTransfer = async (targetVaultId, toLiquidityVault, description, dateOperation) => {
         try {
-            // Эндпоинт один на оба экрана: DELETE /api/bullions/{id}/transfer.
-            // Раньше отсюда уходил POST на несуществующий /bullions/delete-with-transfer
-            await api.delete(`/bullions/${transactionModal.bullionId}/transfer`, {
-                data: {
-                    toVaultId: targetVaultId,
-                    toLiquidityVault: toLiquidityVault,
-                    description: description,
-                    dateOperation: dateOperation
-                }
-            });
+            if (isEmptyBullionAmount(transactionModal.amount)) {
+                // Пустой слиток уходит в архив обычным DELETE: переносить нечего,
+                // и операции в истории не появляется
+                await api.delete(`/bullions/${transactionModal.bullionId}`);
+            } else {
+                // Эндпоинт один на оба экрана: DELETE /api/bullions/{id}/transfer.
+                // Раньше отсюда уходил POST на несуществующий /bullions/delete-with-transfer
+                await api.delete(`/bullions/${transactionModal.bullionId}/transfer`, {
+                    data: {
+                        toVaultId: targetVaultId,
+                        toLiquidityVault: toLiquidityVault,
+                        description: description,
+                        dateOperation: dateOperation
+                    }
+                });
+            }
             await fetchGroupedBullions();
         } catch (err) {
             console.error('Ошибка удаления слитка с переносом:', err);
@@ -391,21 +398,35 @@ function BullionsPage() {
             type: 'withdraw',
             vaults: getVaultsForBullionName(transactionModal.bullionNameId, 'withdraw')
         },
-        delete: {
-            title: `Удаление слитка "${transactionModal.bullionNameTitle}"`,
-            buttonText: 'Удалить и перенести',
-            handler: handleDeleteWithTransfer,
-            showVaultSelector: true,
-            showAmount: false,
-            showDescription: true,
-            vaultSelectorLabel: "Хранилище для переноса остатков",
-            descriptionLabel: "📝 Комментарий",
-            descriptionPlaceholder: "Комментарий к удалению (необязательно)...",
-            isConfirm: false,
-            vaults: getAvailableVaultsForDelete(transactionModal.fromVaultId),
-            initialVaultId: null,
-            type: 'delete'
-        }
+        delete: isEmptyBullionAmount(transactionModal.amount)
+            ? {
+                title: `Удаление пустого слитка "${transactionModal.bullionNameTitle}"`,
+                buttonText: 'Удалить',
+                handler: handleDeleteWithTransfer,
+                showVaultSelector: false,
+                showAmount: false,
+                // Комментарий и дату писать некуда: операции не создаётся
+                showDescription: false,
+                showDateOperation: false,
+                notice: 'Слиток пустой: переносить нечего, в историю операций удаление не попадёт.',
+                isConfirm: false,
+                type: 'delete'
+            }
+            : {
+                title: `Удаление слитка "${transactionModal.bullionNameTitle}"`,
+                buttonText: 'Удалить и перенести',
+                handler: handleDeleteWithTransfer,
+                showVaultSelector: true,
+                showAmount: false,
+                showDescription: true,
+                vaultSelectorLabel: "Хранилище для переноса остатков",
+                descriptionLabel: "📝 Комментарий",
+                descriptionPlaceholder: "Комментарий к удалению (необязательно)...",
+                isConfirm: false,
+                vaults: getAvailableVaultsForDelete(transactionModal.fromVaultId),
+                initialVaultId: null,
+                type: 'delete'
+            }
     };
 
     const [transferModal, setTransferModal] = useState({
@@ -739,7 +760,8 @@ function BullionsPage() {
                                                     bullionName.bullionNameTitle,
                                                     firstVault.id,
                                                     firstVault.name,
-                                                    firstVault.bullionId
+                                                    firstVault.bullionId,
+                                                    firstVault.amount
                                                 )
                                             }
                                         }}
@@ -808,6 +830,8 @@ function BullionsPage() {
                     descriptionLabel={currentTransaction.descriptionLabel}
                     vaultSelectorLabel={currentTransaction.vaultSelectorLabel}
                     type={currentTransaction.type || null}
+                    showDateOperation={currentTransaction.showDateOperation !== false}
+                    notice={currentTransaction.notice}
                     showBudgetOperation={
                         budgetBullionId != null &&
                         ['refill', 'withdraw'].includes(transactionModal.type) &&

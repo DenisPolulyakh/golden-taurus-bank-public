@@ -17,3 +17,11 @@ export const notifyAmountChange = (previousAmount, newAmount) => {
         toast.success('Слиток обновлён')
     }
 }
+
+/**
+ * Пустой слиток — тот, у которого на балансе ноль. Удаляется он начисто:
+ * переносить нечего, операции в истории не появляется.
+ * Неизвестная сумма (null/undefined) пустой не считается — иначе слиток с
+ * остатком удалился бы мимо переноса.
+ */
+export const isEmptyBullionAmount = (amount) => amount != null && Number(amount) === 0
