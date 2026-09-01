@@ -419,6 +419,17 @@ class BudgetIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("Слиток-источник виден и до того, как выбран бюджетный слиток")
+    void sourceBullionSurvivesWithoutBudgetBullion() throws Exception {
+        setSettings(null, incomeId);
+
+        JsonNode report = month();
+
+        assertTrue(report.get("budgetBullion").isNull());
+        assertEquals("Доход текущий", report.get("sourceBullion").get("title").asText());
+    }
+
+    @Test
     @DisplayName("Бюджетный слиток и источник финансирования не могут совпадать")
     void budgetAndSourceMustDiffer() throws Exception {
         mockMvc.perform(put("/api/budget/settings")

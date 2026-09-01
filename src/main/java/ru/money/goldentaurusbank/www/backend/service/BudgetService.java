@@ -80,7 +80,7 @@ public class BudgetService {
         // Слиток не выбран — отдаём пустой отчёт, а не ошибку: экран должен
         // открыться и предложить выбрать слиток, а не показать красное.
         if (budget.isEmpty()) {
-            return emptyMonth(period);
+            return emptyMonth(period, user);
         }
         return buildMonth(period, budget.get(), user);
     }
@@ -164,11 +164,18 @@ public class BudgetService {
         return days;
     }
 
-    private BudgetMonthDto emptyMonth(YearMonth period) {
+    /**
+     * Пустой отчёт, когда бюджетный слиток не выбран. Слиток-источник при этом
+     * отдаём: его можно назначить первым, и он обязан отображаться выбранным,
+     * а не молча теряться до тех пор, пока не появится бюджетный слиток.
+     */
+    private BudgetMonthDto emptyMonth(YearMonth period, User user) {
         return BudgetMonthDto.builder()
                 .year(period.getYear())
                 .month(period.getMonthValue())
                 .monthLabel(period.atDay(1).format(MONTH_LABEL))
+                .sourceBullion(bullionRepository.findByUserAndBudgetSourceTrueAndArchivedFalse(user)
+                        .map(this::toDto).orElse(null))
                 .openingBalance(BigDecimal.ZERO)
                 .funding(BigDecimal.ZERO)
                 .extraFunding(BigDecimal.ZERO)

@@ -153,6 +153,9 @@ const BudgetMonthTab = () => {
     }
 
     const saveSettings = async (budgetBullionId, sourceBullionId) => {
+        // Обе настройки уезжают одним запросом, поэтому без загруженного отчёта
+        // сохранять нельзя: пустой report обнулил бы соседнюю настройку
+        if (!report) return
         try {
             const { data } = await api.put('/budget/settings', { budgetBullionId, sourceBullionId })
             // Настройки отдают текущий месяц; если смотрим другой — перечитываем
