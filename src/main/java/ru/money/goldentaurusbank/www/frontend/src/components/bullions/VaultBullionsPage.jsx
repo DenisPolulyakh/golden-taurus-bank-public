@@ -17,7 +17,7 @@ import BullionTypeStamp from './BullionTypeStamp'
 import { useBudgetBullionId } from '@/components/hooks/useBudgetBullion'
 import BullionTransactionModal from './BullionTransactionModal'
 import CreditCardOperationModal from '../credit-cards/CreditCardOperationModal'
-import { notifyAmountChange } from './bullionAmount'
+import { isEmptyBullionAmount, notifyAmountChange } from './bullionAmount'
 
 function VaultBullionsPage() {
     // Галочку «Трата бюджета» показываем только у бюджетного слитка
@@ -329,15 +329,21 @@ function VaultBullionsPage() {
     const handleDeleteWithTransfer = async (targetVaultId, toLiquidityVault, description, dateOperation) => {
         setActionLoading(true);
         try {
-            await api.delete(`/bullions/${transactionModal.bullion.id}/transfer`, {
-                data: {
-                    fromVaultId: transactionModal.fromVaultId,
-                    toVaultId: targetVaultId,
-                    toLiquidityVault: toLiquidityVault,
-                    description: description,
-                    dateOperation: dateOperation ? dateOperation : null
-                }
-            });
+            if (isEmptyBullionAmount(transactionModal.bullion?.amount)) {
+                // Пустой слиток уходит в архив обычным DELETE: переносить нечего,
+                // и операции в истории не появляется
+                await api.delete(`/bullions/${transactionModal.bullion.id}`);
+            } else {
+                await api.delete(`/bullions/${transactionModal.bullion.id}/transfer`, {
+                    data: {
+                        fromVaultId: transactionModal.fromVaultId,
+                        toVaultId: targetVaultId,
+                        toLiquidityVault: toLiquidityVault,
+                        description: description,
+                        dateOperation: dateOperation ? dateOperation : null
+                    }
+                });
+            }
             closeTransactionModal();
             await refreshData();
         } catch (err) {
@@ -512,21 +518,35 @@ function VaultBullionsPage() {
             descriptionPlaceholder: "Комментарий к списанию (необязательно)...",
             type: 'withdraw'
         },
-        delete: {
-            title: `Удаление слитка "${transactionModal.bullion?.bullionNameTitle}"`,
-            buttonText: 'Удалить и перенести',
-            handler: handleDeleteWithTransfer,
-            showVaultSelector: true,
-            showAmount: false,
-            showDescription: true,
-            vaultSelectorLabel: "Хранилище для переноса остатков",
-            descriptionLabel: "📝 Комментарий",
-            descriptionPlaceholder: "Комментарий к удалению (необязательно)...",
-            isConfirm: false,
-            vaults: getAvailableVaultsForDelete(),
-            initialVaultId: null,
-            type: 'delete'
-        }
+        delete: isEmptyBullionAmount(transactionModal.bullion?.amount)
+            ? {
+                title: `Удаление пустого слитка "${transactionModal.bullion?.bullionNameTitle}"`,
+                buttonText: 'Удалить',
+                handler: handleDeleteWithTransfer,
+                showVaultSelector: false,
+                showAmount: false,
+                // Комментарий и дату писать некуда: операции не создаётся
+                showDescription: false,
+                showDateOperation: false,
+                notice: 'Слиток пустой: переносить нечего, в историю операций удаление не попадёт.',
+                isConfirm: false,
+                type: 'delete'
+            }
+            : {
+                title: `Удаление слитка "${transactionModal.bullion?.bullionNameTitle}"`,
+                buttonText: 'Удалить и перенести',
+                handler: handleDeleteWithTransfer,
+                showVaultSelector: true,
+                showAmount: false,
+                showDescription: true,
+                vaultSelectorLabel: "Хранилище для переноса остатков",
+                descriptionLabel: "📝 Комментарий",
+                descriptionPlaceholder: "Комментарий к удалению (необязательно)...",
+                isConfirm: false,
+                vaults: getAvailableVaultsForDelete(),
+                initialVaultId: null,
+                type: 'delete'
+            }
     };
 
     const currentTransaction = transactionModal.type ? transactionConfig[transactionModal.type] : null;
@@ -663,6 +683,8 @@ function VaultBullionsPage() {
                     descriptionLabel={currentTransaction.descriptionLabel}
                     vaultSelectorLabel={currentTransaction.vaultSelectorLabel}
                     type={currentTransaction.type || null}
+                    showDateOperation={currentTransaction.showDateOperation !== false}
+                    notice={currentTransaction.notice}
                     showBudgetOperation={
                         ['refill', 'withdraw'].includes(currentTransaction.type) &&
                         transactionModal.bullion?.budget === true

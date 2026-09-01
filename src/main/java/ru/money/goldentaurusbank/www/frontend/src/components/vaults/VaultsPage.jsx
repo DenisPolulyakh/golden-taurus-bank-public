@@ -32,7 +32,6 @@ import { formatAmount, formatShortDate } from '@/lib/format'
 import VaultModal from './VaultModal'
 
 const PAGE_SIZES = [5, 10, 20, 50]
-const LIQUIDITY_RESERVE_NAME = 'Ликвидный резерв'
 
 function VaultsPage() {
     const [vaults, setVaults] = useState([])
@@ -159,10 +158,13 @@ function VaultsPage() {
         }
     }
 
-    const handleDeleteVault = (id, name) => {
+    const handleDeleteVault = (vault) => {
+        const { id, name } = vault
         confirm({
             title: 'Удаление хранилища',
-            description: `Удалить хранилище "${name}"?`,
+            description: isLiquidityReserve(vault)
+                ? `Удалить ликвидное хранилище "${name}"? Оно создастся заново, когда понадобится для переноса остатков.`
+                : `Удалить хранилище "${name}"?`,
             onConfirm: async () => {
                 const oldVaults = [...vaults]
                 setVaults((prev) => prev.filter((vault) => vault.id !== id))
@@ -196,8 +198,13 @@ function VaultsPage() {
         }
     }
 
-    const isLiquidityReserve = (vaultName) => vaultName === LIQUIDITY_RESERVE_NAME
-    const hasAnyActions = vaults.some((v) => !isLiquidityReserve(v.name))
+    // Тип, а не название: резерв можно переименовать, особенным он от этого быть не перестанет
+    const isLiquidityReserve = (vault) => vault.vaultType === 'LIQUIDITY_BUFFER'
+    // Резерв не редактируют - имя, ставку и банк он держит свои,
+    // но пустой удаляется: бэкенд заведёт его заново, когда понадобится
+    const canEdit = (vault) => !isLiquidityReserve(vault)
+    const canDelete = (vault) => !isLiquidityReserve(vault) || Number(vault.totalAmount) === 0
+    const hasAnyActions = vaults.some((v) => canEdit(v) || canDelete(v))
     const columnCount = hasAnyActions ? 7 : 6
 
     if (loading && vaults.length === 0) {
@@ -294,7 +301,8 @@ function VaultsPage() {
                                 </TableRow>
                             ) : (
                                 vaults.map((vault) => {
-                                    const hasActions = !isLiquidityReserve(vault.name)
+                                    const editable = canEdit(vault)
+                                    const deletable = canDelete(vault)
 
                                     return (
                                         <TableRow key={vault.id}>
@@ -352,38 +360,36 @@ function VaultsPage() {
                                             </TableCell>
                                             {hasAnyActions && (
                                                 <TableCell className="text-right">
-                                                    {hasActions && (
-                                                        <>
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon-sm"
-                                                                        onClick={() => handleEditVault(vault)}
-                                                                        aria-label="Редактировать"
-                                                                    >
-                                                                        <Pencil />
-                                                                    </Button>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>Редактировать</TooltipContent>
-                                                            </Tooltip>
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon-sm"
-                                                                        className="text-destructive hover:text-destructive"
-                                                                        onClick={() =>
-                                                                            handleDeleteVault(vault.id, vault.name)
-                                                                        }
-                                                                        aria-label="Удалить"
-                                                                    >
-                                                                        <Trash2 />
-                                                                    </Button>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>Удалить</TooltipContent>
-                                                            </Tooltip>
-                                                        </>
+                                                    {editable && (
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon-sm"
+                                                                    onClick={() => handleEditVault(vault)}
+                                                                    aria-label="Редактировать"
+                                                                >
+                                                                    <Pencil />
+                                                                </Button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>Редактировать</TooltipContent>
+                                                        </Tooltip>
+                                                    )}
+                                                    {deletable && (
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon-sm"
+                                                                    className="text-destructive hover:text-destructive"
+                                                                    onClick={() => handleDeleteVault(vault)}
+                                                                    aria-label="Удалить"
+                                                                >
+                                                                    <Trash2 />
+                                                                </Button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>Удалить</TooltipContent>
+                                                        </Tooltip>
                                                     )}
                                                 </TableCell>
                                             )}

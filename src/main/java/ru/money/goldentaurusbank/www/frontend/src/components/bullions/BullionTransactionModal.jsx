@@ -44,6 +44,8 @@ function BullionTransactionModal({
                                      initialDateOperation = null,
                                      availableAmount = null,
                                      showBudgetOperation = false,
+                                     showDateOperation = true,
+                                     notice = null,
                                  }) {
     const [amount, setAmount] = useState('');
     const [amountDisplay, setAmountDisplay] = useState('');
@@ -506,6 +508,10 @@ function BullionTransactionModal({
                 </div>
             )}
 
+            {notice && (
+                <p className="text-sm text-muted-foreground">{notice}</p>
+            )}
+
             {isTransferModal && selectedFromOption && (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-muted px-3 py-2 text-sm">
                     <span className="text-muted-foreground">Откуда:</span>
@@ -743,17 +749,19 @@ function BullionTransactionModal({
                 </Field>
             )}
 
-            <Field>
-                <FieldLabel htmlFor="transaction-date">Дата и время операции *</FieldLabel>
-                <Input
-                    id="transaction-date"
-                    type="datetime-local"
-                    value={dateOperation}
-                    onChange={(e) => setDateOperation(e.target.value)}
-                    max={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}T${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`}
-                    required
-                />
-            </Field>
+            {showDateOperation && (
+                <Field>
+                    <FieldLabel htmlFor="transaction-date">Дата и время операции *</FieldLabel>
+                    <Input
+                        id="transaction-date"
+                        type="datetime-local"
+                        value={dateOperation}
+                        onChange={(e) => setDateOperation(e.target.value)}
+                        max={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}T${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`}
+                        required
+                    />
+                </Field>
+            )}
 
             <ErrorMessage>{error}</ErrorMessage>
         </FormDialog>
