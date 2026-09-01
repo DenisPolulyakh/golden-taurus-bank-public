@@ -69,7 +69,7 @@ public enum ResponseCodes {
     BUDGET_PLAN_NOT_SET(4035, "План месяца не задан — укажите сумму финансирования явно", HttpStatus.BAD_REQUEST),
     BUDGET_ALREADY_FUNDED(4036, "Месяц уже профинансирован по плану. Укажите сумму, если хотите доложить", HttpStatus.BAD_REQUEST),
     BUDGET_NOTHING_TO_CLOSE(4037, "На бюджетном слитке нет остатка — закрывать нечего", HttpStatus.BAD_REQUEST),
-
+    BULLION_NOT_EMPTY(4038, "У слитка есть остаток: удалить можно только с переносом остатка", HttpStatus.BAD_REQUEST),
 
 
     // Системные ошибки (5xxx)

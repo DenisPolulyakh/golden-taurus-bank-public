@@ -48,7 +48,6 @@ public class BullionService {
     // public — на эти тексты смотрят тесты корректировки суммы
     public static final String DEPOSIT_AMOUNT_COMMENT = "Пополнение при корректировке суммы слитка";
     public static final String WITHDRAWAL_AMOUNT_COMMENT = "Снятие при корректировке суммы слитка";
-    private static final String DELETE_BULLION_COMMENT = "Удаление слитка";
     private static final Logger log = LoggerFactory.getLogger(BullionService.class);
 
     private final BullionRepository bullionRepository;
@@ -212,12 +211,15 @@ public class BullionService {
                         BULLION_NOT_FOUND.getMessage()
                 ));
 
-        // Остаток уходит снятием, сам слиток архивируется: физически удалить его нельзя,
-        // на него ссылается история операций.
+        // Остаток отсюда не списывается: деньги исчезли бы без следа в другом слитке.
+        // Слиток с остатком удаляют через /transfer — с переносом в целевое хранилище.
         if (bullion.getAmount().compareTo(BigDecimal.ZERO) > 0) {
-            // Не трата: слиток убирают из обихода, деньги не потрачены
-            transactionService.withdraw(bullionId, bullion.getAmount(), user, DELETE_BULLION_COMMENT, null, null, false);
+            throw new ApplicationException(
+                    BULLION_NOT_EMPTY.getCode(),
+                    BULLION_NOT_EMPTY.getMessage()
+            );
         }
+
 
         transactionService.archive(bullion);
     }
