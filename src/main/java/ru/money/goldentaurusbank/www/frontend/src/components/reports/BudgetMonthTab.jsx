@@ -36,6 +36,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select'
+import { Combobox } from '@/components/ui-app/combobox'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { DatePicker } from '@/components/ui-app/date-picker'
@@ -50,9 +51,6 @@ const MONTHS = [
     'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
     'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
 ]
-
-// Radix Select не умеет пустую строку значением пункта
-const NONE = 'none'
 
 const CHART_CONFIG = {
     spent: { label: 'Потрачено', color: 'var(--chart-1)' },
@@ -113,6 +111,23 @@ const BudgetMonthTab = () => {
     const budgetBullion = report?.budgetBullion
     const planned = report?.plannedAmount
 
+    // Слитков у Дениса десятки, поэтому выбор через Combobox с поиском, а не
+    // Select: три введённых символа сужают список до нужного
+    const bullionOptions = useMemo(
+        () =>
+            bullions.map((bullion) => ({
+                value: bullion.id,
+                label: bullionLabel(bullion),
+                data: bullion,
+            })),
+        [bullions]
+    )
+
+    const sourceOptions = useMemo(
+        () => bullionOptions.filter((option) => option.value !== budgetBullion?.id),
+        [bullionOptions, budgetBullion]
+    )
+
     // Данные графика мемоизируем: без этого перерисовка вкладки перезапускает
     // анимацию Recharts, потому что пропс приезжает новым объектом каждый раз
     const chartData = useMemo(
@@ -149,22 +164,22 @@ const BudgetMonthTab = () => {
         }
     }
 
-    const handleBudgetBullionChange = (value) => {
-        const nextId = value === NONE ? null : Number(value)
+    const handleBudgetBullionChange = (nextId) => {
         const sourceId = report?.sourceBullion?.id ?? null
 
         confirm({
-            title: 'Сменить бюджетный слиток',
+            title: nextId == null ? 'Отвязать отчёт от слитка' : 'Сменить бюджетный слиток',
             description:
-                'Отчёт будет пересчитан по новому слитку. Корзины у уже записанных операций ' +
-                'останутся как есть — при необходимости переразметьте их в таблице.',
-            confirmText: 'Сменить',
+                nextId == null
+                    ? 'Отчёт станет пустым, пока слиток не выбран снова. Данные не пропадут.'
+                    : 'Отчёт будет пересчитан по новому слитку. Корзины у уже записанных операций ' +
+                      'останутся как есть — при необходимости переразметьте их в таблице.',
+            confirmText: nextId == null ? 'Отвязать' : 'Сменить',
             onConfirm: () => saveSettings(nextId, sourceId === nextId ? null : sourceId),
         })
     }
 
-    const handleSourceBullionChange = (value) => {
-        const nextId = value === NONE ? null : Number(value)
+    const handleSourceBullionChange = (nextId) => {
         saveSettings(budgetBullion?.id ?? null, nextId)
     }
 
@@ -314,42 +329,32 @@ const BudgetMonthTab = () => {
                         </Select>
                     </div>
 
-                    <div className="flex flex-col gap-1">
+                    <div className="flex w-64 flex-col gap-1">
                         <Label className="text-xs text-muted-foreground">Бюджетный слиток</Label>
-                        <Select
-                            value={budgetBullion?.id ? String(budgetBullion.id) : NONE}
-                            onValueChange={handleBudgetBullionChange}
-                        >
-                            <SelectTrigger className="w-64"><SelectValue placeholder="Не выбран" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={NONE}>Не выбран</SelectItem>
-                                {bullions.map((bullion) => (
-                                    <SelectItem key={bullion.id} value={String(bullion.id)}>
-                                        {bullionLabel(bullion)}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <Combobox
+                            options={bullionOptions}
+                            value={budgetBullion?.id ?? null}
+                            onChange={handleBudgetBullionChange}
+                            placeholder="Не выбран"
+                            searchPlaceholder="Наименование или хранилище..."
+                            emptyText="Слиток не найден"
+                            clearable
+                            renderOption={renderBullionOption}
+                        />
                     </div>
 
-                    <div className="flex flex-col gap-1">
+                    <div className="flex w-64 flex-col gap-1">
                         <Label className="text-xs text-muted-foreground">Финансировать с</Label>
-                        <Select
-                            value={report?.sourceBullion?.id ? String(report.sourceBullion.id) : NONE}
-                            onValueChange={handleSourceBullionChange}
-                        >
-                            <SelectTrigger className="w-64"><SelectValue placeholder="Не выбран" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={NONE}>Не выбран</SelectItem>
-                                {bullions
-                                    .filter((bullion) => bullion.id !== budgetBullion?.id)
-                                    .map((bullion) => (
-                                        <SelectItem key={bullion.id} value={String(bullion.id)}>
-                                            {bullionLabel(bullion)}
-                                        </SelectItem>
-                                    ))}
-                            </SelectContent>
-                        </Select>
+                        <Combobox
+                            options={sourceOptions}
+                            value={report?.sourceBullion?.id ?? null}
+                            onChange={handleSourceBullionChange}
+                            placeholder="Не выбран"
+                            searchPlaceholder="Наименование или хранилище..."
+                            emptyText="Слиток не найден"
+                            clearable
+                            renderOption={renderBullionOption}
+                        />
                     </div>
 
                     {budgetBullion && (
@@ -630,24 +635,18 @@ const BudgetMonthTab = () => {
                     </div>
                     <div className="flex flex-col gap-2">
                         <Label>Слиток-источник</Label>
-                        <Select
-                            value={fundForm.sourceBullionId || NONE}
-                            onValueChange={(v) =>
-                                setFundForm({ ...fundForm, sourceBullionId: v === NONE ? '' : v })
+                        <Combobox
+                            options={sourceOptions}
+                            value={fundForm.sourceBullionId || null}
+                            onChange={(value) =>
+                                setFundForm({ ...fundForm, sourceBullionId: value == null ? '' : String(value) })
                             }
-                        >
-                            <SelectTrigger><SelectValue placeholder="Из настроек" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={NONE}>Из настроек</SelectItem>
-                                {bullions
-                                    .filter((bullion) => bullion.id !== budgetBullion?.id)
-                                    .map((bullion) => (
-                                        <SelectItem key={bullion.id} value={String(bullion.id)}>
-                                            {bullionLabel(bullion)}
-                                        </SelectItem>
-                                    ))}
-                            </SelectContent>
-                        </Select>
+                            placeholder="Из настроек"
+                            searchPlaceholder="Наименование или хранилище..."
+                            emptyText="Слиток не найден"
+                            clearable
+                            renderOption={renderBullionOption}
+                        />
                     </div>
                     <div className="flex flex-col gap-2">
                         <Label>Дата</Label>
@@ -680,21 +679,17 @@ const BudgetMonthTab = () => {
                 >
                     <div className="flex flex-col gap-2">
                         <Label>Куда увести</Label>
-                        <Select
-                            value={closeForm.targetBullionId}
-                            onValueChange={(v) => setCloseForm({ ...closeForm, targetBullionId: v })}
-                        >
-                            <SelectTrigger><SelectValue placeholder="Выберите слиток" /></SelectTrigger>
-                            <SelectContent>
-                                {bullions
-                                    .filter((bullion) => bullion.id !== budgetBullion?.id)
-                                    .map((bullion) => (
-                                        <SelectItem key={bullion.id} value={String(bullion.id)}>
-                                            {bullionLabel(bullion)}
-                                        </SelectItem>
-                                    ))}
-                            </SelectContent>
-                        </Select>
+                        <Combobox
+                            options={sourceOptions}
+                            value={closeForm.targetBullionId || null}
+                            onChange={(value) =>
+                                setCloseForm({ ...closeForm, targetBullionId: value == null ? '' : String(value) })
+                            }
+                            placeholder="Выберите слиток"
+                            searchPlaceholder="Наименование или хранилище..."
+                            emptyText="Слиток не найден"
+                            renderOption={renderBullionOption}
+                        />
                     </div>
                     <div className="flex flex-col gap-2">
                         <Label htmlFor="close-comment">Комментарий</Label>
@@ -711,6 +706,15 @@ const BudgetMonthTab = () => {
         </TooltipProvider>
     )
 }
+
+/** Строка списка слитков — как в форме перевода: наименование, хранилище, сумма. */
+const renderBullionOption = (option) => (
+    <span className="flex items-center justify-between gap-3">
+        <span className="truncate">{option.data?.bullionName?.title}</span>
+        <span className="truncate text-xs text-muted-foreground">{option.data?.vault?.name}</span>
+        <span className="font-medium tabular-nums">{formatAmount(option.data?.amount)} ₽</span>
+    </span>
+)
 
 const sumOf = (days, field) => (days || []).reduce((total, day) => total + Number(day[field]), 0)
 
