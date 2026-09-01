@@ -215,7 +215,8 @@ public class BullionService {
         // Остаток уходит снятием, сам слиток архивируется: физически удалить его нельзя,
         // на него ссылается история операций.
         if (bullion.getAmount().compareTo(BigDecimal.ZERO) > 0) {
-            transactionService.withdraw(bullionId, bullion.getAmount(), user, DELETE_BULLION_COMMENT, null, null);
+            // Не трата: слиток убирают из обихода, деньги не потрачены
+            transactionService.withdraw(bullionId, bullion.getAmount(), user, DELETE_BULLION_COMMENT, null, null, false);
         }
 
         transactionService.archive(bullion);

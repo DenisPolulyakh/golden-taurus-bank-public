@@ -24,4 +24,12 @@ public class TransferRequest {
     private LocalDateTime dateOperation;
     
     private String comment;
+
+    /**
+     * Корзина операции для месячного бюджета: {@code true} — трата дня,
+     * {@code false} — движение самого бюджета (финансирование, докидывание,
+     * перенос остатка). Обёртка, а не примитив: {@code null} от клиента,
+     * который про поле не знает, читается как трата.
+     */
+    private Boolean budgetOperation;
 }

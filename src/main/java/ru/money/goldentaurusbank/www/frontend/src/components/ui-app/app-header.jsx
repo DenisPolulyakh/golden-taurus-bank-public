@@ -1,5 +1,5 @@
 import { Link, NavLink } from 'react-router-dom'
-import { Coins, FolderTree, History, Landmark, LogOut, Settings, Vault, Wallet } from 'lucide-react'
+import { ChartColumnBig, Coins, FolderTree, History, Landmark, LogOut, Settings, Vault, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
     DropdownMenu,
@@ -17,6 +17,7 @@ const NAV = [
     { to: '/vaults', label: 'Хранилища', icon: Vault },
     { to: '/credit-cards', label: 'Кредитные карты', icon: Wallet },
     { to: '/transactions', label: 'История', icon: History },
+    { to: '/reports', label: 'Отчёты', icon: ChartColumnBig },
 ]
 
 /** Справочники живут под шестерёнкой: заходят в них раз в месяц. */

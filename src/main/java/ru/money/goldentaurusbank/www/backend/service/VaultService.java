@@ -281,6 +281,7 @@ public class VaultService {
                         .amount(b.getAmount())
                         .description(b.getDescription())
                         .bullionType(b.getBullionType())
+                        .budget(b.isBudget())
                         .creditCardId(b.getCreditCard() == null ? null : b.getCreditCard().getId())
                         .creditCardMasked(b.getCreditCard() == null
                                 ? null : creditCardMapper.mask(b.getCreditCard().getLast4()))

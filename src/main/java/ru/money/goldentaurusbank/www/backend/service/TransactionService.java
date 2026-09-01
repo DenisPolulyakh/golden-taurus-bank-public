@@ -55,29 +55,69 @@ public class TransactionService {
     @Transactional
     public Transaction deposit(Long targetBullionId, BigDecimal amount, User user,
                                String comment, LocalDateTime dateOperation, Long batchId) {
-        return record(null, targetBullionId, amount, user, comment, dateOperation, batchId, false, false, null);
+        return deposit(targetBullionId, amount, user, comment, dateOperation, batchId, true);
+    }
+
+    @Transactional
+    public Transaction deposit(Long targetBullionId, BigDecimal amount, User user,
+                               String comment, LocalDateTime dateOperation, Long batchId,
+                               boolean budgetOperation) {
+        return record(null, targetBullionId, amount, user, comment, dateOperation, batchId, false, false, null, budgetOperation);
     }
 
     @Transactional
     public Transaction withdraw(Long sourceBullionId, BigDecimal amount, User user,
                                 String comment, LocalDateTime dateOperation, Long batchId) {
-        return record(sourceBullionId, null, amount, user, comment, dateOperation, batchId, false, false, null);
+        return withdraw(sourceBullionId, amount, user, comment, dateOperation, batchId, true);
+    }
+
+    @Transactional
+    public Transaction withdraw(Long sourceBullionId, BigDecimal amount, User user,
+                                String comment, LocalDateTime dateOperation, Long batchId,
+                                boolean budgetOperation) {
+        return record(sourceBullionId, null, amount, user, comment, dateOperation, batchId, false, false, null, budgetOperation);
     }
 
     @Transactional
     public Transaction transfer(Long sourceBullionId, Long targetBullionId, BigDecimal amount, User user,
                                 String comment, LocalDateTime dateOperation, Long batchId) {
-        return record(sourceBullionId, targetBullionId, amount, user, comment, dateOperation, batchId, false, false, null);
+        return transfer(sourceBullionId, targetBullionId, amount, user, comment, dateOperation, batchId, true);
+    }
+
+    @Transactional
+    public Transaction transfer(Long sourceBullionId, Long targetBullionId, BigDecimal amount, User user,
+                                String comment, LocalDateTime dateOperation, Long batchId,
+                                boolean budgetOperation) {
+        return record(sourceBullionId, targetBullionId, amount, user, comment, dateOperation, batchId, false, false, null, budgetOperation);
     }
 
     /**
      * Стартовый остаток: двигает сам слиток, но не двигает график накоплений —
      * иначе месяц создания слитка показал бы доход на всю сумму накоплений.
+     * Для бюджета это всегда движение, а не трата: иначе первый день истории
+     * слитка показал бы расход на всю сумму уже накопленного.
      */
     @Transactional
     public Transaction openingBalance(Long targetBullionId, BigDecimal amount, User user,
                                       String comment, LocalDateTime dateOperation) {
-        return record(null, targetBullionId, amount, user, comment, dateOperation, null, true, false, null);
+        return record(null, targetBullionId, amount, user, comment, dateOperation, null, true, false, null, false);
+    }
+
+    /**
+     * Корзина бюджета из формы. {@code null} от клиента, который про поле не
+     * знает, разрешается умолчанием по типу операции:
+     * <ul>
+     *   <li><b>наличные</b> (снял / внёс сдачу) — трата: именно из них состоит
+     *       день, и забытая галочка выкинула бы его из отчёта молча;</li>
+     *   <li><b>перевод</b> — движение бюджета: перевод внутрь почти всегда
+     *       финансирование, а не возмещение. С обратным умолчанием забытая
+     *       галочка на финансировании уводит день в глубокий минус.</li>
+     * </ul>
+     * Редкое возмещение переводом отмечается галочкой руками — таких единицы
+     * в месяц, а финансирований столько же, но ошибка в них заметнее.
+     */
+    private static boolean budgetOperationOrDefault(Boolean budgetOperation, boolean fallback) {
+        return budgetOperation == null ? fallback : budgetOperation;
     }
 
     /**
@@ -86,7 +126,8 @@ public class TransactionService {
      */
     private Transaction record(Long sourceBullionId, Long targetBullionId, BigDecimal amount, User user,
                                String comment, LocalDateTime dateOperation, Long batchId,
-                               boolean openingBalance, boolean imported, Long reversalOfId) {
+                               boolean openingBalance, boolean imported, Long reversalOfId,
+                               boolean budgetOperation) {
 
         if (sourceBullionId == null && targetBullionId == null) {
             throw new ApplicationException(BULLION_NOT_FOUND.getCode(), "Не указан ни один слиток операции");
@@ -129,6 +170,7 @@ public class TransactionService {
                 .comment(comment)
                 .reversalOfId(reversalOfId)
                 .batchId(batchId)
+                .budgetOperation(budgetOperation)
                 .build());
 
         log.info("Transaction recorded: id={}, kind={}, source={}, target={}, amount={}",
@@ -149,7 +191,8 @@ public class TransactionService {
     public Bullion refillBullion(RefillBullionRequest request, User user, Long batchId) {
         Bullion bullion = resolveBullion(user, request.getBullionNameId(), request.getVaultId());
         requireIncomeAllowed(bullion);
-        deposit(bullion.getId(), request.getAmount(), user, request.getUserComment(), request.getDateOperation(), batchId);
+        deposit(bullion.getId(), request.getAmount(), user, request.getUserComment(), request.getDateOperation(), batchId,
+                budgetOperationOrDefault(request.getBudgetOperation(), true));
         return bullion;
     }
 
@@ -157,7 +200,8 @@ public class TransactionService {
     public Bullion withdrawBullion(WithdrawBullionRequest request, User user, Long batchId) {
         Bullion bullion = resolveBullion(user, request.getBullionNameId(), request.getVaultId());
         requireExpenseAllowed(bullion);
-        withdraw(bullion.getId(), request.getAmount(), user, request.getUserComment(), request.getDateOperation(), batchId);
+        withdraw(bullion.getId(), request.getAmount(), user, request.getUserComment(), request.getDateOperation(), batchId,
+                budgetOperationOrDefault(request.getBudgetOperation(), true));
         return bullion;
     }
 
@@ -171,7 +215,8 @@ public class TransactionService {
         requireTransferAllowed(loadBullion(request.getFromBullionId(), user),
                 loadBullion(request.getToBullionId(), user));
         Transaction transaction = transfer(request.getFromBullionId(), request.getToBullionId(),
-                request.getAmount(), user, request.getComment(), request.getDateOperation(), null);
+                request.getAmount(), user, request.getComment(), request.getDateOperation(), null,
+                budgetOperationOrDefault(request.getBudgetOperation(), false));
         return loadBullion(transaction.getSourceBullionId(), user);
     }
 
@@ -257,8 +302,10 @@ public class TransactionService {
 
         BigDecimal amount = source.getAmount();
         if (amount.compareTo(BigDecimal.ZERO) > 0) {
+            // Перемещение слитка целиком — не трата: деньги остались у пользователя,
+            // сменилось только хранилище.
             transfer(source.getId(), target.getId(), amount, user,
-                    "Перемещение слитка в хранилище " + describeVault(toVault), dateOperation, batchId);
+                    "Перемещение слитка в хранилище " + describeVault(toVault), dateOperation, batchId, false);
         }
 
         archive(source);
@@ -326,7 +373,11 @@ public class TransactionService {
                 original.getBatchId(),
                 original.isOpeningBalance(),
                 original.isImported(),
-                transactionId
+                transactionId,
+                // Корзину копируем обязательно: иначе трата уйдёт в одну сумму,
+                // а её откат — в другую, и остаток бюджета разъедется с суммой
+                // слитка при верной сумме слитка. Молчаливый разрыв тождества.
+                original.isBudgetOperation()
         );
     }
 
@@ -609,7 +660,8 @@ public class TransactionService {
     // Преобразование в DTO
     // ------------------------------------------------------------------
 
-    private List<TransactionDto> toDtos(List<Transaction> transactions) {
+    /** Публичный: тем же преобразованием пользуется отчёт о бюджете. */
+    public List<TransactionDto> toDtos(List<Transaction> transactions) {
         if (transactions.isEmpty()) {
             return List.of();
         }
@@ -641,6 +693,7 @@ public class TransactionService {
                 .createdAt(transaction.getCreatedAt())
                 .dateOperation(transaction.getDateOperation())
                 .imported(transaction.isImported())
+                .budgetOperation(transaction.isBudgetOperation())
                 .canRollback(reversedById == null && !lockedByCard)
                 .lockedByCard(lockedByCard)
                 .reversalOfId(transaction.getReversalOfId())

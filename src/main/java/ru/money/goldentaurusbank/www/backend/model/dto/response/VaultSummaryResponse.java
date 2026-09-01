@@ -33,6 +33,9 @@ public class VaultSummaryResponse {
         private String description;
         // Нужен форме редактирования слитка: подставить текущий тип
         private BullionType bullionType;
+
+        /** Бюджетный слиток: в формах операций по нему появляется галочка «Трата бюджета» */
+        private boolean budget;
         // Слиток служит накопителем карты: отсюда у него кнопка «Погашение»
         private Long creditCardId;
         private String creditCardMasked;

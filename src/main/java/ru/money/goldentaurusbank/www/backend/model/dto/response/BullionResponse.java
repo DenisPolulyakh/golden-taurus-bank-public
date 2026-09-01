@@ -21,6 +21,9 @@ public class BullionResponse {
     private BigDecimal amount;
     private String description;
     private BullionType bullionType;
+
+    /** Бюджетный слиток: по нему считается отчёт «Бюджет на месяц» */
+    private boolean budget;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

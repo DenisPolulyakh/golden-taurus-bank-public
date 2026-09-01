@@ -48,6 +48,20 @@ public class Transaction {
     @Builder.Default
     private boolean imported = false;
 
+    /**
+     * Корзина операции для месячного бюджета: true — трата дня, false —
+     * движение самого бюджета (финансирование 1-го числа, докидывание среди
+     * месяца, перенос остатка, доход прямо в кошелёк).
+     * <p>
+     * Значимо только для операций, задевающих бюджетный слиток; у остальных
+     * стоит и не мешает. По умолчанию true: забытая галочка на трате выкинула
+     * бы день из статистики молча, а лишняя даёт заметный выброс на графике.
+     */
+    @Column(name = "budget_operation", nullable = false)
+    @Builder.Default
+    private boolean budgetOperation = true;
+
+
     @Column(name = "comment", length = 500)
     private String comment;
 

@@ -110,6 +110,147 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("month") int month
     );
 
+    /*
+     * ------------------------------------------------------------------
+     * Бюджет на месяц. Считается по одному слитку, поэтому фильтр идёт по
+     * bullionId, а не по флагу budget: так ручка умеет показать отчёт и по
+     * слитку, который бюджетным ещё не назначен.
+     *
+     * Отличия от статистики дашборда:
+     *   - imported НЕ исключается: импортированные операции реально двигают
+     *     остаток слитка, и без них тождество «остаток = приход − расход»
+     *     не сойдётся;
+     *   - opening_balance НЕ исключается: стартовый остаток это деньги на
+     *     слитке, просто он лежит в корзине «движение бюджета»;
+     *   - тип операции не значит ничего, всё решает budget_operation.
+     *
+     * Пара «операция + её откат» внутри ОДНОГО месяца выбрасывается: на суммы
+     * она не влияет (гасит сама себя), но раздувает валовые колонки — из-за
+     * такой пары день показывал «снято 140 619 / вернул 138 339» вместо
+     * «снято 5 000». Пару, разорванную границей месяца, не трогаем: там каждая
+     * половина реально двигает остаток своего месяца.
+     */
+    String BUDGET_TX_FILTER = """
+        WHERE t.user_id = :userId
+            AND (t.source_bullion_id = :bullionId OR t.target_bullion_id = :bullionId)
+            AND NOT (
+                (t.reversal_of_id IS NOT NULL AND EXISTS (
+                    SELECT 1 FROM taurus.transactions o
+                    WHERE o.id = t.reversal_of_id
+                      AND DATE_TRUNC('month', o.date_operation) = DATE_TRUNC('month', t.date_operation)))
+                OR EXISTS (
+                    SELECT 1 FROM taurus.transactions r
+                    WHERE r.reversal_of_id = t.id
+                      AND DATE_TRUNC('month', r.date_operation) = DATE_TRUNC('month', t.date_operation))
+            )
+            """;
+
+    /**
+     * Разбивка бюджетного слитка по дням месяца:
+     * снято / вернул / возмещено (нетто переводов) / движение бюджета.
+     */
+    @Query(value = """
+        SELECT
+            EXTRACT(DAY FROM t.date_operation)                                  AS day,
+
+            COALESCE(SUM(t.amount) FILTER (WHERE t.budget_operation
+                AND t.source_bullion_id = :bullionId
+                AND t.target_bullion_id IS NULL), 0)                            AS taken,
+
+            COALESCE(SUM(t.amount) FILTER (WHERE t.budget_operation
+                AND t.target_bullion_id = :bullionId
+                AND t.source_bullion_id IS NULL), 0)                            AS returned,
+
+            COALESCE(SUM(t.amount) FILTER (WHERE t.budget_operation
+                AND t.target_bullion_id = :bullionId
+                AND t.source_bullion_id IS NOT NULL), 0)
+          - COALESCE(SUM(t.amount) FILTER (WHERE t.budget_operation
+                AND t.source_bullion_id = :bullionId
+                AND t.target_bullion_id IS NOT NULL), 0)                        AS compensated,
+
+            COALESCE(SUM(t.amount) FILTER (WHERE NOT t.budget_operation
+                AND t.target_bullion_id = :bullionId), 0)
+          - COALESCE(SUM(t.amount) FILTER (WHERE NOT t.budget_operation
+                AND t.source_bullion_id = :bullionId), 0)                       AS funding,
+
+            COUNT(*)                                                            AS transaction_count
+        FROM taurus.transactions t
+        """ + BUDGET_TX_FILTER + """
+            AND EXTRACT(YEAR FROM t.date_operation) = :year
+            AND EXTRACT(MONTH FROM t.date_operation) = :month
+        GROUP BY EXTRACT(DAY FROM t.date_operation)
+        ORDER BY day ASC
+        """, nativeQuery = true)
+    List<Object[]> getBudgetDailyStatistics(
+            @Param("userId") Long userId,
+            @Param("bullionId") Long bullionId,
+            @Param("year") int year,
+            @Param("month") int month
+    );
+
+    /**
+     * Остаток бюджетного слитка на начало периода — сумма всех ног строго раньше
+     * указанного момента. Здесь не выбрасывается ничего: каждая записанная
+     * операция реально подвинула остаток, включая половинки откатных пар.
+     */
+    @Query(value = """
+        SELECT COALESCE(SUM(amount) FILTER (WHERE target_bullion_id = :bullionId), 0)
+             - COALESCE(SUM(amount) FILTER (WHERE source_bullion_id = :bullionId), 0)
+        FROM taurus.transactions
+        WHERE user_id = :userId
+            AND (source_bullion_id = :bullionId OR target_bullion_id = :bullionId)
+            AND date_operation < :before
+        """, nativeQuery = true)
+    BigDecimal getBudgetBalanceBefore(
+            @Param("userId") Long userId,
+            @Param("bullionId") Long bullionId,
+            @Param("before") LocalDateTime before
+    );
+
+    /** Операции бюджетного слитка за один день — раскрытая строка таблицы отчёта. */
+    @Query(value = """
+        SELECT * FROM taurus.transactions
+        WHERE user_id = :userId
+            AND (source_bullion_id = :bullionId OR target_bullion_id = :bullionId)
+            AND date_operation >= :from
+            AND date_operation < :to
+        ORDER BY date_operation ASC, id ASC
+        """, nativeQuery = true)
+    List<Transaction> findBudgetTransactionsBetween(
+            @Param("userId") Long userId,
+            @Param("bullionId") Long bullionId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    /** То же самое, но свёрнутое по месяцам года — для годовой вкладки отчёта. */
+    @Query(value = """
+        SELECT
+            EXTRACT(MONTH FROM t.date_operation)                                AS month,
+
+            COALESCE(SUM(t.amount) FILTER (WHERE t.budget_operation
+                AND t.source_bullion_id = :bullionId), 0)
+          - COALESCE(SUM(t.amount) FILTER (WHERE t.budget_operation
+                AND t.target_bullion_id = :bullionId), 0)                       AS spent,
+
+            COALESCE(SUM(t.amount) FILTER (WHERE NOT t.budget_operation
+                AND t.target_bullion_id = :bullionId), 0)
+          - COALESCE(SUM(t.amount) FILTER (WHERE NOT t.budget_operation
+                AND t.source_bullion_id = :bullionId), 0)                       AS funding,
+
+            COUNT(*)                                                            AS transaction_count
+        FROM taurus.transactions t
+        """ + BUDGET_TX_FILTER + """
+            AND EXTRACT(YEAR FROM t.date_operation) = :year
+        GROUP BY EXTRACT(MONTH FROM t.date_operation)
+        ORDER BY month ASC
+        """, nativeQuery = true)
+    List<Object[]> getBudgetMonthlyStatistics(
+            @Param("userId") Long userId,
+            @Param("bullionId") Long bullionId,
+            @Param("year") int year
+    );
+
     @Query(value = """
         SELECT
             COALESCE(SUM(amount) FILTER (WHERE source_bullion_id IS NULL

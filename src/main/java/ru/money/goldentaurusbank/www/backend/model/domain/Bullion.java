@@ -64,6 +64,26 @@ public class Bullion {
     @Builder.Default
     private boolean archived = false;
 
+
+    /**
+     * Слиток текущих расходов, по которому строится отчёт «Бюджет на месяц».
+     * Активный такой слиток у пользователя один — держит частичный уникальный
+     * индекс uq_bullions_budget_per_user, а не проверка в коде: два бюджетных
+     * слитка это баг, а не ошибка пользователя.
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean budget = false;
+
+    /**
+     * Слиток, с которого бюджет финансируется кнопкой «Профинансировать».
+     * На арифметику отчёта не влияет — только подставляется в форму перевода.
+     */
+    @Column(name = "budget_source", nullable = false)
+    @Builder.Default
+    private boolean budgetSource = false;
+
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { Coins, CreditCard, Minus, Pencil, Plus, Repeat, Trash2, TrendingUp, Wallet } from 'lucide-react'
+import { Coins, CreditCard, Minus, Pencil, PiggyBank, Plus, Repeat, Trash2, TrendingUp, Wallet } from 'lucide-react'
 import api from '@/api/axios'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -14,11 +14,14 @@ import { StatCard, StatGrid } from '@/components/ui-app/stat-card'
 import { formatAmount, formatDate } from '@/lib/format'
 import BullionModal from './BullionModal'
 import BullionTypeStamp from './BullionTypeStamp'
+import { useBudgetBullionId } from '@/components/hooks/useBudgetBullion'
 import BullionTransactionModal from './BullionTransactionModal'
 import CreditCardOperationModal from '../credit-cards/CreditCardOperationModal'
 import { notifyAmountChange } from './bullionAmount'
 
 function VaultBullionsPage() {
+    // Галочку «Трата бюджета» показываем только у бюджетного слитка
+    const budgetBullionId = useBudgetBullionId();
     const { vaultId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -281,7 +284,7 @@ function VaultBullionsPage() {
         }
     };
 
-    const handleRefill = async (amount, userComment, selectedVaultId, dateOperation) => {
+    const handleRefill = async (amount, userComment, selectedVaultId, dateOperation, budgetOperation) => {
         setActionLoading(true);
         try {
             await api.post('/bullions/refill', {
@@ -289,7 +292,8 @@ function VaultBullionsPage() {
                 vaultId: parseInt(vaultId),
                 amount: amount,
                 userComment: userComment,
-                dateOperation: dateOperation ? dateOperation : null
+                dateOperation: dateOperation ? dateOperation : null,
+                budgetOperation: budgetOperation
             });
             closeTransactionModal();
             await refreshData();
@@ -301,7 +305,7 @@ function VaultBullionsPage() {
         }
     };
 
-    const handleWithdraw = async (amount, userComment, selectedVaultId, dateOperation) => {
+    const handleWithdraw = async (amount, userComment, selectedVaultId, dateOperation, budgetOperation) => {
         setActionLoading(true);
         try {
             await api.post('/bullions/withdraw', {
@@ -309,7 +313,8 @@ function VaultBullionsPage() {
                 vaultId: parseInt(vaultId),
                 amount: amount,
                 userComment: userComment,
-                dateOperation: dateOperation ? dateOperation : null
+                dateOperation: dateOperation ? dateOperation : null,
+                budgetOperation: budgetOperation
             });
             closeTransactionModal();
             await refreshData();
@@ -343,14 +348,15 @@ function VaultBullionsPage() {
         }
     };
 
-    const handleTransfer = async (amount, toBullionId, comment, dateOperation) => {
+    const handleTransfer = async (amount, toBullionId, comment, dateOperation, budgetOperation) => {
         try {
             await api.post('/bullions/transfer', {
                 fromBullionId: transferModal.fromBullionId,
                 toBullionId: toBullionId,
                 amount: amount,
                 comment: comment,
-                dateOperation: dateOperation ? dateOperation : null
+                dateOperation: dateOperation ? dateOperation : null,
+                budgetOperation: budgetOperation
             });
             closeTransferModal();
             await refreshData();
@@ -657,6 +663,10 @@ function VaultBullionsPage() {
                     descriptionLabel={currentTransaction.descriptionLabel}
                     vaultSelectorLabel={currentTransaction.vaultSelectorLabel}
                     type={currentTransaction.type || null}
+                    showBudgetOperation={
+                        ['refill', 'withdraw'].includes(currentTransaction.type) &&
+                        transactionModal.bullion?.budget === true
+                    }
                     initialDateOperation={transactionModal.dateOperation}
                     availableAmount={transactionModal.bullion?.amount}
                 />
@@ -692,6 +702,11 @@ function VaultBullionsPage() {
                     fromBullions={getFromBullions()}
                     onSelectFromBullion={handleSelectFromBullion}
                     selectedFromBullionId={transferModal.fromBullionId}
+                    showBudgetOperation={
+                        budgetBullionId != null &&
+                        (transferModal.fromBullionId === budgetBullionId ||
+                            transferTargets.some((target) => target.id === budgetBullionId))
+                    }
                     initialDateOperation={transferModal.dateOperation}
                 />
             )}
@@ -726,6 +741,17 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
                         {formatAmount(bullion.amount)} ₽
                     </span>
                 </div>
+
+                {bullion.budget && (
+                    <Badge
+                        variant="outline"
+                        className="w-fit"
+                        title="По этому слитку считается отчёт «Бюджет на месяц»"
+                    >
+                        <PiggyBank />
+                        Бюджет
+                    </Badge>
+                )}
 
                 {bullion.creditCardId && (
                     <Badge
