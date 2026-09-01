@@ -178,6 +178,22 @@ class BudgetIntegrationTest extends IntegrationTestBase {
         assertAmount("0.00", day(1), "spent");
     }
 
+    @Test
+    @DisplayName("Умолчание корзины зависит от типа: наличные - трата, перевод - движение бюджета")
+    void defaultBucketDependsOnOperationType() throws Exception {
+        fundToPlan();
+        withdrawWithoutFlag(walletId, "10000.00", "2026-08-07T09:00:00");
+        transferWithoutFlag(incomeId, walletId, "33745.32", "2026-08-07T10:00:00");
+
+        JsonNode day = day(7);
+
+        // Перевод внутрь без галочки — финансирование, а не возмещение. С прежним
+        // умолчанием день показал бы «потрачено −23 745,32»
+        assertAmount("0.00", day, "compensated");
+        assertAmount("10000.00", day, "spent");
+        assertAmount("33745.32", day, "funding");
+    }
+
     // ------------------------------------------------------------------
     // Откат
     // ------------------------------------------------------------------
@@ -631,6 +647,37 @@ class BudgetIntegrationTest extends IntegrationTestBase {
                                 """.formatted(from, to, amount, date, budgetOperation)))
                 .andExpect(status().isOk());
         return lastTransactionId();
+    }
+
+    /** Запрос без поля budgetOperation — как от клиента, который про него не знает. */
+    private void withdrawWithoutFlag(Long bullionId, String amount, String date) throws Exception {
+        mockMvc.perform(post("/api/bullions/withdraw")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "bullionNameId": %d,
+                                    "vaultId": %d,
+                                    "amount": %s,
+                                    "dateOperation": "%s"
+                                }
+                                """.formatted(bullionNameOf(bullionId), vaultId, amount, date)))
+                .andExpect(status().isOk());
+    }
+
+    private void transferWithoutFlag(Long from, Long to, String amount, String date) throws Exception {
+        mockMvc.perform(post("/api/bullions/transfer")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "fromBullionId": %d,
+                                    "toBullionId": %d,
+                                    "amount": %s,
+                                    "dateOperation": "%s"
+                                }
+                                """.formatted(from, to, amount, date)))
+                .andExpect(status().isOk());
     }
 
     private Long lastTransactionId() {

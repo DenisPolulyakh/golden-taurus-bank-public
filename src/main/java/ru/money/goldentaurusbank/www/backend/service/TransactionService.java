@@ -104,11 +104,20 @@ public class TransactionService {
     }
 
     /**
-     * Корзина бюджета из формы: {@code null} от клиента, который про поле не знает,
-     * означает трату — то же умолчание, что у колонки в БД.
+     * Корзина бюджета из формы. {@code null} от клиента, который про поле не
+     * знает, разрешается умолчанием по типу операции:
+     * <ul>
+     *   <li><b>наличные</b> (снял / внёс сдачу) — трата: именно из них состоит
+     *       день, и забытая галочка выкинула бы его из отчёта молча;</li>
+     *   <li><b>перевод</b> — движение бюджета: перевод внутрь почти всегда
+     *       финансирование, а не возмещение. С обратным умолчанием забытая
+     *       галочка на финансировании уводит день в глубокий минус.</li>
+     * </ul>
+     * Редкое возмещение переводом отмечается галочкой руками — таких единицы
+     * в месяц, а финансирований столько же, но ошибка в них заметнее.
      */
-    private static boolean budgetOperationOrDefault(Boolean budgetOperation) {
-        return budgetOperation == null || budgetOperation;
+    private static boolean budgetOperationOrDefault(Boolean budgetOperation, boolean fallback) {
+        return budgetOperation == null ? fallback : budgetOperation;
     }
 
     /**
@@ -183,7 +192,7 @@ public class TransactionService {
         Bullion bullion = resolveBullion(user, request.getBullionNameId(), request.getVaultId());
         requireIncomeAllowed(bullion);
         deposit(bullion.getId(), request.getAmount(), user, request.getUserComment(), request.getDateOperation(), batchId,
-                budgetOperationOrDefault(request.getBudgetOperation()));
+                budgetOperationOrDefault(request.getBudgetOperation(), true));
         return bullion;
     }
 
@@ -192,7 +201,7 @@ public class TransactionService {
         Bullion bullion = resolveBullion(user, request.getBullionNameId(), request.getVaultId());
         requireExpenseAllowed(bullion);
         withdraw(bullion.getId(), request.getAmount(), user, request.getUserComment(), request.getDateOperation(), batchId,
-                budgetOperationOrDefault(request.getBudgetOperation()));
+                budgetOperationOrDefault(request.getBudgetOperation(), true));
         return bullion;
     }
 
@@ -207,7 +216,7 @@ public class TransactionService {
                 loadBullion(request.getToBullionId(), user));
         Transaction transaction = transfer(request.getFromBullionId(), request.getToBullionId(),
                 request.getAmount(), user, request.getComment(), request.getDateOperation(), null,
-                budgetOperationOrDefault(request.getBudgetOperation()));
+                budgetOperationOrDefault(request.getBudgetOperation(), false));
         return loadBullion(transaction.getSourceBullionId(), user);
     }
 

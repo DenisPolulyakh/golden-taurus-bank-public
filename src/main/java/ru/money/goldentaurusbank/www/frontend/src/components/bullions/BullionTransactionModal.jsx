@@ -57,8 +57,9 @@ function BullionTransactionModal({
     const [amountError, setAmountError] = useState('');
     const [isAmountValid, setIsAmountValid] = useState(true);
     const [dateOperation, setDateOperation] = useState(''); // 👈 ДОБАВИТЬ СОСТОЯНИЕ ДАТЫ
-    // Корзина месячного бюджета. По умолчанию трата: забытая галочка на трате
-    // выкинула бы день из отчёта молча, а лишняя даёт заметный выброс на графике
+    // Корзина месячного бюджета. У наличных умолчание «трата»: из них и состоит
+    // день. У перевода наоборот — перевод внутрь почти всегда финансирование,
+    // и галочка на нём уводила бы день в глубокий минус
     const [budgetOperation, setBudgetOperation] = useState(true);
 
     const isDeleteModal = type === 'delete';
@@ -167,7 +168,7 @@ function BullionTransactionModal({
 
     useEffect(() => {
         if (isOpen) {
-            setBudgetOperation(true);
+            setBudgetOperation(type !== 'transfer');
             if (initialAmount !== undefined && initialAmount !== '' && initialAmount !== null) {
                 const numAmount = typeof initialAmount === 'string' ? parseFloat(initialAmount) : initialAmount;
                 if (!isNaN(numAmount) && numAmount > 0) {
@@ -241,7 +242,7 @@ function BullionTransactionModal({
             setError('');
             setSaving(false);
         }
-    }, [isOpen, initialAmount, initialDescription, initialVaultId, initialDateOperation]);
+    }, [isOpen, initialAmount, initialDescription, initialVaultId, initialDateOperation, type]);
 
     useEffect(() => {
         if (selectedFromBullionId && fromBullionOptions.length > 0) {
@@ -735,8 +736,9 @@ function BullionTransactionModal({
                         Трата бюджета
                     </FieldLabel>
                     <FieldDescription>
-                        Снимите, если это пополнение бюджета или перенос остатка, а не трата.
-                        Тогда сумма попадёт в «профинансировано», а не в траты дня.
+                        {isTransferModal
+                            ? 'Поставьте, если этот перевод гасит трату — например, вернули деньги за покупку по чужой категории. Без галочки сумма считается пополнением бюджета или переносом остатка.'
+                            : 'Снимите, если это пополнение бюджета или перенос остатка, а не трата. Тогда сумма попадёт в «профинансировано», а не в траты дня.'}
                     </FieldDescription>
                 </Field>
             )}
