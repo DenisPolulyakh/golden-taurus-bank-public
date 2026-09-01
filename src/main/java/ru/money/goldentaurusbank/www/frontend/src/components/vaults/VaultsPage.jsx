@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Pencil, Plus, Trash2, Vault } from 'lucide-react'
+import { Eraser, Pencil, Plus, Trash2, Vault } from 'lucide-react'
 import api from '@/api/axios'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -184,6 +184,27 @@ function VaultsPage() {
         })
     }
 
+    const handleDeleteEmptyBullions = (vault) => {
+        confirm({
+            title: 'Удаление пустых слитков',
+            description:
+                `Удалить пустые слитки хранилища "${vault.name}"? Слитков с нулём: ` +
+                `${vault.emptyBullionsCount}. Слитки с остатком и само хранилище останутся.`,
+            onConfirm: async () => {
+                try {
+                    setError('')
+                    await api.delete(`/vaults/${vault.id}/empty-bullions`)
+                    // Оптимистично тут не выйдет: и счётчики, и видимость урны
+                    // пересчитывает бэкенд
+                    await fetchVaults(searchTerm, sortField, sortOrder, currentPage, pageSize, true)
+                } catch (err) {
+                    console.error('Ошибка удаления пустых слитков:', err)
+                    setError(err.response?.data?.message || 'Не удалось удалить пустые слитки')
+                }
+            },
+        })
+    }
+
     const handleVaultClick = (vaultId) => {
         navigate(`/vaults/${vaultId}`, { state: { from: 'vaults' } })
     }
@@ -204,7 +225,9 @@ function VaultsPage() {
     // но пустой удаляется: бэкенд заведёт его заново, когда понадобится
     const canEdit = (vault) => !isLiquidityReserve(vault)
     const canDelete = (vault) => !isLiquidityReserve(vault) || Number(vault.totalAmount) === 0
-    const hasAnyActions = vaults.some((v) => canEdit(v) || canDelete(v))
+    // Уборка доступна и резерву: ею его и опустошают перед удалением
+    const canCleanup = (vault) => Number(vault.emptyBullionsCount) > 0
+    const hasAnyActions = vaults.some((v) => canEdit(v) || canCleanup(v) || canDelete(v))
     const columnCount = hasAnyActions ? 7 : 6
 
     if (loading && vaults.length === 0) {
@@ -268,7 +291,7 @@ function VaultsPage() {
                                 />
                                 <TableHead className="w-full">Описание</TableHead>
                                 {hasAnyActions && (
-                                    <TableHead className="w-28 text-right">Действия</TableHead>
+                                    <TableHead className="w-32 text-right">Действия</TableHead>
                                 )}
                             </TableRow>
                         </TableHeader>
@@ -302,6 +325,7 @@ function VaultsPage() {
                             ) : (
                                 vaults.map((vault) => {
                                     const editable = canEdit(vault)
+                                    const cleanable = canCleanup(vault)
                                     const deletable = canDelete(vault)
 
                                     return (
@@ -373,6 +397,25 @@ function VaultsPage() {
                                                                 </Button>
                                                             </TooltipTrigger>
                                                             <TooltipContent>Редактировать</TooltipContent>
+                                                        </Tooltip>
+                                                    )}
+                                                    {cleanable && (
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon-sm"
+                                                                    onClick={() =>
+                                                                        handleDeleteEmptyBullions(vault)
+                                                                    }
+                                                                    aria-label="Удалить пустые слитки"
+                                                                >
+                                                                    <Eraser />
+                                                                </Button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                Удалить пустые слитки ({vault.emptyBullionsCount})
+                                                            </TooltipContent>
                                                         </Tooltip>
                                                     )}
                                                     {deletable && (
