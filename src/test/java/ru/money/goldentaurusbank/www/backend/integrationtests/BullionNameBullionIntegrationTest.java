@@ -15,6 +15,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
+import ru.money.goldentaurusbank.www.backend.model.domain.Bullion;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.GroupedBullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.VaultSummaryResponse;
@@ -648,31 +649,35 @@ class BullionNameBullionIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("Удаление слитка - успешно")
-    void deleteBullionSuccess() throws Exception {
-        String createRequest = """
-                {
-                    "bullionNameId": %d,
-                    "vaultId": %d,
-                    "amount": 100000,
-                    "dateOperation": "2026-07-20T12:00:00"
-                }
-                """.formatted(bullionNameId1, vaultId1);
-
-        MvcResult createResult = mockMvc.perform(post("/api/bullions")
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(createRequest))
-                .andReturn();
-
-        Long bullionId = objectMapper.readTree(createResult.getResponse().getContentAsString())
-                .get("data").get("id").asLong();
+    @DisplayName("Удаление пустого слитка - успешно")
+    void deleteEmptyBullionSuccess() throws Exception {
+        Long bullionId = createBullion(0);
 
         mockMvc.perform(delete("/api/bullions/{bullionId}", bullionId)
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.message").value("Слиток успешно удалён"));
+
+        assertThat(bullionRepository.findById(bullionId).orElseThrow().isArchived()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Удаление слитка с остатком - отказ, остаток на месте")
+    void deleteFundedBullionThrowsException() throws Exception {
+        Long bullionId = createBullion(100000);
+
+        mockMvc.perform(delete("/api/bullions/{bullionId}", bullionId)
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(4038))
+                .andExpect(jsonPath("$.message")
+                        .value("У слитка есть остаток: удалить можно только с переносом остатка"));
+
+        // Остаток отсюда не списывается: деньги ушли бы в никуда, минуя перенос
+        Bullion bullion = bullionRepository.findById(bullionId).orElseThrow();
+        assertThat(bullion.isArchived()).isFalse();
+        assertThat(bullion.getAmount()).isEqualByComparingTo("100000");
     }
 
     @Test
