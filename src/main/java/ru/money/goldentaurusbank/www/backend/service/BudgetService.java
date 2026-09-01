@@ -18,6 +18,7 @@ import ru.money.goldentaurusbank.www.backend.model.dto.statistic.BudgetBullionDt
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.BudgetDayDto;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.BudgetMonthDto;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.BudgetYearDto;
+import ru.money.goldentaurusbank.www.backend.model.dto.statistic.TransactionDto;
 import ru.money.goldentaurusbank.www.backend.repository.BudgetMonthRepository;
 import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
 import ru.money.goldentaurusbank.www.backend.repository.TransactionRepository;
@@ -179,6 +180,22 @@ public class BudgetService {
                 .bullionAmount(BigDecimal.ZERO)
                 .days(List.of())
                 .build();
+    }
+
+    /**
+     * Операции бюджетного слитка за один день — то, что раскрывается кликом по
+     * строке таблицы. Здесь видно хранилище, комментарий и контрагента, то есть
+     * всё, что в Excel приходилось вбивать руками в колонку «Источник».
+     */
+    @Transactional(readOnly = true)
+    public List<TransactionDto> getDayTransactions(int year, int month, int day, User user) {
+        Optional<Bullion> budget = bullionRepository.findByUserAndBudgetTrueAndArchivedFalse(user);
+        if (budget.isEmpty()) {
+            return List.of();
+        }
+        LocalDateTime from = LocalDate.of(year, month, day).atStartOfDay();
+        return transactionService.toDtos(transactionRepository.findBudgetTransactionsBetween(
+                user.getId(), budget.get().getId(), from, from.plusDays(1)));
     }
 
     // ------------------------------------------------------------------

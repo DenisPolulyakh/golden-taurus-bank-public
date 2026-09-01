@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -42,6 +43,7 @@ function BullionTransactionModal({
                                      selectedFromBullionId = null,
                                      initialDateOperation = null,
                                      availableAmount = null,
+                                     showBudgetOperation = false,
                                  }) {
     const [amount, setAmount] = useState('');
     const [amountDisplay, setAmountDisplay] = useState('');
@@ -55,6 +57,9 @@ function BullionTransactionModal({
     const [amountError, setAmountError] = useState('');
     const [isAmountValid, setIsAmountValid] = useState(true);
     const [dateOperation, setDateOperation] = useState(''); // 👈 ДОБАВИТЬ СОСТОЯНИЕ ДАТЫ
+    // Корзина месячного бюджета. По умолчанию трата: забытая галочка на трате
+    // выкинула бы день из отчёта молча, а лишняя даёт заметный выброс на графике
+    const [budgetOperation, setBudgetOperation] = useState(true);
 
     const isDeleteModal = type === 'delete';
     const isTransferModal = type === 'transfer';
@@ -162,6 +167,7 @@ function BullionTransactionModal({
 
     useEffect(() => {
         if (isOpen) {
+            setBudgetOperation(true);
             if (initialAmount !== undefined && initialAmount !== '' && initialAmount !== null) {
                 const numAmount = typeof initialAmount === 'string' ? parseFloat(initialAmount) : initialAmount;
                 if (!isNaN(numAmount) && numAmount > 0) {
@@ -400,7 +406,8 @@ function BullionTransactionModal({
                     amountNum,
                     selectedTargetOption.value,
                     description.trim() || null,
-                    dateOperation // 👈 ПЕРЕДАЕМ ДАТУ ОПЕРАЦИИ
+                    dateOperation, // 👈 ПЕРЕДАЕМ ДАТУ ОПЕРАЦИИ
+                    budgetOperation
                 );
                 onClose();
             } catch (err) {
@@ -452,7 +459,8 @@ function BullionTransactionModal({
                     dateOperation ? dateOperation : null
                 );
             } else if (showAmount) {
-                await onSave(amountNum, description.trim() || null, selectedVaultId, dateOperation ? dateOperation : null);
+                await onSave(amountNum, description.trim() || null, selectedVaultId,
+                    dateOperation ? dateOperation : null, budgetOperation);
             } else {
                 await onSave(selectedVaultId, description.trim() || null, dateOperation ? dateOperation : null);
             }
@@ -712,6 +720,24 @@ function BullionTransactionModal({
                         rows={3}
                     />
                     <FieldDescription>Необязательное поле</FieldDescription>
+                </Field>
+            )}
+
+            {/* Галочка появляется только у операций по бюджетному слитку —
+                в остальных формах она бы только мозолила глаза */}
+            {showBudgetOperation && (
+                <Field>
+                    <FieldLabel className="flex items-center gap-2 font-normal">
+                        <Checkbox
+                            checked={budgetOperation}
+                            onCheckedChange={(checked) => setBudgetOperation(checked === true)}
+                        />
+                        Трата бюджета
+                    </FieldLabel>
+                    <FieldDescription>
+                        Снимите, если это пополнение бюджета или перенос остатка, а не трата.
+                        Тогда сумма попадёт в «профинансировано», а не в траты дня.
+                    </FieldDescription>
                 </Field>
             )}
 

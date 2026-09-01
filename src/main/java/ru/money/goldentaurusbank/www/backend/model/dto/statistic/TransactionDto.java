@@ -28,6 +28,11 @@ public class TransactionDto {
     private LocalDateTime createdAt;
     private LocalDateTime dateOperation;
     private boolean imported;
+    /**
+     * Корзина операции в месячном бюджете: true — трата дня, false — движение
+     * самого бюджета. Осмысленно только у операций по бюджетному слитку.
+     */
+    private boolean budgetOperation;
     private boolean canRollback;
     /** Заполнено у записи, которая сама является откатом другой операции. */
     private Long reversalOfId;

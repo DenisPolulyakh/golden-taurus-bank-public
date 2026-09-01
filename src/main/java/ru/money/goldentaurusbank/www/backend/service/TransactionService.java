@@ -651,7 +651,8 @@ public class TransactionService {
     // Преобразование в DTO
     // ------------------------------------------------------------------
 
-    private List<TransactionDto> toDtos(List<Transaction> transactions) {
+    /** Публичный: тем же преобразованием пользуется отчёт о бюджете. */
+    public List<TransactionDto> toDtos(List<Transaction> transactions) {
         if (transactions.isEmpty()) {
             return List.of();
         }
@@ -683,6 +684,7 @@ public class TransactionService {
                 .createdAt(transaction.getCreatedAt())
                 .dateOperation(transaction.getDateOperation())
                 .imported(transaction.isImported())
+                .budgetOperation(transaction.isBudgetOperation())
                 .canRollback(reversedById == null && !lockedByCard)
                 .lockedByCard(lockedByCard)
                 .reversalOfId(transaction.getReversalOfId())

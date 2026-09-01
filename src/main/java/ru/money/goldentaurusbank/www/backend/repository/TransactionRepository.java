@@ -207,6 +207,22 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("before") LocalDateTime before
     );
 
+    /** Операции бюджетного слитка за один день — раскрытая строка таблицы отчёта. */
+    @Query(value = """
+        SELECT * FROM taurus.transactions
+        WHERE user_id = :userId
+            AND (source_bullion_id = :bullionId OR target_bullion_id = :bullionId)
+            AND date_operation >= :from
+            AND date_operation < :to
+        ORDER BY date_operation ASC, id ASC
+        """, nativeQuery = true)
+    List<Transaction> findBudgetTransactionsBetween(
+            @Param("userId") Long userId,
+            @Param("bullionId") Long bullionId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
     /** То же самое, но свёрнутое по месяцам года — для годовой вкладки отчёта. */
     @Query(value = """
         SELECT

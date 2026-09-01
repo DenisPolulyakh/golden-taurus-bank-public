@@ -14,11 +14,14 @@ import { StatCard, StatGrid } from '@/components/ui-app/stat-card'
 import { formatAmount } from '@/lib/format'
 import BullionModal from './BullionModal'
 import BullionTypeStamp from './BullionTypeStamp'
+import { useBudgetBullionId } from '@/components/hooks/useBudgetBullion'
 import BullionTransactionModal from './BullionTransactionModal'
 import CreditCardOperationModal from '../credit-cards/CreditCardOperationModal'
 import { notifyAmountChange } from './bullionAmount'
 
 function BullionsPage() {
+    // Галочку «Трата бюджета» показываем только у бюджетного слитка
+    const budgetBullionId = useBudgetBullionId();
     const [groupedData, setGroupedData] = useState(null);
     const [bullionNameBullions, setBullionNameBullions] = useState([]);
     const [allVaults, setAllVaults] = useState([]);
@@ -233,14 +236,15 @@ function BullionsPage() {
         });
     };
 
-    const handleRefill = async (amount, description, vaultId, dateOperation) => {
+    const handleRefill = async (amount, description, vaultId, dateOperation, budgetOperation) => {
         try {
             await api.post('/bullions/refill', {
                 bullionNameId: transactionModal.bullionNameId,
                 vaultId: vaultId,
                 amount: amount,
                 description: description,
-                dateOperation: dateOperation
+                dateOperation: dateOperation,
+                budgetOperation: budgetOperation
             });
             await fetchGroupedBullions();
         } catch (err) {
@@ -249,14 +253,15 @@ function BullionsPage() {
         }
     };
 
-    const handleWithdraw = async (amount, description, vaultId, dateOperation) => {
+    const handleWithdraw = async (amount, description, vaultId, dateOperation, budgetOperation) => {
         try {
             await api.post('/bullions/withdraw', {
                 bullionNameId: transactionModal.bullionNameId,
                 vaultId: vaultId,
                 amount: amount,
                 description: description,
-                dateOperation: dateOperation
+                dateOperation: dateOperation,
+                budgetOperation: budgetOperation
             });
             await fetchGroupedBullions();
         } catch (err) {
@@ -434,14 +439,15 @@ function BullionsPage() {
         });
     };
 
-    const handleTransfer = async (amount, toBullionId, comment, dateOperation) => {
+    const handleTransfer = async (amount, toBullionId, comment, dateOperation, budgetOperation) => {
         try {
             await api.post('/bullions/transfer', {
                 fromBullionId: transferModal.fromBullionId,
                 toBullionId: toBullionId,
                 amount: amount,
                 comment: comment,
-                dateOperation: dateOperation
+                dateOperation: dateOperation,
+                budgetOperation: budgetOperation
             });
             await fetchGroupedBullions();
         } catch (err) {
@@ -802,6 +808,12 @@ function BullionsPage() {
                     descriptionLabel={currentTransaction.descriptionLabel}
                     vaultSelectorLabel={currentTransaction.vaultSelectorLabel}
                     type={currentTransaction.type || null}
+                    showBudgetOperation={
+                        budgetBullionId != null &&
+                        ['refill', 'withdraw'].includes(transactionModal.type) &&
+                        getVaultsForBullionName(transactionModal.bullionNameId)
+                            .some((vault) => vault.bullionId === budgetBullionId)
+                    }
                     maxTransferAmount={currentTransaction.type === 'transfer' ? 0 : 0} // не используется для refill/withdraw/delete
                     transferTargets={currentTransaction.type === 'transfer' ? getTransferTargets() : []}
                     fromBullionId={currentTransaction.type === 'transfer' ? null : null}
@@ -843,6 +855,11 @@ function BullionsPage() {
                         }));
                     }}
                     selectedFromBullionId={transferModal.fromBullionId}
+                    showBudgetOperation={
+                        budgetBullionId != null &&
+                        (transferModal.fromBullionId === budgetBullionId ||
+                            getTransferTargets().some((target) => target.id === budgetBullionId))
+                    }
                     initialDateOperation={null} // Для transfer модалки будем устанавливать дату внутри (сегодня)
                 />
             )}

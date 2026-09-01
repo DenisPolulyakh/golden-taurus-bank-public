@@ -16,10 +16,11 @@ import ru.money.goldentaurusbank.www.backend.model.dto.request.BudgetPlanRequest
 import ru.money.goldentaurusbank.www.backend.model.dto.request.BudgetSettingsRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.BudgetMonthDto;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.BudgetYearDto;
+import ru.money.goldentaurusbank.www.backend.model.dto.statistic.TransactionDto;
 import ru.money.goldentaurusbank.www.backend.repository.UserRepository;
 import ru.money.goldentaurusbank.www.backend.service.BudgetService;
 
-import java.time.LocalDate;
+import java.util.List;
 
 import static ru.money.goldentaurusbank.www.backend.model.dto.enums.ResponseCodes.USER_NOT_FOUND;
 
@@ -71,6 +72,18 @@ public class BudgetController {
 
         User user = getUserFromUserDetails(userDetails);
         return ResponseEntity.ok(budgetService.getMonth(year, month, user));
+    }
+
+    /** Операции одного дня — раскрытая строка таблицы. */
+    @GetMapping("/{year}/{month}/days/{day}/transactions")
+    public ResponseEntity<List<TransactionDto>> getDayTransactions(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable int year,
+            @PathVariable int month,
+            @PathVariable int day) {
+
+        User user = getUserFromUserDetails(userDetails);
+        return ResponseEntity.ok(budgetService.getDayTransactions(year, month, day, user));
     }
 
     @PutMapping("/{year}/{month}/plan")
