@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { TriangleAlert } from 'lucide-react'
 import api from '@/api/axios'
+import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import {
@@ -68,6 +69,16 @@ function BullionModal({
     // Создание слитка галочки не трогают: это регистрация уже накопленного,
     // а не операция. Гасим поле только при правке существующего.
     const amountLocked = isEditing && !allowedChangeAmount;
+
+    // Пустой слиток — нормальный случай: место под наименование в хранилище,
+    // деньги придут потом переводом. Операции у такого создания нет, поэтому
+    // ниже прячется и дата: писать её было бы некуда.
+    const isEmptyCreate = !isEditing && (amountIsEmpty || enteredCents() === 0);
+
+    const applyEmptyAmount = () => {
+        setAmount('0');
+        setAmountDisplay('0');
+    };
 
     // Направление правки: вверх упирается в «Можно вносить», вниз - в «Можно снимать»
     const directionError = () => {
@@ -143,8 +154,8 @@ function BullionModal({
 
             if (initialAmount !== undefined && initialAmount !== '' && initialAmount !== null) {
                 const numAmount = typeof initialAmount === 'string' ? parseFloat(initialAmount) : initialAmount;
-                // Ноль подставляем как «0», а не пустотой: пустое поле не проходит
-                // required, и слиток с нулевым остатком было не сохранить
+                // Ноль подставляем как «0», а не пустотой: у правки пустое поле
+                // означало бы «сумму не трогаем», а тут остаток именно нулевой
                 if (!isNaN(numAmount) && numAmount >= 0) {
                     const formatted = numAmount.toLocaleString('ru-RU', {
                         minimumFractionDigits: 0,
@@ -277,7 +288,7 @@ function BullionModal({
                 isEditing ? parseInt(initialVaultId) : parseInt(vaultId),
                 amountNum,
                 description.trim() || null,
-                dateOperation ? dateOperation : null,
+                isEmptyCreate ? null : (dateOperation || null),
                 // Без дельты операции не будет, комментарию некуда попасть
                 deltaCents !== 0 ? (userComment.trim() || null) : null,
                 bullionType
@@ -376,7 +387,9 @@ function BullionModal({
             </Field>
 
             <Field>
-                <FieldLabel htmlFor="bullion-amount">Сумма * (₽)</FieldLabel>
+                <FieldLabel htmlFor="bullion-amount">
+                    {isEditing ? 'Сумма * (₽)' : 'Сумма (₽)'}
+                </FieldLabel>
                 <Input
                     id="bullion-amount"
                     type="text"
@@ -385,10 +398,21 @@ function BullionModal({
                     onBlur={handleAmountBlur}
                     onFocus={handleAmountFocus}
                     placeholder="0.00"
-                    required
                     inputMode="decimal"
                     disabled={amountLocked}
                 />
+                {!isEditing && (
+                    <div className="flex flex-wrap gap-1.5">
+                        <Button
+                            type="button"
+                            variant={isEmptyCreate ? 'secondary' : 'outline'}
+                            size="xs"
+                            onClick={applyEmptyAmount}
+                        >
+                            Пустой слиток
+                        </Button>
+                    </div>
+                )}
                 {amountLocked && (
                     <FieldDescription className="flex items-center gap-1.5 text-destructive">
                         <TriangleAlert className="size-3.5 shrink-0" />
@@ -396,7 +420,11 @@ function BullionModal({
                     </FieldDescription>
                 )}
                 {!amountLocked && !isEditing && (
-                    <FieldDescription>Используйте точку или запятую для копеек</FieldDescription>
+                    <FieldDescription>
+                        {isEmptyCreate
+                            ? 'Слиток заведётся пустым — операции в истории не будет'
+                            : 'Используйте точку или запятую для копеек'}
+                    </FieldDescription>
                 )}
                 {!amountLocked && isEditing && directionError() && (
                     <FieldDescription className="flex items-center gap-1.5 text-destructive">
@@ -436,17 +464,19 @@ function BullionModal({
                 </Field>
             )}
 
-            <Field>
-                <FieldLabel htmlFor="bullion-date">Дата и время операции *</FieldLabel>
-                <Input
-                    id="bullion-date"
-                    type="datetime-local"
-                    value={dateOperation}
-                    onChange={(e) => setDateOperation(e.target.value)}
-                    max={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}T${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`}
-                    required
-                />
-            </Field>
+            {!isEmptyCreate && (
+                <Field>
+                    <FieldLabel htmlFor="bullion-date">Дата и время операции *</FieldLabel>
+                    <Input
+                        id="bullion-date"
+                        type="datetime-local"
+                        value={dateOperation}
+                        onChange={(e) => setDateOperation(e.target.value)}
+                        max={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}T${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`}
+                        required
+                    />
+                </Field>
+            )}
 
             <Field>
                 <FieldLabel htmlFor="bullion-description">Описание</FieldLabel>

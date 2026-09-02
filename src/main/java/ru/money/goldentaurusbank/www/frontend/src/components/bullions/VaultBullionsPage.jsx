@@ -115,6 +115,8 @@ function VaultBullionsPage() {
             if (bullion.id !== fromBullionId && isAllowed) {
                 targets.push({
                     id: bullion.id,
+                    vaultId: bullion.vault?.id,
+                    bullionNameId: bullion.bullionName?.id,
                     bullionNameTitle: bullion.bullionName?.title || 'Без наименования',
                     vaultName: bullion.vault?.name || 'Без хранилища',
                     amount: bullion.amount || 0,
@@ -129,12 +131,14 @@ function VaultBullionsPage() {
         if (!vaultSummary?.bullions) return [];
         return vaultSummary.bullions.map(bullion => ({
             id: bullion.id,
+            vaultId: parseInt(vaultId),
+            bullionNameId: bullion.bullionNameId,
             bullionNameTitle: bullion.bullionNameTitle,
             vaultName: vault?.name || 'Текущее хранилище',
             amount: bullion.amount || 0,
             allowedTransferOut: vault?.allowedTransferOut
         }));
-    }, [vaultSummary, vault]);
+    }, [vaultSummary, vault, vaultId]);
 
     const filteredAndSortedBullions = useMemo(() => {
         if (!vaultSummary?.bullions) return [];
@@ -354,11 +358,14 @@ function VaultBullionsPage() {
         }
     };
 
-    const handleTransfer = async (amount, toBullionId, comment, dateOperation, budgetOperation) => {
+    // Получатель адресуется слитком, а если слитка в хранилище ещё нет - самим
+    // хранилищем: бэк заведёт там пустой слиток и переведёт в него сумму
+    const handleTransfer = async (amount, toBullionId, comment, dateOperation, budgetOperation, toVaultId = null) => {
         try {
             await api.post('/bullions/transfer', {
                 fromBullionId: transferModal.fromBullionId,
                 toBullionId: toBullionId,
+                toVaultId: toVaultId,
                 amount: amount,
                 comment: comment,
                 dateOperation: dateOperation ? dateOperation : null,
@@ -716,6 +723,7 @@ function VaultBullionsPage() {
                     type="transfer"
                     maxTransferAmount={transferModal.fromAmount}
                     transferTargets={transferTargets}
+                    vaultsForNewBullion={allVaults}
                     fromBullionId={transferModal.fromBullionId}
                     showAmount={true}
                     showDescription={true}

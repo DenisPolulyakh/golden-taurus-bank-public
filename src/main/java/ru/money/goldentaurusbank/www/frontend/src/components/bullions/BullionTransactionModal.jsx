@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { TriangleAlert } from 'lucide-react'
+import { Plus, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
@@ -14,6 +14,11 @@ import { formatAmount } from '@/lib/format'
 
 // Кнопки быстрого ввода: прибавляются к текущей сумме
 const QUICK_AMOUNTS = [100, 500, 1000, 2000, 3000, 5000, 10000];
+
+// Разделы списка получателей: существующие слитки и хранилища, где слитка
+// выбранного наименования ещё нет — там он заведётся сам
+const EXISTING_TARGETS_GROUP = 'Существующие слитки';
+const NEW_TARGETS_GROUP = 'Слитка нет, создадим';
 
 function BullionTransactionModal({
                                      isOpen,
@@ -46,6 +51,9 @@ function BullionTransactionModal({
                                      showBudgetOperation = false,
                                      showDateOperation = true,
                                      notice = null,
+                                     // Живые хранилища с галочками — из них берутся
+                                     // получатели, у которых слитка ещё нет
+                                     vaultsForNewBullion = [],
                                  }) {
     const [amount, setAmount] = useState('');
     const [amountDisplay, setAmountDisplay] = useState('');
@@ -67,14 +75,44 @@ function BullionTransactionModal({
     const isDeleteModal = type === 'delete';
     const isTransferModal = type === 'transfer';
 
+    // Куда ещё можно перевести: хранилища, где слитка отправителя нет. Наименование
+    // берём у отправителя - оно и создастся, поэтому список пересчитывается при
+    // смене слитка-отправителя (в хранилище их несколько, у каждого своё имя).
+    const fromData = selectedFromOption?.data;
+    const newTargetOptions = (!fromData?.bullionNameId || fromData.vaultId == null) ? [] : vaultsForNewBullion
+        .filter(vault => vault.allowedTransferIn !== false
+            && vault.id !== fromData.vaultId
+            && !transferTargets.some(target => target.vaultId === vault.id
+                && target.bullionNameId === fromData.bullionNameId))
+        .map(vault => ({
+            value: `new:${vault.id}`,
+            label: `${fromData.bullionNameTitle} | ${vault.name} | создать`,
+            group: NEW_TARGETS_GROUP,
+            data: {
+                isNew: true,
+                vaultId: vault.id,
+                vaultName: vault.name,
+                bullionNameId: fromData.bullionNameId,
+                bullionNameTitle: fromData.bullionNameTitle,
+                amount: 0
+            }
+        }));
+
+    // Заголовки разделов появляются только вместе со вторым разделом: пока
+    // создавать нечего, список выглядит как раньше
+    const useTargetGroups = newTargetOptions.length > 0;
+
     // Получатель должен разрешать и перевод, и внесение - это один флаг с бэка
-    const transferTargetOptions = transferTargets
+    const existingTargetOptions = transferTargets
         .filter(target => target.allowedTransferIn !== false)
         .map(target => ({
             value: target.id,
             label: `${target.bullionNameTitle} | ${target.vaultName} | ${formatAmount(target.amount)} ₽`,
+            group: useTargetGroups ? EXISTING_TARGETS_GROUP : undefined,
             data: target
         }));
+
+    const transferTargetOptions = [...existingTargetOptions, ...newTargetOptions];
 
     // Отправитель - и перевод, и снятие: если снимать нельзя, то и переводить нельзя
     const fromBullionOptions = fromBullions
@@ -159,6 +197,11 @@ function BullionTransactionModal({
         setSelectedFromOption(option);
         if (onSelectFromBullion && option) {
             onSelectFromBullion(option.value, option.data.amount);
+        }
+        // Получатель «создадим» привязан к наименованию отправителя: сменили
+        // отправителя - прежний выбор больше не про то наименование
+        if (selectedTargetOption?.data?.isNew) {
+            setSelectedTargetOption(null);
         }
         if (option && selectedTargetOption && option.value === selectedTargetOption.value) {
             setError('Нельзя перевести в тот же слиток');
@@ -404,13 +447,18 @@ function BullionTransactionModal({
             setSaving(true);
             setError('');
 
+            const targetIsNew = selectedTargetOption.data?.isNew === true;
+
             try {
                 await onSave(
                     amountNum,
-                    selectedTargetOption.value,
+                    targetIsNew ? null : selectedTargetOption.value,
                     description.trim() || null,
                     dateOperation, // 👈 ПЕРЕДАЕМ ДАТУ ОПЕРАЦИИ
-                    budgetOperation
+                    budgetOperation,
+                    // Слитка в хранилище нет: перевод адресуется хранилищу,
+                    // слиток заведёт бэк в той же транзакции
+                    targetIsNew ? selectedTargetOption.data.vaultId : null
                 );
                 onClose();
             } catch (err) {
@@ -478,13 +526,20 @@ function BullionTransactionModal({
     // Строка списка у слитков одна и та же: наименование, хранилище, сумма
     const renderBullionOption = (option) => (
         <span className="flex items-center justify-between gap-3">
-            <span className="truncate">{option.data?.bullionNameTitle}</span>
+            <span className="flex min-w-0 items-center gap-1.5 truncate">
+                {option.data?.isNew && <Plus className="size-3.5 shrink-0 text-muted-foreground" />}
+                {option.data?.bullionNameTitle}
+            </span>
             <span className="truncate text-xs text-muted-foreground">
                 {option.data?.vaultName}
             </span>
-            <span className="font-medium tabular-nums">
-                {formatAmount(option.data?.amount)} ₽
-            </span>
+            {option.data?.isNew ? (
+                <span className="text-xs text-muted-foreground">создать</span>
+            ) : (
+                <span className="font-medium tabular-nums">
+                    {formatAmount(option.data?.amount)} ₽
+                </span>
+            )}
         </span>
     )
 
@@ -495,7 +550,11 @@ function BullionTransactionModal({
             title={title}
             onSubmit={handleSubmit}
             saving={saving}
-            submitText={buttonText}
+            submitText={
+                isTransferModal && selectedTargetOption?.data?.isNew
+                    ? 'Перевести и создать слиток'
+                    : buttonText
+            }
             savingText="Обработка..."
             submitVariant={isDeleteModal ? 'destructive' : 'default'}
             submitDisabled={isSubmitDisabled()}
@@ -586,14 +645,23 @@ function BullionTransactionModal({
                             renderOption={renderBullionOption}
                         />
                         <FieldDescription>
-                            Выберите слиток, на который будут переведены средства
+                            {selectedTargetOption?.data?.isNew
+                                ? `В хранилище «${selectedTargetOption.data.vaultName}» слитка «${selectedTargetOption.data.bullionNameTitle}» нет — он будет создан пустым, и деньги придут в него переводом`
+                                : 'Выберите слиток, на который будут переведены средства'}
                         </FieldDescription>
                     </Field>
 
                     {selectedTargetOption && selectedFromOption &&
                         selectedTargetOption.value !== selectedFromOption.value && (
                         <div className="flex flex-col gap-1.5 rounded-md border bg-muted/50 px-3 py-2 text-sm">
-                            <div className="font-medium">Выбран получатель</div>
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium">Выбран получатель</span>
+                                {selectedTargetOption.data?.isNew && (
+                                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                                        Новый слиток
+                                    </span>
+                                )}
+                            </div>
                             <div className="flex justify-between gap-2">
                                 <span className="text-muted-foreground">Наименование</span>
                                 <span>{selectedTargetOption.data?.bullionNameTitle}</span>

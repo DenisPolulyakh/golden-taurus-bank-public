@@ -76,6 +76,7 @@ public class BullionService {
 
     @Transactional
     public BullionResponse transferAmountBullion(User user, TransferRequest request) {
+        resolveTransferTarget(user, request);
         Bullion withdrawBullion = transactionService.transferAmount(request, user);
         log.info("Сумма перенесена из слитка {} в слиток {}", request.getFromBullionId(), request.getToBullionId());
         return bullionMapper.toResponse(withdrawBullion);
@@ -133,6 +134,44 @@ public class BullionService {
 
         return bullionMapper.toResponse(bullion);
     }
+
+
+    /**
+     * Получателя адресуют слитком либо хранилищем. Во втором случае слитка там
+     * ещё нет: заводим пустой слиток того же наименования и типа, что у
+     * отправителя, и дальше перевод идёт обычным путём — вместе с проверкой
+     * галочек в transferAmount. Всё в одной транзакции: запрещённый перевод
+     * откатит и создание слитка.
+     */
+    private void resolveTransferTarget(User user, TransferRequest request) {
+        boolean byBullion = request.getToBullionId() != null;
+        boolean byVault = request.getToVaultId() != null;
+        if (byBullion == byVault) {
+            throw new ApplicationException(
+                    TRANSFER_TARGET_NOT_SET.getCode(),
+                    TRANSFER_TARGET_NOT_SET.getMessage()
+            );
+        }
+        if (byBullion) {
+            return;
+        }
+        Bullion fromBullion = bullionRepository.findByIdAndUser(request.getFromBullionId(), user)
+                .orElseThrow(() -> new ApplicationException(
+                        BULLION_NOT_FOUND.getCode(),
+                        BULLION_NOT_FOUND.getMessage()
+                ));
+
+        BullionRequest createRequest = new BullionRequest();
+        createRequest.setBullionNameId(fromBullion.getBullionName().getId());
+        createRequest.setVaultId(request.getToVaultId());
+        createRequest.setAmount(BigDecimal.ZERO);
+        createRequest.setBullionType(fromBullion.getBullionType());
+
+        // createBullion вернёт существующий слиток, если фронт показывал устаревший
+        // список, и оживит архивный: пара «наименование + хранилище» уникальна
+        request.setToBullionId(createBullion(user, createRequest).getId());
+    }
+
 
     @Transactional(readOnly = true)
     public List<BullionResponse> getAllBullions(User user) {
