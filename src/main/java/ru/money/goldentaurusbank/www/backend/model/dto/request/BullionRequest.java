@@ -33,4 +33,6 @@ public class BullionRequest {
 
     @Size(max = 500, message = "Комментарий не должен превышать 500 символов")
     private String userComment;
+
+
 }

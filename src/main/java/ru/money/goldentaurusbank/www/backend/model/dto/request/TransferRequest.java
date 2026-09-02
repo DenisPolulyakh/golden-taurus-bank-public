@@ -14,9 +14,16 @@ public class TransferRequest {
     @NotNull(message = "ID слитка-отправителя обязателен")
     private Long fromBullionId;
     
-    @NotNull(message = "ID слитка-получателя обязателен")
     private Long toBullionId;
-    
+
+    /**
+     * Хранилище-получатель на случай, когда слитка нужного наименования в нём
+     * ещё нет: сервис заведёт там пустой слиток и переведёт сумму в него.
+     * Ровно одно из двух — либо {@code toBullionId}, либо это поле.
+     */
+    private Long toVaultId;
+
+
     @NotNull(message = "Сумма перевода обязательна")
     @Positive(message = "Сумма должна быть больше 0")
     private BigDecimal amount;
