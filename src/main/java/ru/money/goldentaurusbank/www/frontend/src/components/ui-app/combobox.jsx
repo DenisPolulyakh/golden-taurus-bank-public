@@ -15,9 +15,11 @@ import { cn } from '@/lib/utils'
 /**
  * Выпадающий список с поиском — замена react-select.
  *
- * options: [{ value, label, keywords?, data? }]
+ * options: [{ value, label, keywords?, data?, group? }]
  * renderOption(option) — как рисовать строку списка (у переводов это три
  * колонки: наименование, хранилище, сумма).
+ * group — заголовок раздела. Если его нет ни у одной опции, список плоский,
+ * как был; иначе опции идут разделами в порядке первого появления.
  */
 export function Combobox({
     options = [],
@@ -35,6 +37,38 @@ export function Combobox({
 }) {
     const [open, setOpen] = useState(false)
     const selected = options.find((option) => String(option.value) === String(value)) || null
+
+    const groups = []
+    options.forEach((option) => {
+        const heading = option.group || ''
+        let group = groups.find((candidate) => candidate.heading === heading)
+        if (!group) {
+            group = { heading, items: [] }
+            groups.push(group)
+        }
+        group.items.push(option)
+    })
+
+    const renderItem = (option) => (
+        <CommandItem
+            key={option.value}
+            value={`${option.label} ${option.keywords || ''}`}
+            onSelect={() => {
+                onChange(option.value, option)
+                setOpen(false)
+            }}
+        >
+            <Check
+                className={cn(
+                    'size-4',
+                    String(option.value) === String(value) ? 'opacity-100' : 'opacity-0'
+                )}
+            />
+            <span className="min-w-0 flex-1">
+                {renderOption ? renderOption(option) : option.label}
+            </span>
+        </CommandItem>
+    )
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -86,30 +120,11 @@ export function Combobox({
                     <CommandInput placeholder={searchPlaceholder} />
                     <CommandList>
                         <CommandEmpty>{emptyText}</CommandEmpty>
-                        <CommandGroup>
-                            {options.map((option) => (
-                                <CommandItem
-                                    key={option.value}
-                                    value={`${option.label} ${option.keywords || ''}`}
-                                    onSelect={() => {
-                                        onChange(option.value, option)
-                                        setOpen(false)
-                                    }}
-                                >
-                                    <Check
-                                        className={cn(
-                                            'size-4',
-                                            String(option.value) === String(value)
-                                                ? 'opacity-100'
-                                                : 'opacity-0'
-                                        )}
-                                    />
-                                    <span className="min-w-0 flex-1">
-                                        {renderOption ? renderOption(option) : option.label}
-                                    </span>
-                                </CommandItem>
-                            ))}
-                        </CommandGroup>
+                        {groups.map((group) => (
+                            <CommandGroup key={group.heading} heading={group.heading || undefined}>
+                                {group.items.map(renderItem)}
+                            </CommandGroup>
+                        ))}
                     </CommandList>
                 </Command>
             </PopoverContent>

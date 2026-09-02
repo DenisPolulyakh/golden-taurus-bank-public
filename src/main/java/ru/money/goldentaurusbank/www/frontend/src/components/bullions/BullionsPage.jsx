@@ -460,11 +460,14 @@ function BullionsPage() {
         });
     };
 
-    const handleTransfer = async (amount, toBullionId, comment, dateOperation, budgetOperation) => {
+    // Получатель адресуется слитком, а если слитка в хранилище ещё нет - самим
+    // хранилищем: бэк заведёт там пустой слиток и переведёт в него сумму
+    const handleTransfer = async (amount, toBullionId, comment, dateOperation, budgetOperation, toVaultId = null) => {
         try {
             await api.post('/bullions/transfer', {
                 fromBullionId: transferModal.fromBullionId,
                 toBullionId: toBullionId,
+                toVaultId: toVaultId,
                 amount: amount,
                 comment: comment,
                 dateOperation: dateOperation,
@@ -487,6 +490,8 @@ function BullionsPage() {
                 if (vault.bullionId !== transferModal.fromBullionId && vault.allowedTransferIn !== false) {
                     targets.push({
                         id: vault.bullionId,
+                        vaultId: vault.id,
+                        bullionNameId: bullionName.bullionNameId,
                         bullionNameTitle: bullionName.bullionNameTitle,
                         vaultName: vault.name,
                         amount: vault.amount,
@@ -509,6 +514,8 @@ function BullionsPage() {
                     if (vault.allowedTransferOut !== false) {
                         targets.push({
                             id: vault.bullionId,
+                            vaultId: vault.id,
+                            bullionNameId: bullionName.bullionNameId,
                             bullionNameTitle: bullionName.bullionNameTitle,
                             vaultName: vault.name,
                             amount: vault.amount,
@@ -865,6 +872,7 @@ function BullionsPage() {
                     type="transfer"
                     maxTransferAmount={transferModal.fromAmount}
                     transferTargets={getTransferTargets()}
+                    vaultsForNewBullion={allVaults}
                     fromBullionId={transferModal.fromBullionId}
                     showAmount={true}
                     showDescription={true}
