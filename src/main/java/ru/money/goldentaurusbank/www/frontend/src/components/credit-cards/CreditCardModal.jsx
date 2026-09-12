@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
+import { KeyRound } from 'lucide-react'
 import api from '@/api/axios'
+import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -7,6 +9,9 @@ import { Label } from '@/components/ui/label'
 import { DatePicker } from '@/components/ui-app/date-picker'
 import { FormDialog } from '@/components/ui-app/form-dialog'
 import { formatAmount } from '@/lib/format'
+import { useCardVault } from './CardVaultProvider'
+
+const EMPTY_REQUISITES = { pan: '', account: '', bic: '', receiver: '', note: '' }
 
 /**
  * Заведение и правка карты. Полный номер нигде не хранится и не спрашивается —
@@ -23,7 +28,10 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
     const [debt, setDebt] = useState('')
     const [bullionIds, setBullionIds] = useState([])
     const [availableBullions, setAvailableBullions] = useState([])
+    const [requisites, setRequisites] = useState(EMPTY_REQUISITES)
     const [saving, setSaving] = useState(false)
+
+    const vault = useCardVault()
 
     useEffect(() => {
         if (!isOpen) return
@@ -34,12 +42,34 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
         setLimit(card?.limit ?? '')
         setDebt(card?.debt ?? '')
         setBullionIds((card?.accumulators || []).map((item) => item.bullionId))
+        const saved = card && vault.isOpen ? vault.cardById(card.id) : null
+        setRequisites(saved
+            ? {
+                pan: saved.pan || '',
+                account: saved.account || '',
+                bic: saved.bic || '',
+                receiver: saved.receiver || '',
+                note: saved.note || '',
+            }
+            : EMPTY_REQUISITES)
 
         const params = card ? `?cardId=${card.id}` : ''
         api.get(`/credit-cards/available-bullions${params}`)
             .then((response) => setAvailableBullions(response.data.data || []))
             .catch((err) => console.error('Ошибка загрузки слитков:', err))
-    }, [isOpen, card])
+    }, [isOpen, card, vault.isOpen])
+
+    const changeRequisite = (field, value) => {
+        setRequisites((prev) => ({ ...prev, [field]: value }))
+    }
+
+    const changePan = (value) => {
+        const digits = value.replace(/\D/g, '').slice(0, 19)
+        changeRequisite('pan', digits)
+        if (digits.length >= 12) {
+            setLast4(digits.slice(-4))
+        }
+    }
 
     const toggleBullion = (bullionId) => {
         setBullionIds((prev) =>
@@ -53,7 +83,15 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
         e.preventDefault()
         setSaving(true)
         try {
-            await onSave({ name, last4, gracePeriodDate, limit, debt, bullionIds })
+            await onSave({
+                name,
+                last4,
+                gracePeriodDate,
+                limit,
+                debt,
+                bullionIds,
+                requisites: vault.isOpen ? { ...requisites, last4: requisites.pan.slice(-4) || last4 } : null,
+            })
         } catch (err) {
             // Текст ошибки показывает общий обработчик axios — форму не закрываем
             console.error('Ошибка сохранения карты:', err.response?.status, err.response?.data?.message)
@@ -140,6 +178,55 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
                 />
                 <FieldDescription>
                     Изменение задолженности записывается операцией и попадает в историю карты
+                </FieldDescription>
+            </Field>
+
+            <Field>
+                <FieldLabel>Реквизиты для пополнения</FieldLabel>
+                {vault.isOpen ? (
+                    <div className="flex flex-col gap-3 rounded-md border p-3">
+                        <Input
+                            inputMode="numeric"
+                            value={requisites.pan}
+                            onChange={(e) => changePan(e.target.value)}
+                            placeholder="Номер карты"
+                        />
+                        <Input
+                            inputMode="numeric"
+                            value={requisites.account}
+                            onChange={(e) => changeRequisite('account', e.target.value.replace(/\D/g, '').slice(0, 20))}
+                            placeholder="Номер счёта"
+                        />
+                        <Input
+                            inputMode="numeric"
+                            value={requisites.bic}
+                            onChange={(e) => changeRequisite('bic', e.target.value.replace(/\D/g, '').slice(0, 9))}
+                            placeholder="БИК"
+                        />
+                        <Input
+                            value={requisites.receiver}
+                            onChange={(e) => changeRequisite('receiver', e.target.value)}
+                            placeholder="Получатель"
+                        />
+                        <Input
+                            value={requisites.note}
+                            onChange={(e) => changeRequisite('note', e.target.value)}
+                            placeholder="Заметка"
+                        />
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-start gap-2 rounded-md border border-dashed px-3 py-3">
+                        <p className="text-sm text-muted-foreground">
+                            Реквизиты заперты. Откройте сундук фразой, чтобы их заполнить
+                        </p>
+                        <Button type="button" variant="outline" onClick={vault.requestUnlock}>
+                            <KeyRound />
+                            Открыть реквизиты
+                        </Button>
+                    </div>
+                )}
+                <FieldDescription>
+                    Шифруются в браузере, на сервер уходит только шифротекст
                 </FieldDescription>
             </Field>
 
