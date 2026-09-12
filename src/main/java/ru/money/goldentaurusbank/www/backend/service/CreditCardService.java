@@ -150,6 +150,7 @@ public class CreditCardService {
                 .name(name)
                 .last4(last4)
                 .gracePeriodDate(request.getGracePeriodDate())
+                .paymentAmount(request.getPaymentAmount())
                 .cardLimit(limit)
                 // Долг ставит операция, а не поле: иначе история начиналась бы
                 // с суммы, взявшейся ниоткуда
@@ -180,6 +181,7 @@ public class CreditCardService {
         }
 
         card.setGracePeriodDate(request.getGracePeriodDate());
+        card.setPaymentAmount(request.getPaymentAmount());
 
         BigDecimal targetLimit = request.getLimit() == null ? card.getCardLimit() : scale(request.getLimit());
         BigDecimal targetDebt = request.getDebt() == null ? card.getDebt() : scale(request.getDebt());

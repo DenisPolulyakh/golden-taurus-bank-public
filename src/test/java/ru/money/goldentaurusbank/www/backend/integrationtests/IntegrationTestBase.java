@@ -20,6 +20,7 @@ abstract class IntegrationTestBase {
     /** Все таблицы схемы; порядок неважен — CASCADE сам разберётся со связями. */
     private static final String TRUNCATE_ALL = "TRUNCATE TABLE "
             + "taurus.credit_card_history, taurus.credit_cards, taurus.card_requisites, "
+            + "taurus.telegram_links, taurus.telegram_link_codes, taurus.telegram_reminders_sent, "
             + "taurus.budget_months, "
             + "taurus.transactions, taurus.bullions, taurus.vaults, "
             + "taurus.bullion_names, taurus.bank_dictionary, taurus.users "

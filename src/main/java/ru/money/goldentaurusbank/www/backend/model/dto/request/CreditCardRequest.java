@@ -24,6 +24,9 @@ public class CreditCardRequest {
 
     private LocalDate gracePeriodDate;
 
+    @DecimalMin(value = "0.0", message = "Сумма платежа не может быть отрицательной")
+    private BigDecimal paymentAmount;
+
     @DecimalMin(value = "0.0", message = "Лимит не может быть отрицательным")
     private BigDecimal limit;
 

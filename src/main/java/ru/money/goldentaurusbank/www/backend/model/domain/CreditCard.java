@@ -44,6 +44,9 @@ public class CreditCard {
     @Column(name = "grace_period_date")
     private LocalDate gracePeriodDate;
 
+    @Column(name = "payment_amount", precision = 19, scale = 2)
+    private BigDecimal paymentAmount;
+
     /** {@code limit} — зарезервированное слово Postgres, отсюда имя колонки. */
     @Column(name = "card_limit", nullable = false, precision = 19, scale = 2)
     @Builder.Default

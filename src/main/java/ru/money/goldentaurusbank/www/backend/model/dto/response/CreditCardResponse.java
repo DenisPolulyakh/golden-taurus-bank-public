@@ -26,6 +26,7 @@ public class CreditCardResponse {
     private String maskedNumber;
     private String last4;
     private LocalDate gracePeriodDate;
+    private BigDecimal paymentAmount;
     /**
      * Дней до конца льготного периода; {@code null}, если период не задан,
      * отрицательное — просрочен. Считает бэк, чтобы цвет счётчика не зависел

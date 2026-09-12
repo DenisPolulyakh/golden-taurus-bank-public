@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import ru.money.goldentaurusbank.www.backend.model.domain.CreditCardHistory;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.CreditCardOperation;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,6 +21,9 @@ public interface CreditCardHistoryRepository extends JpaRepository<CreditCardHis
      */
 
     List<CreditCardHistory> findByCreditCardIdOrderByDateOperationDescIdDesc(Long creditCardId);
+
+    boolean existsByCreditCardIdAndOperationAndDateOperationAfter(
+            Long creditCardId, CreditCardOperation operation, LocalDateTime dateOperation);
 
     boolean existsByReversalOfId(Long reversalOfId);
 

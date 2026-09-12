@@ -28,6 +28,7 @@ public class CreditCardMapper {
                 .maskedNumber(mask(card.getLast4()))
                 .last4(card.getLast4())
                 .gracePeriodDate(card.getGracePeriodDate())
+                .paymentAmount(card.getPaymentAmount())
                 .graceDaysLeft(graceDaysLeft(card.getGracePeriodDate()))
                 .limit(card.getCardLimit())
                 .debt(card.getDebt())

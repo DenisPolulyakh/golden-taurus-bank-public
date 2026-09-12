@@ -11,3 +11,7 @@ spring:
 app:
   jwt:
     secret: YOUR_JWT_SECRET_HERE
+
+  telegram:
+    enabled: true
+    bot-token: YOUR_TELEGRAM_BOT_TOKEN_HERE

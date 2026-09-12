@@ -71,6 +71,23 @@ export const getAccessToken = () => {
     return accessToken;
 };
 
+export const getUserKey = () => {
+    if (!accessToken) {
+        return 'anonymous';
+    }
+
+    try {
+        const payload = accessToken.split('.')[1];
+        const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+        const { sub } = JSON.parse(atob(base64));
+
+        return sub ? String(sub) : 'anonymous';
+    } catch (e) {
+        console.error('Не удалось прочитать владельца токена:', e);
+        return 'anonymous';
+    }
+};
+
 export const clearAccessToken = () => {
     accessToken = null;
     if (refreshTimerId) {

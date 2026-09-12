@@ -114,6 +114,9 @@ function CreditCardsPage() {
             name: form.name,
             last4: form.last4 || null,
             gracePeriodDate: form.gracePeriodDate || null,
+            paymentAmount: form.paymentAmount === '' || form.paymentAmount === null
+                ? null
+                : Number(form.paymentAmount),
             limit: form.limit === '' ? 0 : Number(form.limit),
             debt: form.debt === '' ? 0 : Number(form.debt),
             bullionIds: form.bullionIds
@@ -427,6 +430,9 @@ const CreditCard = ({ card, disabled, onSpend, onRepay, onHistory, onEdit, onDel
                     value={graceText(card.graceDaysLeft)}
                     valueClassName={graceClass(card.graceDaysLeft)}
                 />
+                {card.paymentAmount != null && (
+                    <Row label="К внесению" value={`${formatAmount(card.paymentAmount)} ₽`} />
+                )}
                 <Row label="Лимит" value={`${formatAmount(card.limit)} ₽`} />
                 <Row
                     label="Задолженность"

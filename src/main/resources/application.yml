@@ -52,6 +52,10 @@ app:
     url: ${FRONTEND_URL:http://localhost:3000}
   cookie:
     secure: ${COOKIE_SECURE:false}
+  telegram:
+    enabled: ${TELEGRAM_ENABLED:false}
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    api-url: ${TELEGRAM_API_URL:https://api.telegram.org}
   jwt:
     secret: ${JWT_SECRET:}
     access-expiration: ${JWT_ACCESS_EXPIRATION:900000}

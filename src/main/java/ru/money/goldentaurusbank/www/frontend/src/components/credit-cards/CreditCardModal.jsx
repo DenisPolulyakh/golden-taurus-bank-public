@@ -24,6 +24,7 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
     const [name, setName] = useState('')
     const [last4, setLast4] = useState('')
     const [gracePeriodDate, setGracePeriodDate] = useState('')
+    const [paymentAmount, setPaymentAmount] = useState('')
     const [limit, setLimit] = useState('')
     const [debt, setDebt] = useState('')
     const [bullionIds, setBullionIds] = useState([])
@@ -39,6 +40,7 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
         setName(card?.name || '')
         setLast4('')
         setGracePeriodDate(card?.gracePeriodDate || '')
+        setPaymentAmount(card?.paymentAmount ?? '')
         setLimit(card?.limit ?? '')
         setDebt(card?.debt ?? '')
         setBullionIds((card?.accumulators || []).map((item) => item.bullionId))
@@ -87,6 +89,7 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
                 name,
                 last4,
                 gracePeriodDate,
+                paymentAmount,
                 limit,
                 debt,
                 bullionIds,
@@ -150,6 +153,22 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
                     onChange={setGracePeriodDate}
                     clearable
                 />
+            </Field>
+
+            <Field>
+                <FieldLabel htmlFor="card-payment-amount">К внесению</FieldLabel>
+                <Input
+                    id="card-payment-amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    placeholder="—"
+                />
+                <FieldDescription>
+                    Сколько внести к дате платежа. Необязательно: пусто — значит платёж не задан
+                </FieldDescription>
             </Field>
 
             <Field>

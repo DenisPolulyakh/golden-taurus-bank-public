@@ -1,6 +1,7 @@
+import { getUserKey } from '@/api/axios'
 import { deriveKek, fromBase64, randomBytes, seal, toBase64, unseal } from './cardVault'
 
-const STORAGE_KEY = 'card-vault-pin'
+const STORAGE_PREFIX = 'card-vault-pin'
 const PIN_KDF = { alg: 'argon2id', m: 65536, t: 3, p: 1 }
 const MAX_ATTEMPTS = 5
 const KEY_BYTES = 32
@@ -10,9 +11,13 @@ export const WRONG_PIN = 'WRONG_PIN'
 export const PIN_BLOCKED = 'PIN_BLOCKED'
 export const NO_PIN = 'NO_PIN'
 
+function storageKey() {
+    return `${STORAGE_PREFIX}:${getUserKey()}`
+}
+
 function read() {
     try {
-        const raw = localStorage.getItem(STORAGE_KEY)
+        const raw = localStorage.getItem(storageKey())
         return raw ? JSON.parse(raw) : null
     } catch (error) {
         return null
@@ -21,7 +26,7 @@ function read() {
 
 function write(record) {
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(record))
+        localStorage.setItem(storageKey(), JSON.stringify(record))
     } catch (error) {
         console.error('Не удалось сохранить пин:', error)
     }
@@ -33,7 +38,7 @@ export function hasPin() {
 
 export function clearPin() {
     try {
-        localStorage.removeItem(STORAGE_KEY)
+        localStorage.removeItem(storageKey())
     } catch (error) {
         console.error('Не удалось удалить пин:', error)
     }

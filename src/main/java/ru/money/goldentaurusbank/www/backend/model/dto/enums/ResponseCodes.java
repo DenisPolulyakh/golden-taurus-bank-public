@@ -72,6 +72,8 @@ public enum ResponseCodes {
     BULLION_NOT_EMPTY(4038, "У слитка есть остаток: удалить можно только с переносом остатка", HttpStatus.BAD_REQUEST),
     TRANSFER_TARGET_NOT_SET(4039, "Укажите получателя перевода: либо слиток, либо хранилище", HttpStatus.BAD_REQUEST),
     CARD_REQUISITES_CONFLICT(4040, "Реквизиты изменились с момента открытия. Обновите страницу и повторите", HttpStatus.CONFLICT),
+    TELEGRAM_CODE_INVALID(4041, "Код не подходит или уже использован. Получите новый в настройках", HttpStatus.BAD_REQUEST),
+    TELEGRAM_LINK_NOT_FOUND(4042, "Привязка не найдена", HttpStatus.NOT_FOUND),
 
 
     // Системные ошибки (5xxx)
