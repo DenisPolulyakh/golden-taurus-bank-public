@@ -36,8 +36,9 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_SCHEMA: ${DB_SCHEMA:-taurus}
       JWT_SECRET: ${JWT_SECRET}
-      # Шифрование номеров карт. Без них приложение не поднимется —
-      # завести в .env до выкладки (salt: openssl rand -hex 8)
+      # Телеграм-бот. Выключен по умолчанию, чаты привязываются кодом из приложения
+      TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       SERVER_ADDRESS: 0.0.0.0
       SERVER_PORT: 8081
       FRONTEND_URL: ${FRONTEND_URL}

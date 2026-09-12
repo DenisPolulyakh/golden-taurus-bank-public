@@ -16,6 +16,7 @@ import TransactionHistoryPage from './components/history/TransactionHistoryPage'
 import ReportsPage from './components/reports/ReportsPage';
 import api, { setAccessToken, clearAccessToken } from './api/axios';
 import BankDetailPage from './components/banks/BankDetailPage';
+import SettingsPage from './components/settings/SettingsPage';
 
 function App() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -105,6 +106,15 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <Dashboard user={user} onLogout={handleLogout} />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/settings"
+                    element={
+                        <ProtectedRoute>
+                            <SettingsPage />
                         </ProtectedRoute>
                     }
                 />

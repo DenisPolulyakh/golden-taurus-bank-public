@@ -7,13 +7,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -313,6 +319,86 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
 
         createCard("Платинум", "4321", "300000", "0");
         createCardExpectingError("платинум", "9999", "100000", "0", null, 4022);
+    }
+
+    @Test
+    @DisplayName("Карта заводится с суммой к внесению, она приходит в ответе")
+    void paymentAmountIsSaved() throws Exception {
+        Long cardId = createCardWithPayment("Платинум", "4321", "300000", "20000");
+
+        assertThat(getCard(cardId).get("paymentAmount").decimalValue()).isEqualByComparingTo("20000");
+    }
+
+    @Test
+    @DisplayName("Сумма к внесению необязательна: без неё карта заводится с пустым полем")
+    void paymentAmountIsOptional() throws Exception {
+        Long cardId = createCard("Без платежа", "1111", "100000", "0");
+
+        assertThat(getCard(cardId).get("paymentAmount").isNull()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Отрицательная сумма к внесению не принимается")
+    void negativePaymentAmountRejected() throws Exception {
+        paymentRequest(post("/api/credit-cards"), "Минус", "2222", "100000", "0", "-1")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(2001));
+    }
+
+    @Test
+    @DisplayName("Правка меняет сумму к внесению, пустое значение её очищает")
+    void paymentAmountIsEditable() throws Exception {
+        Long cardId = createCardWithPayment("Платинум", "4321", "300000", "20000");
+
+        paymentRequest(put("/api/credit-cards/{cardId}", cardId), "Платинум", null, "300000", "0", "35000")
+                .andExpect(status().isOk());
+        assertThat(getCard(cardId).get("paymentAmount").decimalValue()).isEqualByComparingTo("35000");
+
+        paymentRequest(put("/api/credit-cards/{cardId}", cardId), "Платинум", null, "300000", "0", null)
+                .andExpect(status().isOk());
+        assertThat(getCard(cardId).get("paymentAmount").isNull()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Сумма к внесению не участвует в проверке «долг не больше лимита»")
+    void paymentAmountDoesNotAffectLimit() throws Exception {
+        Long cardId = createCardWithPayment("Платинум", "4321", "100000", "100000", "999999");
+
+        JsonNode card = getCard(cardId);
+
+        assertThat(card.get("remainder").decimalValue()).isEqualByComparingTo("0");
+        assertThat(card.get("paymentAmount").decimalValue()).isEqualByComparingTo("999999");
+    }
+
+    private Long createCardWithPayment(String name, String last4, String limit, String paymentAmount)
+            throws Exception {
+        return createCardWithPayment(name, last4, limit, "0", paymentAmount);
+    }
+
+    private Long createCardWithPayment(String name, String last4, String limit, String debt, String paymentAmount)
+            throws Exception {
+        MvcResult result = paymentRequest(post("/api/credit-cards"), name, last4, limit, debt, paymentAmount)
+                .andExpect(status().isOk())
+                .andReturn();
+
+        return dataId(result);
+    }
+
+    private ResultActions paymentRequest(MockHttpServletRequestBuilder builder, String name, String last4,
+                                         String limit, String debt, String paymentAmount) throws Exception {
+        StringBuilder body = new StringBuilder("{\"name\": \"").append(name).append('"');
+        if (last4 != null) {
+            body.append(", \"last4\": \"").append(last4).append('"');
+        }
+        body.append(", \"limit\": ").append(limit);
+        body.append(", \"debt\": ").append(debt);
+        body.append(", \"paymentAmount\": ").append(paymentAmount == null ? "null" : paymentAmount);
+        body.append('}');
+
+        return mockMvc.perform(builder
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body.toString()));
     }
 
     @Test

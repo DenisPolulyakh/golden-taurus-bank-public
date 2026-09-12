@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import { CreditCard as CreditCardIcon, History, Minus, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
+import { CreditCard as CreditCardIcon, Download, History, KeyRound, Lock, Minus, Pencil, Plus, Printer, ScrollText, Settings, Trash2, Wallet } from 'lucide-react'
 import api from '@/api/axios'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -14,7 +14,12 @@ import { EmptyState, ErrorMessage, PageLoading } from '@/components/ui-app/page-
 import { StatCard, StatGrid } from '@/components/ui-app/stat-card'
 import { useConfirm } from '@/components/ui-app/confirm-dialog'
 import { cn } from '@/lib/utils'
+import { buildSheetHtml } from '@/lib/vaultSheet'
 import CreditCardModal from './CreditCardModal'
+import VaultUnlockDialog from './VaultUnlockDialog'
+import CardRequisitesDialog from './CardRequisitesDialog'
+import VaultSettingsDialog from './VaultSettingsDialog'
+import { CardVaultProvider, useCardVault } from './CardVaultProvider'
 import CreditCardOperationModal from './CreditCardOperationModal'
 import CreditCardHistoryModal from './CreditCardHistoryModal'
 import {
@@ -44,6 +49,9 @@ function CreditCardsPage() {
     const [editingCard, setEditingCard] = useState(null);
     const [operation, setOperation] = useState(null);
     const [historyCard, setHistoryCard] = useState(null);
+    const [requisitesCard, setRequisitesCard] = useState(null);
+    const [vaultSettingsOpen, setVaultSettingsOpen] = useState(false);
+    const vault = useCardVault();
 
     const navigate = useNavigate();
     const { confirm, confirmDialog } = useConfirm();
@@ -106,21 +114,69 @@ function CreditCardsPage() {
             name: form.name,
             last4: form.last4 || null,
             gracePeriodDate: form.gracePeriodDate || null,
+            paymentAmount: form.paymentAmount === '' || form.paymentAmount === null
+                ? null
+                : Number(form.paymentAmount),
             limit: form.limit === '' ? 0 : Number(form.limit),
             debt: form.debt === '' ? 0 : Number(form.debt),
             bullionIds: form.bullionIds
         };
 
+        let cardId;
         if (editingCard) {
             await api.put(`/credit-cards/${editingCard.id}`, payload);
+            cardId = editingCard.id;
         } else {
-            await api.post('/credit-cards', payload);
+            const response = await api.post('/credit-cards', payload);
+            cardId = response.data.data.id;
+        }
+
+        if (form.requisites) {
+            try {
+                await vault.saveCard({ ...form.requisites, cardId });
+            } catch (err) {
+                await reload();
+                toast.error('Карта сохранена, а реквизиты — нет. Повторите сохранение');
+                throw err;
+            }
         }
 
         setModalOpen(false);
         setEditingCard(null);
         await reload();
     };
+
+    const handleDownloadPackage = async () => {
+        try {
+            const response = await api.get('/card-requisites/emergency-package')
+            const blob = new Blob([JSON.stringify(response.data.data, null, 2)], {
+                type: 'application/json',
+            })
+            const url = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+
+            link.href = url
+            link.download = `taurus-package-${new Date().toISOString().slice(0, 10)}.json`
+            link.click()
+            URL.revokeObjectURL(url)
+
+            toast.success('Аварийный пакет скачан')
+        } catch (err) {
+            console.error('Ошибка выгрузки пакета:', err)
+        }
+    }
+
+    const handlePrintSheet = () => {
+        const sheet = window.open('', '_blank')
+        if (!sheet) {
+            toast.error('Браузер заблокировал новую вкладку — разрешите всплывающие окна')
+            return
+        }
+
+        sheet.document.write(buildSheetHtml({ cards, entries: vault.cards }))
+        sheet.document.close()
+        vault.touch()
+    }
 
     const handleDeleteCard = (card) => {
         confirm({
@@ -130,6 +186,9 @@ function CreditCardsPage() {
                 setActionLoading(true);
                 try {
                     await api.delete(`/credit-cards/${card.id}`);
+                    if (vault.isOpen && vault.cardById(card.id)) {
+                        await vault.dropCard(card.id);
+                    }
                     toast.success('Кредитная карта удалена');
                     await reload();
                 } catch (err) {
@@ -165,6 +224,39 @@ function CreditCardsPage() {
     return (
         <PageContainer>
             <PageHeader title="Кредитные карты" onBack={() => navigate('/dashboard')}>
+                <Button
+                    variant="outline"
+                    onClick={() => (vault.isOpen ? vault.lock() : vault.requestUnlock())}
+                    disabled={!vault.loaded}
+                >
+                    {vault.isOpen ? <Lock /> : <KeyRound />}
+                    {vault.isOpen ? 'Запереть реквизиты' : 'Открыть реквизиты'}
+                </Button>
+                {vault.isOpen && (
+                    <Button variant="outline" onClick={handlePrintSheet}>
+                        <Printer />
+                        Аварийный лист
+                    </Button>
+                )}
+                <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleDownloadPackage}
+                    aria-label="Скачать аварийный пакет"
+                    title="Скачать аварийный пакет"
+                >
+                    <Download />
+                </Button>
+                {vault.isOpen && (
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setVaultSettingsOpen(true)}
+                        aria-label="Настройки сундука"
+                    >
+                        <Settings />
+                    </Button>
+                )}
                 <Button
                     onClick={() => {
                         setEditingCard(null)
@@ -266,6 +358,11 @@ function CreditCardsPage() {
                                 setModalOpen(true)
                             }}
                             onDelete={() => handleDeleteCard(card)}
+                            hasRequisites={vault.isOpen && !!vault.cardById(card.id)}
+                            vaultLocked={!vault.isOpen}
+                            onRequisites={() =>
+                                vault.isOpen ? setRequisitesCard(card) : vault.requestUnlock()
+                            }
                         />
                     ))}
                 </div>
@@ -302,12 +399,18 @@ function CreditCardsPage() {
                 />
             )}
 
+            <VaultUnlockDialog />
+
+            <CardRequisitesDialog card={requisitesCard} onClose={() => setRequisitesCard(null)} />
+
+            <VaultSettingsDialog open={vaultSettingsOpen} onOpenChange={setVaultSettingsOpen} />
+
             {confirmDialog}
         </PageContainer>
     )
 }
 
-const CreditCard = ({ card, disabled, onSpend, onRepay, onHistory, onEdit, onDelete }) => {
+const CreditCard = ({ card, disabled, onSpend, onRepay, onHistory, onEdit, onDelete, hasRequisites, vaultLocked, onRequisites }) => {
     const accumulators = card.accumulators || []
 
     return (
@@ -327,6 +430,9 @@ const CreditCard = ({ card, disabled, onSpend, onRepay, onHistory, onEdit, onDel
                     value={graceText(card.graceDaysLeft)}
                     valueClassName={graceClass(card.graceDaysLeft)}
                 />
+                {card.paymentAmount != null && (
+                    <Row label="К внесению" value={`${formatAmount(card.paymentAmount)} ₽`} />
+                )}
                 <Row label="Лимит" value={`${formatAmount(card.limit)} ₽`} />
                 <Row
                     label="Задолженность"
@@ -405,6 +511,12 @@ const CreditCard = ({ card, disabled, onSpend, onRepay, onHistory, onEdit, onDel
                         <History />
                         История
                     </Button>
+                    {(hasRequisites || vaultLocked) && (
+                        <Button variant="outline" size="sm" onClick={onRequisites} disabled={disabled}>
+                            <ScrollText />
+                            Реквизиты
+                        </Button>
+                    )}
                     <Button variant="outline" size="sm" onClick={onEdit} disabled={disabled}>
                         <Pencil />
                         Редактировать
@@ -432,4 +544,10 @@ const Row = ({ label, value, valueClassName }) => (
     </div>
 )
 
-export default CreditCardsPage
+export default function CreditCardsPageWithVault() {
+    return (
+        <CardVaultProvider>
+            <CreditCardsPage />
+        </CardVaultProvider>
+    )
+}

@@ -1,6 +1,7 @@
 package ru.money.goldentaurusbank.www.backend.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,6 +13,7 @@ import ru.money.goldentaurusbank.www.backend.model.domain.Transaction;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.dto.enums.BullionType;
 import ru.money.goldentaurusbank.www.backend.model.dto.enums.CreditCardOperation;
+import ru.money.goldentaurusbank.www.backend.model.dto.telegram.CreditCardOperationEvent;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.RepayFromBullionRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.CreditCardHistoryResponse;
 import ru.money.goldentaurusbank.www.backend.model.mapper.CreditCardMapper;
@@ -50,6 +52,7 @@ public class CreditCardTransactionService {
     private final BullionRepository bullionRepository;
     private final TransactionService transactionService;
     private final CreditCardMapper creditCardMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     // ------------------------------------------------------------------
     // Операции
@@ -154,6 +157,12 @@ public class CreditCardTransactionService {
 
         log.info("Credit card operation recorded: id={}, cardId={}, operation={}, amount={}, debtAfter={}",
                 history.getId(), card.getId(), operation, scaled, debt);
+
+        eventPublisher.publishEvent(new CreditCardOperationEvent(
+                user.getId(), card.getName(), card.getLast4(), operation, scaled,
+                operation.increasesDebt() ? debt.subtract(scaled) : debt.add(scaled),
+                debt, card.getCardLimit(), reversalOfId != null));
+
         return history;
     }
 

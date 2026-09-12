@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Открывашка реквизитов</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; font: 14px/1.5 -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: #111; background: #f6f6f6; }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .hint { color: #666; margin-bottom: 16px; }
+  .panel { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  .drop { border: 2px dashed #bbb; border-radius: 8px; padding: 24px; text-align: center; color: #666; cursor: pointer; }
+  .drop.over { border-color: #444; background: #fafafa; }
+  textarea { width: 100%; min-height: 90px; margin-top: 12px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; padding: 8px; }
+  label { display: block; font-weight: 600; margin-bottom: 6px; }
+  input[type=password] { width: 100%; padding: 8px; font: inherit; }
+  button { padding: 10px 18px; font: inherit; cursor: pointer; border: 1px solid #444; background: #111; color: #fff; border-radius: 6px; }
+  button.secondary { background: #fff; color: #111; }
+  button[disabled] { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+  .error { color: #c00; margin-top: 10px; }
+  .status { color: #666; margin-top: 10px; }
+  iframe { width: 100%; height: 70vh; border: 1px solid #ddd; border-radius: 8px; background: #fff; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Открывашка реквизитов</h1>
+  <div class="hint">Работает без интернета. Ничего не сохраняет: закрыли вкладку — на компьютере не осталось ничего</div>
+
+  <div class="panel" id="input-panel">
+    <div class="drop" id="drop">
+      Перетащите сюда файл пакета или нажмите, чтобы выбрать
+      <input type="file" id="file" accept=".json,.txt" class="hidden">
+    </div>
+    <textarea id="text" placeholder="Либо вставьте сюда содержимое пакета или сундука"></textarea>
+
+    <div style="margin-top:16px">
+      <label for="phrase">Фраза</label>
+      <input type="password" id="phrase" autocomplete="off">
+    </div>
+
+    <div class="row">
+      <button id="open">Открыть</button>
+      <span class="status" id="status"></span>
+    </div>
+    <div class="error" id="error"></div>
+  </div>
+
+  <div class="panel hidden" id="result-panel">
+    <div class="row" style="margin-top:0">
+      <button id="print">Печать</button>
+      <button class="secondary" id="reset">Закрыть и очистить</button>
+    </div>
+    <div style="margin-top:12px"><iframe id="sheet" title="Лист реквизитов"></iframe></div>
+  </div>
+</div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
