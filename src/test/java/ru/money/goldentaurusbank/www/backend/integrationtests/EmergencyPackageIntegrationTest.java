@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -102,9 +103,10 @@ class EmergencyPackageIntegrationTest extends CreditCardTestBase {
 
     @Test
     @DisplayName("Без токена пакет не отдаётся")
-    void withoutTokenForbidden() throws Exception {
+    void withoutTokenUnauthorized() throws Exception {
         mockMvc.perform(get("/api/card-requisites/emergency-package"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(3002));
     }
 
     private JsonNode loadPackage(String token) throws Exception {

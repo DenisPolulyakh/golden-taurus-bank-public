@@ -54,10 +54,7 @@ const scheduleTokenRefresh = (token) => {
     // Запускаем обновление за REFRESH_LEEWAY_MS до истечения (но не раньше чем через 1с)
     const delay = Math.max(expiryMs - Date.now() - REFRESH_LEEWAY_MS, 1000);
 
-    refreshTimerId = setTimeout(() => {
-        // Обновляем токен в фоне; ошибку глотаем — реактивный перехватчик подхватит при следующем запросе
-        refreshAccessToken().catch(() => {});
-    }, delay);
+    refreshTimerId = setTimeout(refreshInBackground, delay);
 };
 
 export const setAccessToken = (token) => {
@@ -159,15 +156,47 @@ const showErrorToast = (error) => {
     toast.error(message);
 };
 
+// Сервер ответил 4xx на refresh — сессии больше нет (кука протухла или её нет).
+// 5xx и обрыв сети сюда не относятся: во время выкладки бэк отдаёт 502,
+// и выкидывать за это на логин не надо.
+const isSessionGone = (error) => {
+    const status = error?.response?.status;
+    return status >= 400 && status < 500;
+};
+
+// Уходим на логин полной перезагрузкой: заодно сбрасывается состояние всех страниц.
+// Флаг гасит повторы, когда 401 разом получают несколько параллельных запросов.
+let redirectingToLogin = false;
+
+const redirectToLogin = () => {
+    clearAccessToken();
+    if (redirectingToLogin) return;
+    redirectingToLogin = true;
+    window.location.replace('/login');
+};
+
+// Фоновое обновление (таймер, возврат на вкладку): если сессии уже нет — сразу
+// на логин, не дожидаясь клика. Сетевую ошибку глотаем — повторим при следующем запросе.
+const refreshInBackground = () => {
+    refreshAccessToken().catch((error) => {
+        if (isSessionGone(error)) {
+            redirectToLogin();
+        }
+    });
+};
+
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
 
-        // Не пытаемся обновлять токен для самого запроса обновления или после повторной попытки
+        // 401 от /auth/* — это ответ по существу (например, неверный пароль на логине),
+        // а не протухший токен: обновлять нечего, ошибку отдаём странице как есть.
+        // Не обновляем токен и для самого refresh, и после повторной попытки.
         if (
             error.response?.status === 401 &&
             originalRequest &&
+            !originalRequest.url?.startsWith('/auth/') &&
             !originalRequest._retry &&
             !originalRequest._skipAuthRefresh
         ) {
@@ -178,8 +207,13 @@ api.interceptors.response.use(
                 originalRequest.headers.Authorization = `Bearer ${newToken}`;
                 return api(originalRequest);
             } catch (refreshError) {
-                clearAccessToken();
-                window.location.href = '/login';
+                if (isSessionGone(refreshError)) {
+                    redirectToLogin();
+                    // Страница уже уходит на логин: не отдаём ей ошибку, иначе она
+                    // успеет показать тост или упасть до перезагрузки
+                    return new Promise(() => {});
+                }
+                showErrorToast(refreshError);
                 return Promise.reject(refreshError);
             }
         }
@@ -201,7 +235,7 @@ const refreshIfNeeded = () => {
 
     if (isTokenExpiringSoon(accessToken)) {
         // Токен уже истёк или вот-вот истечёт — обновляем немедленно
-        refreshAccessToken().catch(() => {});
+        refreshInBackground();
     } else {
         // Токен ещё валиден, но таймер мог сбиться за время сна — перепланируем
         scheduleTokenRefresh(accessToken);

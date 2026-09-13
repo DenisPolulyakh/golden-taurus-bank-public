@@ -373,7 +373,8 @@ class TransactionIntegrationTest extends IntegrationTestBase {
     @DisplayName("Обращение без токена — ошибка")
     void accessWithoutTokenIsRejected() throws Exception {
         mockMvc.perform(get("/api/transactions/history"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(3002));
     }
 
     // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
