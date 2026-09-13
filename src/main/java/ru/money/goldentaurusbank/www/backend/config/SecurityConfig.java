@@ -16,6 +16,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import ru.money.goldentaurusbank.www.backend.security.JwtAuthenticationEntryPoint;
 import ru.money.goldentaurusbank.www.backend.security.JwtAuthenticationFilter;
 
 
@@ -27,6 +28,7 @@ public class SecurityConfig {
     
     private final UserDetailsService userDetailsService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -50,6 +52,8 @@ public class SecurityConfig {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // Без токена или с протухшим — 401 вместо пустого 403, см. JwtAuthenticationEntryPoint
+            .exceptionHandling(e -> e.authenticationEntryPoint(jwtAuthenticationEntryPoint))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
                 // Иначе ответ об ошибке подменяется пустым 403 при форварде на /error

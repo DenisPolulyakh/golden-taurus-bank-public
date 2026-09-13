@@ -79,9 +79,6 @@ function Dashboard({ user, onLogout }) {
             setUserData(response.data.data)
         } catch (err) {
             console.error('Ошибка загрузки данных:', err)
-            if (err.response?.status === 401) {
-                handleLogout()
-            }
         }
     }
 

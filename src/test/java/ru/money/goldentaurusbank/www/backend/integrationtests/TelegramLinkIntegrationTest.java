@@ -147,9 +147,10 @@ class TelegramLinkIntegrationTest extends CreditCardTestBase {
 
     @Test
     @DisplayName("Без токена код не выдаётся")
-    void withoutTokenForbidden() throws Exception {
+    void withoutTokenUnauthorized() throws Exception {
         mockMvc.perform(post("/api/telegram/link-code"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(3002));
     }
 
     private JsonNode createCode(String token) throws Exception {

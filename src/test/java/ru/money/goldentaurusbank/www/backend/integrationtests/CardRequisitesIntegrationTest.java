@@ -112,14 +112,16 @@ class CardRequisitesIntegrationTest extends CreditCardTestBase {
 
     @Test
     @DisplayName("Без токена сундук недоступен ни на чтение, ни на запись")
-    void withoutTokenForbidden() throws Exception {
+    void withoutTokenUnauthorized() throws Exception {
         mockMvc.perform(get("/api/card-requisites"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(3002));
 
         mockMvc.perform(put("/api/card-requisites")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"payload\": \"что-нибудь\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(3002));
     }
 
     @Test

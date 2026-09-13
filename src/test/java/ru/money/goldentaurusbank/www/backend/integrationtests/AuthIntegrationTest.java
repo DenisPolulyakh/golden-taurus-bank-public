@@ -2,10 +2,13 @@ package ru.money.goldentaurusbank.www.backend.integrationtests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -16,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.repository.UserRepository;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,6 +42,9 @@ class AuthIntegrationTest extends IntegrationTestBase {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Value("${app.jwt.secret}")
+    private String jwtSecret;
 
     @BeforeEach
     void cleanUp() {
@@ -314,6 +322,31 @@ class AuthIntegrationTest extends IntegrationTestBase {
 
         User updatedUser = userRepository.findByEmail("resend@example.com").get();
         assertThat(updatedUser.getVerificationToken()).isNotEqualTo(oldToken);
+    }
+
+    @Test
+    @DisplayName("Битый или протухший токен - 401, чтобы фронт обновил токен или ушёл на логин")
+    void invalidOrExpiredTokenUnauthorized() throws Exception {
+        mockMvc.perform(get("/api/vaults")
+                        .header("Authorization", "Bearer это-не-токен"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(3002));
+
+        // Настоящая подпись, но срок вышел час назад — как после долгого отсутствия
+        long now = System.currentTimeMillis();
+        String expiredToken = Jwts.builder()
+                .subject("1")
+                .claim("email", "ghost@example.com")
+                .claim("role", "USER")
+                .issuedAt(new Date(now - 7_200_000))
+                .expiration(new Date(now - 3_600_000))
+                .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
+                .compact();
+
+        mockMvc.perform(get("/api/vaults")
+                        .header("Authorization", "Bearer " + expiredToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(3002));
     }
 
     @Test

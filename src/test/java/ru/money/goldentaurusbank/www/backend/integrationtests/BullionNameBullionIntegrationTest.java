@@ -684,7 +684,8 @@ class BullionNameBullionIntegrationTest extends IntegrationTestBase {
     @DisplayName("Попытка доступа к слиткам без токена - ошибка")
     void accessWithoutTokenThrowsException() throws Exception {
         mockMvc.perform(get("/api/bullions"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(3002));
     }
 
     @Test

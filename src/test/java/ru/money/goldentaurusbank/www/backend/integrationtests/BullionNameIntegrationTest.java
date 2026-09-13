@@ -485,7 +485,8 @@ class BullionNameIntegrationTest extends IntegrationTestBase {
     @DisplayName("Попытка доступа к категориям без токена - ошибка")
     void accessWithoutTokenThrowsException() throws Exception {
         mockMvc.perform(get("/api/bullion-names"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(3002));
     }
 
     // Вспомогательные методы

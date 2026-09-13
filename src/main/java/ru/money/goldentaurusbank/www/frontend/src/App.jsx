@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { FullScreenLoading } from '@/components/ui-app/page-state';
+import { ErrorBoundary } from '@/components/ui-app/error-boundary';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/dashboard/Dashboard.jsx';
@@ -96,116 +97,118 @@ function App() {
                 expand
                 duration={5000}
             />
-            <Routes>
-                <Route path="/login" element={<Login onLogin={handleLogin} />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/verify" element={<VerifyEmail />} />
+            <ErrorBoundary>
+                <Routes>
+                    <Route path="/login" element={<Login onLogin={handleLogin} />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/verify" element={<VerifyEmail />} />
 
-                <Route
-                    path="/dashboard"
-                    element={
-                        <ProtectedRoute>
-                            <Dashboard user={user} onLogout={handleLogout} />
-                        </ProtectedRoute>
-                    }
-                />
+                    <Route
+                        path="/dashboard"
+                        element={
+                            <ProtectedRoute>
+                                <Dashboard user={user} onLogout={handleLogout} />
+                            </ProtectedRoute>
+                        }
+                    />
 
-                <Route
-                    path="/settings"
-                    element={
-                        <ProtectedRoute>
-                            <SettingsPage />
-                        </ProtectedRoute>
-                    }
-                />
+                    <Route
+                        path="/settings"
+                        element={
+                            <ProtectedRoute>
+                                <SettingsPage />
+                            </ProtectedRoute>
+                        }
+                    />
 
-                <Route
-                    path="/bullion-names"
-                    element={
-                        <ProtectedRoute>
-                            <BullionNamesPage />
-                        </ProtectedRoute>
-                    }
-                />
-                <Route
-                    path="/banks"
-                    element={
-                        <ProtectedRoute>
-                            <BanksPage />
-                        </ProtectedRoute>
-                    }
-                />
+                    <Route
+                        path="/bullion-names"
+                        element={
+                            <ProtectedRoute>
+                                <BullionNamesPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/banks"
+                        element={
+                            <ProtectedRoute>
+                                <BanksPage />
+                            </ProtectedRoute>
+                        }
+                    />
 
-                <Route
-                    path="/vaults"
-                    element={
-                        <ProtectedRoute>
-                            <VaultsPage />
-                        </ProtectedRoute>
-                    }
-                />
+                    <Route
+                        path="/vaults"
+                        element={
+                            <ProtectedRoute>
+                                <VaultsPage />
+                            </ProtectedRoute>
+                        }
+                    />
 
-                <Route
-                    path="/vaults/:vaultId"
-                    element={
-                        <ProtectedRoute>
-                            <VaultBullionsPage />
-                        </ProtectedRoute>
-                    }
-                />
+                    <Route
+                        path="/vaults/:vaultId"
+                        element={
+                            <ProtectedRoute>
+                                <VaultBullionsPage />
+                            </ProtectedRoute>
+                        }
+                    />
 
-                <Route
-                    path="/bullions"
-                    element={
-                        <ProtectedRoute>
-                            <BullionsPage />
-                        </ProtectedRoute>
-                    }
-                />
+                    <Route
+                        path="/bullions"
+                        element={
+                            <ProtectedRoute>
+                                <BullionsPage />
+                            </ProtectedRoute>
+                        }
+                    />
 
-                <Route
-                    path="/credit-cards"
-                    element={
-                        <ProtectedRoute>
-                            <CreditCardsPage />
-                        </ProtectedRoute>
-                    }
-                />
+                    <Route
+                        path="/credit-cards"
+                        element={
+                            <ProtectedRoute>
+                                <CreditCardsPage />
+                            </ProtectedRoute>
+                        }
+                    />
 
-                <Route
-                    path="/transactions"
-                    element={
-                        <ProtectedRoute>
-                            <TransactionHistoryPage />
-                        </ProtectedRoute>
-                    }
-                />
+                    <Route
+                        path="/transactions"
+                        element={
+                            <ProtectedRoute>
+                                <TransactionHistoryPage />
+                            </ProtectedRoute>
+                        }
+                    />
 
-                <Route
-                    path="/reports"
-                    element={
-                        <ProtectedRoute>
-                            <ReportsPage />
-                        </ProtectedRoute>
-                    }
-                />
+                    <Route
+                        path="/reports"
+                        element={
+                            <ProtectedRoute>
+                                <ReportsPage />
+                            </ProtectedRoute>
+                        }
+                    />
 
-                <Route
-                    path="/"
-                    element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />}
-                />
+                    <Route
+                        path="/"
+                        element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />}
+                    />
 
-                <Route
-                    path="/banks/:bankId"
-                    element={
-                        <ProtectedRoute>
-                            <BankDetailPage />
-                        </ProtectedRoute>
-                    }
-                />
+                    <Route
+                        path="/banks/:bankId"
+                        element={
+                            <ProtectedRoute>
+                                <BankDetailPage />
+                            </ProtectedRoute>
+                        }
+                    />
 
-                <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+            </ErrorBoundary>
         </BrowserRouter>
     );
 }

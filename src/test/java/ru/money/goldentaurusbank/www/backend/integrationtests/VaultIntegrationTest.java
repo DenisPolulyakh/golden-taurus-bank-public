@@ -579,7 +579,8 @@ class VaultIntegrationTest extends IntegrationTestBase {
     @DisplayName("Попытка доступа к банкам без токена - ошибка")
     void accessWithoutTokenThrowsException() throws Exception {
         mockMvc.perform(get("/api/vaults"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(3002));
     }
 
     @Test
