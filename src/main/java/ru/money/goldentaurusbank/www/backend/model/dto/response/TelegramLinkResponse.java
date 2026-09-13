@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Data
 @AllArgsConstructor
@@ -15,5 +15,5 @@ public class TelegramLinkResponse {
 
     private Long chatId;
 
-    private LocalDateTime linkedAt;
+    private OffsetDateTime linkedAt;
 }

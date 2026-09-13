@@ -14,6 +14,7 @@ import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.service.telegram.TelegramLinkService;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -47,9 +48,10 @@ class TelegramLinkIntegrationTest extends CreditCardTestBase {
         JsonNode data = createCode(accessToken);
 
         assertThat(data.get("code").asText()).hasSize(8);
-        assertThat(LocalDateTime.parse(data.get("expiresAt").asText()))
-                .isAfter(LocalDateTime.now().plusMinutes(13))
-                .isBefore(LocalDateTime.now().plusMinutes(17));
+        // Время приходит с поясом: без него браузер в другом поясе считал код просроченным
+        assertThat(OffsetDateTime.parse(data.get("expiresAt").asText()))
+                .isAfter(OffsetDateTime.now().plusMinutes(13))
+                .isBefore(OffsetDateTime.now().plusMinutes(17));
     }
 
     @Test

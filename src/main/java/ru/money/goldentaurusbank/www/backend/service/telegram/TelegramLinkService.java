@@ -16,6 +16,8 @@ import ru.money.goldentaurusbank.www.backend.repository.TelegramLinkRepository;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,13 +47,13 @@ public class TelegramLinkService {
 
         telegramLinkCodeRepository.save(code);
 
-        return new TelegramLinkCodeResponse(code.getCode(), code.getExpiresAt());
+        return new TelegramLinkCodeResponse(code.getCode(), withZone(code.getExpiresAt()));
     }
 
     @Transactional(readOnly = true)
     public List<TelegramLinkResponse> links(User user) {
         return telegramLinkRepository.findByUserOrderByLinkedAtAsc(user).stream()
-                .map(link -> new TelegramLinkResponse(link.getId(), link.getChatId(), link.getLinkedAt()))
+                .map(link -> new TelegramLinkResponse(link.getId(), link.getChatId(), withZone(link.getLinkedAt())))
                 .toList();
     }
 
@@ -100,6 +102,15 @@ public class TelegramLinkService {
     @Transactional(readOnly = true)
     public List<TelegramLink> allLinks() {
         return telegramLinkRepository.findAll();
+    }
+
+    /**
+     * В базе время лежит без пояса, в поясе сервера (в контейнере это UTC). Браузер
+     * читает такую строку как своё местное время и сдвигает её на разницу поясов —
+     * код объявлялся просроченным сразу после выдачи. Поэтому наружу время уходит с поясом.
+     */
+    private static OffsetDateTime withZone(LocalDateTime value) {
+        return value == null ? null : value.atZone(ZoneId.systemDefault()).toOffsetDateTime();
     }
 
     private String generateCode() {
