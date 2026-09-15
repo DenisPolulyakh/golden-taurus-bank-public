@@ -367,4 +367,42 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("fromDate") LocalDateTime fromDate,
             @Param("toDate") LocalDateTime toDate
     );
+
+    /**
+     * Суммы по классифицированным доходам, сгруппированные по типу и по бакету
+     * даты ({@code unit} = 'day' | 'month' | 'year', см. date_trunc). Только
+     * пополнения с заполненным income_type — этим условием отсекаются переводы,
+     * снятия и стартовый остаток (у них income_type всегда NULL по ограничению БД).
+     * Откаченные пополнения (на которые есть реверс) не считаются.
+     */
+    @Query(value = """
+        SELECT
+            date_trunc(:unit, t.date_operation) AS bucket,
+            t.income_type,
+            SUM(t.amount) AS total,
+            COUNT(*) AS cnt
+        FROM taurus.transactions t
+        WHERE t.user_id = :userId
+            AND t.income_type IS NOT NULL
+            AND t.date_operation >= :fromDate
+            AND t.date_operation <= :toDate
+            AND NOT EXISTS (
+                SELECT 1 FROM taurus.transactions r WHERE r.reversal_of_id = t.id
+            )
+        GROUP BY bucket, income_type
+        ORDER BY bucket
+        """, nativeQuery = true)
+    List<Object[]> getIncomeStatistics(
+            @Param("userId") Long userId,
+            @Param("unit") String unit,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate
+    );
+
+    /** Дата самого раннего классифицированного дохода — начало диапазона для графика по годам. */
+    @Query(value = """
+        SELECT MIN(date_operation) FROM taurus.transactions
+        WHERE user_id = :userId AND income_type IS NOT NULL
+        """, nativeQuery = true)
+    LocalDateTime findEarliestIncomeDate(@Param("userId") Long userId);
 }

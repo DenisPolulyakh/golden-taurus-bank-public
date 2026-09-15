@@ -5,6 +5,8 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.IncomeType;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -26,6 +28,12 @@ public class RefillBullionRequest implements ChangeBullionRequest {
 
 
     private LocalDateTime dateOperation;
+
+    /**
+     * Тип дохода. {@code null} — без классификации, в статистику доходов не
+     * попадает (например пополнение из текущих расходов).
+     */
+    private IncomeType incomeType;
 
     /**
      * Корзина операции для месячного бюджета: {@code true} — трата дня,

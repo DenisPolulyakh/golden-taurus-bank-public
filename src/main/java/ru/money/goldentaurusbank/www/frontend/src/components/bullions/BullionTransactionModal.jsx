@@ -7,6 +7,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Textarea } from '@/components/ui/textarea'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
 import { Combobox } from '@/components/ui-app/combobox'
 import { FormDialog } from '@/components/ui-app/form-dialog'
 import { ErrorMessage } from '@/components/ui-app/page-state'
@@ -19,6 +26,9 @@ const QUICK_AMOUNTS = [100, 500, 1000, 2000, 3000, 5000, 10000];
 // выбранного наименования ещё нет — там он заведётся сам
 const EXISTING_TARGETS_GROUP = 'Существующие слитки';
 const NEW_TARGETS_GROUP = 'Слитка нет, создадим';
+
+// Radix Select не принимает пустую строку как value — используем сентинел
+const NO_INCOME_TYPE = 'NONE';
 
 function BullionTransactionModal({
                                      isOpen,
@@ -54,6 +64,8 @@ function BullionTransactionModal({
                                      // Живые хранилища с галочками — из них берутся
                                      // получатели, у которых слитка ещё нет
                                      vaultsForNewBullion = [],
+                                     // Справочник типов дохода — поле показывается только у пополнения
+                                     incomeTypes = [],
                                  }) {
     const [amount, setAmount] = useState('');
     const [amountDisplay, setAmountDisplay] = useState('');
@@ -71,9 +83,11 @@ function BullionTransactionModal({
     // день. У перевода наоборот — перевод внутрь почти всегда финансирование,
     // и галочка на нём уводила бы день в глубокий минус
     const [budgetOperation, setBudgetOperation] = useState(true);
+    const [incomeType, setIncomeType] = useState(NO_INCOME_TYPE);
 
     const isDeleteModal = type === 'delete';
     const isTransferModal = type === 'transfer';
+    const isRefillModal = type === 'refill';
 
     // Куда ещё можно перевести: хранилища, где слитка отправителя нет. Наименование
     // берём у отправителя - оно и создастся, поэтому список пересчитывается при
@@ -281,6 +295,7 @@ function BullionTransactionModal({
 
             setDescription(initialDescription || '');
             setSelectedVaultId(initialVaultId || '');
+            setIncomeType(NO_INCOME_TYPE);
             setToLiquidityVault(true);
             setSelectedTargetOption(null);
             setSelectedFromOption(null);
@@ -511,7 +526,8 @@ function BullionTransactionModal({
                 );
             } else if (showAmount) {
                 await onSave(amountNum, description.trim() || null, selectedVaultId,
-                    dateOperation ? dateOperation : null, budgetOperation);
+                    dateOperation ? dateOperation : null, budgetOperation,
+                    isRefillModal && incomeType !== NO_INCOME_TYPE ? incomeType : null);
             } else {
                 await onSave(selectedVaultId, description.trim() || null, dateOperation ? dateOperation : null);
             }
@@ -781,6 +797,29 @@ function BullionTransactionModal({
                     />
                     {renderQuickAmounts()}
                     <FieldDescription>Используйте точку или запятую для копеек</FieldDescription>
+                </Field>
+            )}
+
+            {isRefillModal && !isConfirm && (
+                <Field>
+                    <FieldLabel htmlFor="income-type">Тип дохода</FieldLabel>
+                    <Select value={incomeType} onValueChange={setIncomeType}>
+                        <SelectTrigger id="income-type">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={NO_INCOME_TYPE}>Без классификации</SelectItem>
+                            {incomeTypes.map(option => (
+                                <SelectItem key={option.code} value={option.code}>
+                                    {option.displayName}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <FieldDescription>
+                        Без классификации операция не попадает в статистику доходов —
+                        например, пополнение из текущих расходов
+                    </FieldDescription>
                 </Field>
             )}
 

@@ -28,11 +28,14 @@ import { PageContainer, PageHeader } from '@/components/ui-app/page-header'
 import { TablePager } from '@/components/ui-app/data-table'
 import { EmptyState, PageLoading } from '@/components/ui-app/page-state'
 import { useConfirm } from '@/components/ui-app/confirm-dialog'
+import { useIncomeTypes } from '@/components/hooks/useIncomeTypes'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 // Radix Select не умеет пустую строку значением пункта — «все типы» ездит сторожевым
 const ALL_KINDS = 'all'
+// Тот же сторожевой приём для «без классификации» в выборе типа дохода
+const NO_INCOME_TYPE = 'NONE'
 
 // Вид операции выводится бэкендом из того, какие ноги заполнены.
 const KIND_LABELS = {
@@ -72,6 +75,7 @@ const TransactionHistoryPage = () => {
 
     const navigate = useNavigate();
     const { confirm, confirmDialog } = useConfirm();
+    const incomeTypes = useIncomeTypes();
 
     useEffect(() => {
         fetchTransactions();
@@ -118,6 +122,23 @@ const TransactionHistoryPage = () => {
     };
 
     const getKindLabel = (kind) => KIND_LABELS[kind] || kind || '—';
+
+    const getIncomeTypeLabel = (code) =>
+        incomeTypes.find((option) => option.code === code)?.displayName || code;
+
+    const handleIncomeTypeChange = async (tx, value) => {
+        const incomeType = value === NO_INCOME_TYPE ? null : value;
+        try {
+            await api.patch(`/transactions/${tx.id}/income-type`, { incomeType });
+            setTransactions((prev) =>
+                prev.map((t) => (t.id === tx.id ? { ...t, incomeType } : t))
+            );
+            toast.success('Тип дохода обновлён');
+        } catch (err) {
+            console.error('Ошибка обновления типа дохода:', err);
+            toast.error(err.response?.data?.message || 'Не удалось обновить тип дохода');
+        }
+    };
 
     const renderDescription = (tx) => {
         const segments = tx.descriptionSegments;
@@ -252,6 +273,37 @@ const TransactionHistoryPage = () => {
                                                     >
                                                         откат
                                                     </Badge>
+                                                )}
+                                                {/* Тип дохода — только у пополнения; у откаченного своё
+                                                    менять нельзя (бэк отклонит), просто показываем бейджем */}
+                                                {tx.kind === 'DEPOSIT' && (
+                                                    tx.reversedById ? (
+                                                        tx.incomeType && (
+                                                            <Badge variant="outline">
+                                                                {getIncomeTypeLabel(tx.incomeType)}
+                                                            </Badge>
+                                                        )
+                                                    ) : (
+                                                        <Select
+                                                            value={tx.incomeType || NO_INCOME_TYPE}
+                                                            onValueChange={(value) => handleIncomeTypeChange(tx, value)}
+                                                        >
+                                                            <SelectTrigger
+                                                                size="sm"
+                                                                className="h-6 w-auto gap-1 border-dashed px-2 text-xs"
+                                                            >
+                                                                <SelectValue placeholder="Тип дохода" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value={NO_INCOME_TYPE}>Без классификации</SelectItem>
+                                                                {incomeTypes.map((option) => (
+                                                                    <SelectItem key={option.code} value={option.code}>
+                                                                        {option.displayName}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    )
                                                 )}
                                             </span>
                                         </TableCell>

@@ -74,6 +74,8 @@ public enum ResponseCodes {
     CARD_REQUISITES_CONFLICT(4040, "Реквизиты изменились с момента открытия. Обновите страницу и повторите", HttpStatus.CONFLICT),
     TELEGRAM_CODE_INVALID(4041, "Код не подходит или уже использован. Получите новый в настройках", HttpStatus.BAD_REQUEST),
     TELEGRAM_LINK_NOT_FOUND(4042, "Привязка не найдена", HttpStatus.NOT_FOUND),
+    INCOME_TYPE_NOT_ALLOWED(4043, "Тип дохода можно указать только у пополнения слитка", HttpStatus.BAD_REQUEST),
+    INCOME_TYPE_UPDATE_NOT_ALLOWED(4044, "Тип дохода можно менять только у пополнения слитка, которое не откачено", HttpStatus.BAD_REQUEST),
 
 
     // Системные ошибки (5xxx)

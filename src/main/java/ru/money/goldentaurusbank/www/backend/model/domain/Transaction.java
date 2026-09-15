@@ -2,7 +2,9 @@ package ru.money.goldentaurusbank.www.backend.model.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Check;
 import org.hibernate.annotations.CreationTimestamp;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.IncomeType;
 import ru.money.goldentaurusbank.www.backend.model.dto.enums.TransactionKind;
 
 import java.math.BigDecimal;
@@ -10,6 +12,9 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "transactions", schema = "taurus")
+@Check(name = "chk_transactions_income_only_deposit",
+        constraints = "income_type IS NULL OR (target_bullion_id IS NOT NULL "
+                + "AND source_bullion_id IS NULL AND NOT opening_balance)")
 @Getter
 @Setter
 @Builder
@@ -61,6 +66,16 @@ public class Transaction {
     @Builder.Default
     private boolean budgetOperation = true;
 
+
+    /**
+     * Тип дохода при пополнении. {@code null} — без классификации, в статистику
+     * доходов не попадает. Имеет смысл только для DEPOSIT (см. {@link #getKind()});
+     * у перевода, снятия и стартового остатка не хранится — это проверяет БД
+     * (chk_transactions_income_only_deposit).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "income_type", length = 30)
+    private IncomeType incomeType;
 
     @Column(name = "comment", length = 500)
     private String comment;

@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.IncomeType;
 import ru.money.goldentaurusbank.www.backend.model.dto.enums.TransactionKind;
 
 import java.math.BigDecimal;
@@ -25,6 +26,8 @@ public class TransactionDto {
     private String description;
     private List<DescriptionSegmentDto> descriptionSegments;
     private String comment;
+    /** Тип дохода — заполнен только у классифицированного пополнения. */
+    private IncomeType incomeType;
     private LocalDateTime createdAt;
     private LocalDateTime dateOperation;
     private boolean imported;

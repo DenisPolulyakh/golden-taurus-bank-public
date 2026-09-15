@@ -8,8 +8,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.money.goldentaurusbank.www.backend.infrastructure.exception.ApplicationException;
 import ru.money.goldentaurusbank.www.backend.model.domain.*;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.IncomeType;
 import ru.money.goldentaurusbank.www.backend.model.dto.enums.TransactionKind;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.RefillBullionRequest;
+import ru.money.goldentaurusbank.www.backend.model.dto.request.UpdateIncomeTypeRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.TransferRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.WithdrawBullionRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.*;
@@ -62,7 +64,14 @@ public class TransactionService {
     public Transaction deposit(Long targetBullionId, BigDecimal amount, User user,
                                String comment, LocalDateTime dateOperation, Long batchId,
                                boolean budgetOperation) {
-        return record(null, targetBullionId, amount, user, comment, dateOperation, batchId, false, false, null, budgetOperation);
+        return deposit(targetBullionId, amount, user, comment, dateOperation, batchId, budgetOperation, null);
+    }
+
+    @Transactional
+    public Transaction deposit(Long targetBullionId, BigDecimal amount, User user,
+                               String comment, LocalDateTime dateOperation, Long batchId,
+                               boolean budgetOperation, IncomeType incomeType) {
+        return record(null, targetBullionId, amount, user, comment, dateOperation, batchId, false, false, null, budgetOperation, incomeType);
     }
 
     @Transactional
@@ -75,7 +84,7 @@ public class TransactionService {
     public Transaction withdraw(Long sourceBullionId, BigDecimal amount, User user,
                                 String comment, LocalDateTime dateOperation, Long batchId,
                                 boolean budgetOperation) {
-        return record(sourceBullionId, null, amount, user, comment, dateOperation, batchId, false, false, null, budgetOperation);
+        return record(sourceBullionId, null, amount, user, comment, dateOperation, batchId, false, false, null, budgetOperation, null);
     }
 
     @Transactional
@@ -88,7 +97,7 @@ public class TransactionService {
     public Transaction transfer(Long sourceBullionId, Long targetBullionId, BigDecimal amount, User user,
                                 String comment, LocalDateTime dateOperation, Long batchId,
                                 boolean budgetOperation) {
-        return record(sourceBullionId, targetBullionId, amount, user, comment, dateOperation, batchId, false, false, null, budgetOperation);
+        return record(sourceBullionId, targetBullionId, amount, user, comment, dateOperation, batchId, false, false, null, budgetOperation, null);
     }
 
     /**
@@ -100,7 +109,7 @@ public class TransactionService {
     @Transactional
     public Transaction openingBalance(Long targetBullionId, BigDecimal amount, User user,
                                       String comment, LocalDateTime dateOperation) {
-        return record(null, targetBullionId, amount, user, comment, dateOperation, null, true, false, null, false);
+        return record(null, targetBullionId, amount, user, comment, dateOperation, null, true, false, null, false, null);
     }
 
     /**
@@ -127,7 +136,7 @@ public class TransactionService {
     private Transaction record(Long sourceBullionId, Long targetBullionId, BigDecimal amount, User user,
                                String comment, LocalDateTime dateOperation, Long batchId,
                                boolean openingBalance, boolean imported, Long reversalOfId,
-                               boolean budgetOperation) {
+                               boolean budgetOperation, IncomeType incomeType) {
 
         if (sourceBullionId == null && targetBullionId == null) {
             throw new ApplicationException(BULLION_NOT_FOUND.getCode(), "Не указан ни один слиток операции");
@@ -135,6 +144,11 @@ public class TransactionService {
         if (Objects.equals(sourceBullionId, targetBullionId)) {
             throw new ApplicationException(CANNOT_TRANSFER_TO_SAME_VAULT.getCode(),
                     "Слиток-отправитель и слиток-получатель совпадают");
+        }
+        boolean isDeposit = sourceBullionId == null && targetBullionId != null && !openingBalance;
+        if (incomeType != null && !isDeposit) {
+            throw new ApplicationException(INCOME_TYPE_NOT_ALLOWED.getCode(),
+                    "Тип дохода можно указать только у пополнения слитка");
         }
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new ApplicationException(CHANGE_AMOUNT_ZERO.getCode(), CHANGE_AMOUNT_ZERO.getMessage());
@@ -171,6 +185,7 @@ public class TransactionService {
                 .reversalOfId(reversalOfId)
                 .batchId(batchId)
                 .budgetOperation(budgetOperation)
+                .incomeType(incomeType)
                 .build());
 
         log.info("Transaction recorded: id={}, kind={}, source={}, target={}, amount={}",
@@ -192,8 +207,35 @@ public class TransactionService {
         Bullion bullion = resolveBullion(user, request.getBullionNameId(), request.getVaultId());
         requireIncomeAllowed(bullion);
         deposit(bullion.getId(), request.getAmount(), user, request.getUserComment(), request.getDateOperation(), batchId,
-                budgetOperationOrDefault(request.getBudgetOperation(), true));
+                budgetOperationOrDefault(request.getBudgetOperation(), true), request.getIncomeType());
         return bullion;
+    }
+
+    /**
+     * Правка или сброс типа дохода у уже проведённого пополнения — этим же
+     * путём размечаются задним числом старые операции, заведённые до появления
+     * классификации.
+     */
+    @Transactional
+    public TransactionDto updateIncomeType(Long transactionId, User user, UpdateIncomeTypeRequest request) {
+        Transaction transaction = transactionRepository.findById(transactionId)
+                .orElseThrow(() -> new ApplicationException(TRANSACTION_NOT_FOUND.getCode(), TRANSACTION_NOT_FOUND.getMessage()));
+
+        if (!transaction.getUserId().equals(user.getId())) {
+            throw new ApplicationException(ACCESS_DENIED.getCode(), ACCESS_DENIED.getMessage());
+        }
+        if (transaction.getKind() != TransactionKind.DEPOSIT) {
+            throw new ApplicationException(INCOME_TYPE_UPDATE_NOT_ALLOWED.getCode(), INCOME_TYPE_UPDATE_NOT_ALLOWED.getMessage());
+        }
+        if (transactionRepository.existsByReversalOfId(transactionId)) {
+            throw new ApplicationException(INCOME_TYPE_UPDATE_NOT_ALLOWED.getCode(), INCOME_TYPE_UPDATE_NOT_ALLOWED.getMessage());
+        }
+
+        transaction.setIncomeType(request.getIncomeType());
+        transactionRepository.save(transaction);
+        log.info("Income type updated: transactionId={}, incomeType={}", transactionId, request.getIncomeType());
+
+        return toDtos(List.of(transaction)).get(0);
     }
 
     @Transactional
@@ -377,7 +419,11 @@ public class TransactionService {
                 // Корзину копируем обязательно: иначе трата уйдёт в одну сумму,
                 // а её откат — в другую, и остаток бюджета разъедется с суммой
                 // слитка при верной сумме слитка. Молчаливый разрыв тождества.
-                original.isBudgetOperation()
+                original.isBudgetOperation(),
+                // Тип дохода не копируем: результат отката — списание (withdraw),
+                // тип дохода бывает только у пополнения, и запись отменяет операцию,
+                // а не повторяет её смысл.
+                null
         );
     }
 
@@ -690,6 +736,7 @@ public class TransactionService {
                 .description(buildDescription(transaction))
                 .descriptionSegments(buildDescriptionSegments(transaction))
                 .comment(transaction.getComment())
+                .incomeType(transaction.getIncomeType())
                 .createdAt(transaction.getCreatedAt())
                 .dateOperation(transaction.getDateOperation())
                 .imported(transaction.isImported())
