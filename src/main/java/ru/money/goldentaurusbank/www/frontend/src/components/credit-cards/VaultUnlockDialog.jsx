@@ -8,11 +8,6 @@ import { WRONG_PASSPHRASE } from '@/lib/cardVault'
 import { NO_PIN, PIN_BLOCKED, PIN_LENGTH, WRONG_PIN } from '@/lib/vaultPin'
 import { useCardVault } from './CardVaultProvider'
 
-const MIN_WORDS = 4
-
-function countWords(value) {
-    return value.trim().split(/\s+/).filter(Boolean).length
-}
 
 function VaultUnlockDialog() {
     const {
@@ -73,10 +68,6 @@ function VaultUnlockDialog() {
 
     const submitPassphrase = async () => {
         if (!exists) {
-            if (countWords(passphrase) < MIN_WORDS) {
-                setError(`Фраза должна состоять минимум из ${MIN_WORDS} слов`)
-                return
-            }
             if (passphrase !== confirmation) {
                 setError('Фразы не совпадают')
                 return
@@ -167,7 +158,7 @@ function VaultUnlockDialog() {
                         />
                         {!exists && (
                             <FieldDescription>
-                                Минимум {MIN_WORDS} случайных слова, например: тапок компот вулкан редиска
+                                Случайные слова, например: тапок компот вулкан редиска или носорог
                             </FieldDescription>
                         )}
                     </Field>

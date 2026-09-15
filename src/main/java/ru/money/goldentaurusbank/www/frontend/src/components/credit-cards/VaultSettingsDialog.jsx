@@ -7,12 +7,6 @@ import { InfoDialog } from '@/components/ui-app/form-dialog'
 import { PIN_LENGTH } from '@/lib/vaultPin'
 import { useCardVault } from './CardVaultProvider'
 
-const MIN_WORDS = 4
-
-function countWords(value) {
-    return value.trim().split(/\s+/).filter(Boolean).length
-}
-
 function VaultSettingsDialog({ open, onOpenChange }) {
     const { busy, pinEnabled, enablePin, disablePin, rotateVaultKey, replacePassphrase } = useCardVault()
 
@@ -56,10 +50,6 @@ function VaultSettingsDialog({ open, onOpenChange }) {
 
     const handleChangePassphrase = async () => {
         setError('')
-        if (countWords(passphrase) < MIN_WORDS) {
-            setError(`Фраза должна состоять минимум из ${MIN_WORDS} слов`)
-            return
-        }
         if (passphrase !== passphraseConfirm) {
             setError('Фразы не совпадают')
             return
@@ -149,7 +139,7 @@ function VaultSettingsDialog({ open, onOpenChange }) {
                             value={passphrase}
                             onChange={(e) => setPassphrase(e.target.value)}
                         />
-                        <FieldDescription>Минимум {MIN_WORDS} слова. Карты не перешифровываются</FieldDescription>
+                        <FieldDescription>Карты не перешифровываются, меняется только обёртка ключа</FieldDescription>
                     </Field>
                     <Field>
                         <FieldLabel htmlFor="vault-new-phrase-confirm">Повторите фразу</FieldLabel>
