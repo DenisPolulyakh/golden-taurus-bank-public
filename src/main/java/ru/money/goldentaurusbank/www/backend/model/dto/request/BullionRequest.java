@@ -5,6 +5,7 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import ru.money.goldentaurusbank.www.backend.model.dto.enums.BullionType;
+import ru.money.goldentaurusbank.www.backend.model.dto.enums.IncomeType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -30,6 +31,13 @@ public class BullionRequest {
     private BullionType bullionType;
 
     private LocalDateTime dateOperation;
+
+    /**
+     * Тип дохода — используется только когда запрос идёт в пополнение уже
+     * существующего слитка (см. BullionService.createBullion); у стартового
+     * остатка нового слитка игнорируется, это не доход.
+     */
+    private IncomeType incomeType;
 
     @Size(max = 500, message = "Комментарий не должен превышать 500 символов")
     private String userComment;

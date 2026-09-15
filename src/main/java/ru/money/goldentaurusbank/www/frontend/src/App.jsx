@@ -15,6 +15,7 @@ import VaultBullionsPage from './components/bullions/VaultBullionsPage';
 import CreditCardsPage from './components/credit-cards/CreditCardsPage';
 import TransactionHistoryPage from './components/history/TransactionHistoryPage';
 import ReportsPage from './components/reports/ReportsPage';
+import IncomePage from './components/income/IncomePage';
 import api, { setAccessToken, clearAccessToken } from './api/axios';
 import BankDetailPage from './components/banks/BankDetailPage';
 import SettingsPage from './components/settings/SettingsPage';
@@ -188,6 +189,15 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <ReportsPage />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    <Route
+                        path="/income"
+                        element={
+                            <ProtectedRoute>
+                                <IncomePage />
                             </ProtectedRoute>
                         }
                     />

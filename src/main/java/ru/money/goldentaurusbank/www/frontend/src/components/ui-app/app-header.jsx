@@ -1,5 +1,5 @@
 import { Link, NavLink } from 'react-router-dom'
-import { ChartColumnBig, Coins, FolderTree, History, Landmark, LogOut, Settings, SlidersHorizontal, Vault, Wallet } from 'lucide-react'
+import { ChartColumnBig, Coins, FolderTree, History, Landmark, LogOut, Settings, SlidersHorizontal, TrendingUp, Vault, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
     DropdownMenu,
@@ -17,6 +17,7 @@ const NAV = [
     { to: '/vaults', label: 'Хранилища', icon: Vault },
     { to: '/credit-cards', label: 'Кредитные карты', icon: Wallet },
     { to: '/transactions', label: 'История', icon: History },
+    { to: '/income', label: 'Доходы', icon: TrendingUp },
     { to: '/reports', label: 'Отчёты', icon: ChartColumnBig },
 ]
 

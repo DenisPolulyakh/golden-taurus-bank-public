@@ -15,9 +15,13 @@ import ru.money.goldentaurusbank.www.backend.infrastructure.exception.Applicatio
 import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.DashboardDailyStatisticsDto;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.DashboardStatisticsDto;
+import ru.money.goldentaurusbank.www.backend.model.dto.request.UpdateIncomeTypeRequest;
+import ru.money.goldentaurusbank.www.backend.model.dto.statistic.IncomeStatisticsDto;
+import ru.money.goldentaurusbank.www.backend.model.dto.statistic.IncomeTypeOptionDto;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.TransactionDto;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.TransactionHistoryResponse;
 import ru.money.goldentaurusbank.www.backend.repository.UserRepository;
+import ru.money.goldentaurusbank.www.backend.service.IncomeStatisticsService;
 import ru.money.goldentaurusbank.www.backend.service.TransactionService;
 
 import java.time.LocalDate;
@@ -33,6 +37,7 @@ import static ru.money.goldentaurusbank.www.backend.model.dto.enums.ResponseCode
 public class TransactionController {
 
     private final TransactionService transactionService;
+    private final IncomeStatisticsService incomeStatisticsService;
     private final UserRepository userRepository;  // Добавить
 
     /**
@@ -85,6 +90,33 @@ public class TransactionController {
     }
 
     /**
+     * Статистика доходов по типам для графиков. granularity=DAY — по дням
+     * заданного месяца, MONTH — по месяцам заданного года, YEAR — по годам,
+     * начиная с первого классифицированного дохода.
+     */
+    @GetMapping("/income-statistics")
+    public ResponseEntity<IncomeStatisticsDto> getIncomeStatistics(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam String granularity,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month) {
+
+        User user = getUserFromUserDetails(userDetails);
+        log.info("Get income statistics for user: {}, granularity: {}, year: {}, month: {}",
+                user.getId(), granularity, year, month);
+        IncomeStatisticsDto statistics = incomeStatisticsService.getIncomeStatistics(user.getId(), granularity, year, month);
+        return ResponseEntity.ok(statistics);
+    }
+
+    /**
+     * Справочник типов дохода для выпадающего списка на фронте
+     */
+    @GetMapping("/income-types")
+    public ResponseEntity<List<IncomeTypeOptionDto>> getIncomeTypes() {
+        return ResponseEntity.ok(incomeStatisticsService.getIncomeTypes());
+    }
+
+    /**
      * Получить доступные года для фильтрации
      */
     @GetMapping("/available-years")
@@ -95,6 +127,21 @@ public class TransactionController {
         log.info("Get available years for user: {}", user.getId());
         List<Integer> years = transactionService.getAvailableYears(user.getId());
         return ResponseEntity.ok(years);
+    }
+
+    /**
+     * Проставить или сбросить тип дохода у уже проведённой операции
+     */
+    @PatchMapping("/{id}/income-type")
+    public ResponseEntity<TransactionDto> updateIncomeType(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long id,
+            @RequestBody UpdateIncomeTypeRequest request) {
+
+        User user = getUserFromUserDetails(userDetails);
+        log.info("Update income type: user={}, transactionId={}, incomeType={}", user.getId(), id, request.getIncomeType());
+        TransactionDto dto = transactionService.updateIncomeType(id, user, request);
+        return ResponseEntity.ok(dto);
     }
 
     /**

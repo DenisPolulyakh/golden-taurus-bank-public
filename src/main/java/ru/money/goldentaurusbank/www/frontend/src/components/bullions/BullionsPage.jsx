@@ -15,6 +15,7 @@ import { formatAmount } from '@/lib/format'
 import BullionModal from './BullionModal'
 import BullionTypeStamp from './BullionTypeStamp'
 import { useBudgetBullionId } from '@/components/hooks/useBudgetBullion'
+import { useIncomeTypes } from '@/components/hooks/useIncomeTypes'
 import BullionTransactionModal from './BullionTransactionModal'
 import CreditCardOperationModal from '../credit-cards/CreditCardOperationModal'
 import { isEmptyBullionAmount, notifyAmountChange } from './bullionAmount'
@@ -22,6 +23,7 @@ import { isEmptyBullionAmount, notifyAmountChange } from './bullionAmount'
 function BullionsPage() {
     // Галочку «Трата бюджета» показываем только у бюджетного слитка
     const budgetBullionId = useBudgetBullionId();
+    const incomeTypes = useIncomeTypes();
     const [groupedData, setGroupedData] = useState(null);
     const [bullionNameBullions, setBullionNameBullions] = useState([]);
     const [allVaults, setAllVaults] = useState([]);
@@ -237,7 +239,7 @@ function BullionsPage() {
         });
     };
 
-    const handleRefill = async (amount, description, vaultId, dateOperation, budgetOperation) => {
+    const handleRefill = async (amount, description, vaultId, dateOperation, budgetOperation, incomeType) => {
         try {
             await api.post('/bullions/refill', {
                 bullionNameId: transactionModal.bullionNameId,
@@ -245,7 +247,8 @@ function BullionsPage() {
                 amount: amount,
                 description: description,
                 dateOperation: dateOperation,
-                budgetOperation: budgetOperation
+                budgetOperation: budgetOperation,
+                incomeType: incomeType
             });
             await fetchGroupedBullions();
         } catch (err) {
@@ -845,6 +848,7 @@ function BullionsPage() {
                         getVaultsForBullionName(transactionModal.bullionNameId)
                             .some((vault) => vault.bullionId === budgetBullionId)
                     }
+                    incomeTypes={incomeTypes}
                     maxTransferAmount={currentTransaction.type === 'transfer' ? 0 : 0} // не используется для refill/withdraw/delete
                     transferTargets={currentTransaction.type === 'transfer' ? getTransferTargets() : []}
                     fromBullionId={currentTransaction.type === 'transfer' ? null : null}

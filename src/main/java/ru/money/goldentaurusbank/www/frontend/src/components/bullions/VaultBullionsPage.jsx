@@ -15,6 +15,7 @@ import { formatAmount, formatDate } from '@/lib/format'
 import BullionModal from './BullionModal'
 import BullionTypeStamp from './BullionTypeStamp'
 import { useBudgetBullionId } from '@/components/hooks/useBudgetBullion'
+import { useIncomeTypes } from '@/components/hooks/useIncomeTypes'
 import BullionTransactionModal from './BullionTransactionModal'
 import CreditCardOperationModal from '../credit-cards/CreditCardOperationModal'
 import { isEmptyBullionAmount, notifyAmountChange } from './bullionAmount'
@@ -22,6 +23,7 @@ import { isEmptyBullionAmount, notifyAmountChange } from './bullionAmount'
 function VaultBullionsPage() {
     // Галочку «Трата бюджета» показываем только у бюджетного слитка
     const budgetBullionId = useBudgetBullionId();
+    const incomeTypes = useIncomeTypes();
     const { vaultId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -288,7 +290,7 @@ function VaultBullionsPage() {
         }
     };
 
-    const handleRefill = async (amount, userComment, selectedVaultId, dateOperation, budgetOperation) => {
+    const handleRefill = async (amount, userComment, selectedVaultId, dateOperation, budgetOperation, incomeType) => {
         setActionLoading(true);
         try {
             await api.post('/bullions/refill', {
@@ -297,7 +299,8 @@ function VaultBullionsPage() {
                 amount: amount,
                 userComment: userComment,
                 dateOperation: dateOperation ? dateOperation : null,
-                budgetOperation: budgetOperation
+                budgetOperation: budgetOperation,
+                incomeType: incomeType
             });
             closeTransactionModal();
             await refreshData();
@@ -696,6 +699,7 @@ function VaultBullionsPage() {
                         ['refill', 'withdraw'].includes(currentTransaction.type) &&
                         transactionModal.bullion?.budget === true
                     }
+                    incomeTypes={incomeTypes}
                     initialDateOperation={transactionModal.dateOperation}
                     availableAmount={transactionModal.bullion?.amount}
                 />
