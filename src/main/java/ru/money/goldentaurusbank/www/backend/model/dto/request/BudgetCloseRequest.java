@@ -1,16 +1,18 @@
 package ru.money.goldentaurusbank.www.backend.model.dto.request;
 
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/** Закрытие месяца: остаток бюджета уходит переводом на выбранный слиток. */
+/**
+ * Закрытие месяца: снимок фиксируется всегда. Остаток бюджета, если он есть,
+ * уходит переводом на targetBullionId — тогда поле обязательно. Без остатка
+ * (0 или минус) поле не нужно, переносить нечего.
+ */
 @Data
 public class BudgetCloseRequest {
 
-    @NotNull(message = "Слиток, куда уводить остаток, обязателен")
     private Long targetBullionId;
 
     /** Пусто — последний день месяца */

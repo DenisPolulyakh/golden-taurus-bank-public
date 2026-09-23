@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.time.YearMonth;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -389,16 +390,255 @@ class BudgetIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("Закрывать нечего - ошибка, а не пустой перевод")
-    void closeEmptyMonthIsRejected() throws Exception {
+    @DisplayName("Закрытие пишет снимок плана, финансирования, трат и остатка на момент закрытия")
+    void closeMonthWritesSnapshot() throws Exception {
+        fundToPlan();
+        withdraw(walletId, "97460.61", "2026-08-15T09:00:00", true);
+
+        JsonNode report = close(YEAR, MONTH, incomeId);
+
+        assertTrue(report.get("closed").asBoolean());
+        assertFalse(report.get("snapshotMismatch").asBoolean());
+
+        JsonNode snapshot = report.get("snapshot");
+        assertAmount("100000.00", snapshot, "plannedAmount");
+        assertAmount("100000.00", snapshot, "funding");
+        assertAmount("97460.61", snapshot, "spent");
+        assertAmount("2539.39", snapshot, "closingBalance");
+        assertAmount("2539.39", snapshot, "remainderTransferred");
+        assertEquals("Доход текущий", snapshot.get("remainderTargetBullion").get("title").asText());
+    }
+
+    @Test
+    @DisplayName("Остатка нет - закрытие проходит без targetBullionId и без перевода")
+    void closeMonthWithoutRemainderNeedsNoTarget() throws Exception {
+        fundToPlan();
+        withdraw(walletId, "100000.00", "2026-08-15T09:00:00", true);
+        BigDecimal incomeBefore = bullionAmount(incomeId);
+
+        JsonNode report = close(YEAR, MONTH, null);
+
+        assertTrue(report.get("closed").asBoolean());
+        JsonNode snapshot = report.get("snapshot");
+        assertAmount("0.00", snapshot, "closingBalance");
+        assertAmount("0.00", snapshot, "remainderTransferred");
+        assertTrue(snapshot.get("remainderTargetBullion").isNull());
+        assertEquals(0, incomeBefore.compareTo(bullionAmount(incomeId)));
+    }
+
+    @Test
+    @DisplayName("План не задавали - в снимке он тоже пустой, а не ноль")
+    void closeMonthWithoutPlanLeavesSnapshotPlanNull() throws Exception {
+        // В setUp план задан на август и на текущий месяц (CURRENT) - берём
+        // соседний месяц, но не CURRENT: тесты гоняются и в августе, и в
+        // сентябре, и план CURRENT не должен туда случайно попасть.
+        int noPlanMonth = MONTH == 12 ? 1 : MONTH + 1;
+        if (CURRENT.getYear() == YEAR && CURRENT.getMonthValue() == noPlanMonth) {
+            noPlanMonth = noPlanMonth == 12 ? 1 : noPlanMonth + 1;
+        }
+        String date = "2026-%02d-05T0%d:00:00";
+
+        // Сначала финансирование, потом трата - иначе списывать не с чего.
+        transfer(incomeId, walletId, "1000.00", date.formatted(noPlanMonth, 8), false);
+        withdraw(walletId, "1000.00", date.formatted(noPlanMonth, 9), true);
+
+        JsonNode report = close(YEAR, noPlanMonth, null);
+
+        assertTrue(report.get("snapshot").get("plannedAmount").isNull());
+    }
+
+    @Test
+    @DisplayName("Остаток положительный - без targetBullionId закрытие отклоняется")
+    void closeMonthWithRemainderRequiresTarget() throws Exception {
+        fundToPlan();
+        withdraw(walletId, "97460.61", "2026-08-15T09:00:00", true);
+
         mockMvc.perform(post("/api/budget/%d/%d/close".formatted(YEAR, MONTH))
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                { "targetBullionId": %d }
-                                """.formatted(incomeId)))
+                        .content("{}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(4037));
+                .andExpect(jsonPath("$.code").value(4039));
+    }
+
+    @Test
+    @DisplayName("Повторное закрытие уже закрытого месяца отклоняется")
+    void closingAlreadyClosedMonthIsRejected() throws Exception {
+        close(YEAR, MONTH, null);
+
+        mockMvc.perform(post("/api/budget/%d/%d/close".formatted(YEAR, MONTH))
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(4045));
+    }
+
+    // ------------------------------------------------------------------
+    // Запреты в закрытом месяце
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("План закрытого месяца менять нельзя")
+    void settingPlanOnClosedMonthIsRejected() throws Exception {
+        close(YEAR, MONTH, null);
+
+        mockMvc.perform(put("/api/budget/%d/%d/plan".formatted(YEAR, MONTH))
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "plannedAmount": 50000.00 }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(4046));
+    }
+
+    @Test
+    @DisplayName("Финансировать закрытый месяц нельзя")
+    void fundingClosedMonthIsRejected() throws Exception {
+        close(YEAR, MONTH, null);
+
+        mockMvc.perform(post("/api/budget/%d/%d/fund".formatted(YEAR, MONTH))
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(4046));
+    }
+
+    @Test
+    @DisplayName("Откатить операцию закрытого месяца нельзя")
+    void rollbackInClosedMonthIsRejected() throws Exception {
+        transfer(incomeId, walletId, "1000.00", "2026-08-05T08:00:00", false);
+        Long transactionId = withdraw(walletId, "1000.00", "2026-08-05T09:00:00", true);
+        close(YEAR, MONTH, null);
+
+        mockMvc.perform(post("/api/budget/%d/%d/transactions/%d/rollback".formatted(YEAR, MONTH, transactionId))
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(4046));
+    }
+
+    @Test
+    @DisplayName("Переразметить операцию закрытого месяца нельзя")
+    void bucketChangeInClosedMonthIsRejected() throws Exception {
+        transfer(incomeId, walletId, "1000.00", "2026-08-05T08:00:00", false);
+        Long transactionId = withdraw(walletId, "1000.00", "2026-08-05T09:00:00", true);
+        close(YEAR, MONTH, null);
+
+        mockMvc.perform(patch("/api/budget/transactions/%d/bucket".formatted(transactionId))
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "budgetOperation": false }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(4046));
+    }
+
+    @Test
+    @DisplayName("Закрытие одного месяца не мешает редактировать другой")
+    void otherMonthsStayEditableAfterClose() throws Exception {
+        close(YEAR, MONTH, null);
+
+        mockMvc.perform(put("/api/budget/%d/%d/plan".formatted(YEAR, MONTH + 1))
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "plannedAmount": 50000.00 }
+                                """))
+                .andExpect(status().isOk());
+
+        fundToPlan(YEAR, MONTH + 1);
+
+        assertAmount("50000.00", month(YEAR, MONTH + 1), "funding");
+    }
+
+    // ------------------------------------------------------------------
+    // Переоткрытие
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("Переоткрыть незакрытый месяц нельзя")
+    void reopenUnclosedMonthIsRejected() throws Exception {
+        mockMvc.perform(post("/api/budget/%d/%d/reopen".formatted(YEAR, MONTH))
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(4047));
+    }
+
+    @Test
+    @DisplayName("Переоткрытие откатывает перевод остатка - слитки возвращаются к исходным суммам")
+    void reopenRestoresRemainderTransfer() throws Exception {
+        fundToPlan();
+        withdraw(walletId, "97460.61", "2026-08-15T09:00:00", true);
+        BigDecimal incomeBeforeClose = bullionAmount(incomeId);
+
+        close(YEAR, MONTH, incomeId);
+
+        assertEquals(0, new BigDecimal("0.00").compareTo(bullionAmount(walletId)));
+        assertEquals(0, incomeBeforeClose.add(new BigDecimal("2539.39")).compareTo(bullionAmount(incomeId)));
+
+        JsonNode report = reopen(YEAR, MONTH);
+
+        assertFalse(report.get("closed").asBoolean());
+        assertTrue(report.get("snapshot").isNull());
+        assertEquals(0, new BigDecimal("2539.39").compareTo(bullionAmount(walletId)));
+        assertEquals(0, incomeBeforeClose.compareTo(bullionAmount(incomeId)));
+    }
+
+    @Test
+    @DisplayName("Переоткрытие без остатка просто стирает снимок, лишних операций не создаёт")
+    void reopenWithoutRemainderJustClearsSnapshot() throws Exception {
+        close(YEAR, MONTH, null);
+        long transactionsBefore = transactionCount();
+
+        JsonNode report = reopen(YEAR, MONTH);
+
+        assertFalse(report.get("closed").asBoolean());
+        assertEquals(transactionsBefore, transactionCount());
+    }
+
+    @Test
+    @DisplayName("После переоткрытия план и финансирование снова редактируются, месяц можно закрыть заново")
+    void reopenAllowsEditingAndReclosing() throws Exception {
+        close(YEAR, MONTH, null);
+        reopen(YEAR, MONTH);
+
+        setPlan(YEAR, MONTH, "80000.00");
+        fundToPlan();
+        withdraw(walletId, "80000.00", "2026-08-15T09:00:00", true);
+
+        JsonNode report = close(YEAR, MONTH, null);
+
+        assertTrue(report.get("closed").asBoolean());
+        assertAmount("80000.00", report.get("snapshot"), "plannedAmount");
+    }
+
+    // ------------------------------------------------------------------
+    // Расхождение со снимком
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("Смена бюджетного слитка после закрытия помечает расхождение со снимком")
+    void changingBudgetBullionAfterCloseFlagsMismatch() throws Exception {
+        fundToPlan();
+        withdraw(walletId, "97460.61", "2026-08-15T09:00:00", true);
+        close(YEAR, MONTH, incomeId);
+
+        setSettings(healthId, incomeId);
+
+        JsonNode report = month();
+        assertTrue(report.get("closed").asBoolean());
+        assertTrue(report.get("snapshotMismatch").asBoolean());
+    }
+
+    @Test
+    @DisplayName("Пока ничего не поменяли, закрытый месяц не расходится со снимком")
+    void snapshotMatchesWhenNothingChangedAfterClose() throws Exception {
+        fundToPlan();
+        withdraw(walletId, "97460.61", "2026-08-15T09:00:00", true);
+        close(YEAR, MONTH, incomeId);
+
+        assertFalse(month().get("snapshotMismatch").asBoolean());
     }
 
     // ------------------------------------------------------------------
@@ -501,6 +741,31 @@ class BudgetIntegrationTest extends IntegrationTestBase {
         assertAmount("0.00", report.get("months").get(0), "spent");
     }
 
+    @Test
+    @DisplayName("Годовая сводка помечает закрытые месяцы")
+    void yearlyReportMarksClosedMonths() throws Exception {
+        close(YEAR, MONTH, null);
+
+        JsonNode report = year(YEAR);
+
+        assertTrue(report.get("months").get(MONTH - 1).get("closed").asBoolean());
+        assertFalse(report.get("months").get(MONTH).get("closed").asBoolean());
+    }
+
+    @Test
+    @DisplayName("Годовая сводка помечает расхождение со снимком")
+    void yearlyReportMarksSnapshotMismatch() throws Exception {
+        fundToPlan();
+        withdraw(walletId, "97460.61", "2026-08-15T09:00:00", true);
+        close(YEAR, MONTH, incomeId);
+
+        setSettings(healthId, incomeId);
+
+        JsonNode report = year(YEAR);
+
+        assertTrue(report.get("months").get(MONTH - 1).get("snapshotMismatch").asBoolean());
+    }
+
     // ------------------------------------------------------------------
     // Вспомогательные методы
     // ------------------------------------------------------------------
@@ -542,6 +807,61 @@ class BudgetIntegrationTest extends IntegrationTestBase {
                         .formatted(CURRENT.getYear(), CURRENT.getMonthValue(), transactionId))
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk());
+    }
+
+    /** targetBullionId == null - тело {} как от клиента без остатка для переноса. */
+    private JsonNode close(int year, int month, Long targetBullionId) throws Exception {
+        entityManager.flush();
+        entityManager.clear();
+
+        String body = targetBullionId == null
+                ? "{}"
+                : "{ \"targetBullionId\": %d }".formatted(targetBullionId);
+
+        MvcResult result = mockMvc.perform(post("/api/budget/%d/%d/close".formatted(year, month))
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andReturn();
+        return json(result);
+    }
+
+    private JsonNode reopen(int year, int month) throws Exception {
+        entityManager.flush();
+        entityManager.clear();
+
+        MvcResult result = mockMvc.perform(post("/api/budget/%d/%d/reopen".formatted(year, month))
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        return json(result);
+    }
+
+    private JsonNode year(int year) throws Exception {
+        entityManager.flush();
+        entityManager.clear();
+
+        MvcResult result = mockMvc.perform(get("/api/budget/" + year)
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        return json(result);
+    }
+
+    private BigDecimal bullionAmount(Long bullionId) {
+        entityManager.flush();
+        Object value = entityManager
+                .createNativeQuery("SELECT amount FROM taurus.bullions WHERE id = " + bullionId)
+                .getSingleResult();
+        return new BigDecimal(value.toString());
+    }
+
+    private long transactionCount() {
+        entityManager.flush();
+        return ((Number) entityManager
+                .createNativeQuery("SELECT COUNT(*) FROM taurus.transactions")
+                .getSingleResult()).longValue();
     }
 
     /**

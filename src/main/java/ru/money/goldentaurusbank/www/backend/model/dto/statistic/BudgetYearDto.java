@@ -53,5 +53,11 @@ public class BudgetYearDto {
         private BigDecimal closingBalance;
 
         private Long transactionCount;
+
+        /** Месяц закрыт closeMonth */
+        private boolean closed;
+
+        /** Живые цифры разошлись со снимком закрытия — см. BudgetMonthDto.snapshotMismatch */
+        private boolean snapshotMismatch;
     }
 }

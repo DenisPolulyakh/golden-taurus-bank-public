@@ -76,6 +76,9 @@ public enum ResponseCodes {
     TELEGRAM_LINK_NOT_FOUND(4042, "Привязка не найдена", HttpStatus.NOT_FOUND),
     INCOME_TYPE_NOT_ALLOWED(4043, "Тип дохода можно указать только у пополнения слитка", HttpStatus.BAD_REQUEST),
     INCOME_TYPE_UPDATE_NOT_ALLOWED(4044, "Тип дохода можно менять только у пополнения слитка, которое не откачено", HttpStatus.BAD_REQUEST),
+    BUDGET_MONTH_ALREADY_CLOSED(4045, "Месяц уже закрыт. Переоткройте его, если нужно что-то поправить", HttpStatus.BAD_REQUEST),
+    BUDGET_MONTH_CLOSED(4046, "Месяц закрыт — сначала переоткройте его", HttpStatus.BAD_REQUEST),
+    BUDGET_MONTH_NOT_CLOSED(4047, "Месяц не закрыт — переоткрывать нечего", HttpStatus.BAD_REQUEST),
 
 
     // Системные ошибки (5xxx)

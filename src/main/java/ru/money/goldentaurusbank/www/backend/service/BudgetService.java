@@ -17,6 +17,7 @@ import ru.money.goldentaurusbank.www.backend.model.dto.request.BudgetSettingsReq
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.BudgetBullionDto;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.BudgetDayDto;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.BudgetMonthDto;
+import ru.money.goldentaurusbank.www.backend.model.dto.statistic.BudgetMonthSnapshotDto;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.BudgetYearDto;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.TransactionDto;
 import ru.money.goldentaurusbank.www.backend.repository.BudgetMonthRepository;
@@ -100,6 +101,10 @@ public class BudgetService {
                 .findByUserAndYearAndMonth(user, period.getYear(), period.getMonthValue());
         BigDecimal planned = plan.map(BudgetMonth::getPlannedAmount).orElse(null);
 
+        BudgetMonthSnapshotDto snapshot = plan.filter(BudgetMonth::isClosed)
+                .map(p -> buildSnapshot(p, user)).orElse(null);
+        boolean snapshotMismatch = snapshot != null && !snapshotMatches(snapshot, planned, spent, funding);
+
         return BudgetMonthDto.builder()
                 .year(period.getYear())
                 .month(period.getMonthValue())
@@ -120,7 +125,66 @@ public class BudgetService {
                 .discrepancy(scaled(closingBalance.subtract(controlBalance)))
                 .bullionAmount(bullion.getAmount())
                 .days(days)
+                .closed(snapshot != null)
+                .snapshot(snapshot)
+                .snapshotMismatch(snapshotMismatch)
                 .build();
+    }
+
+    /** Снимок месяца из закрытой строки {@link BudgetMonth}. */
+    private BudgetMonthSnapshotDto buildSnapshot(BudgetMonth plan, User user) {
+        return BudgetMonthSnapshotDto.builder()
+                .closedAt(plan.getClosedAt())
+                .plannedAmount(plan.getSnapshotPlanned())
+                .openingBalance(plan.getSnapshotOpeningBalance())
+                .funding(plan.getSnapshotFunding())
+                .spent(plan.getSnapshotSpent())
+                .closingBalance(plan.getSnapshotClosingBalance())
+                .remainderTransferred(plan.getRemainderTransferred())
+                .remainderTargetBullion(plan.getRemainderTargetBullionId() == null
+                        ? null : toDto(loadBullion(plan.getRemainderTargetBullionId(), user)))
+                .build();
+    }
+
+    /**
+     * Живые план/потрачено/финансирование против снимка. Финансирование
+     * сверяется с поправкой на уведённый остаток: сам перевод остатка входит
+     * в живое funding отрицательным слагаемым, иначе флаг загорался бы на
+     * каждом закрытом месяце с остатком, а не только при реальном расхождении.
+     */
+    private boolean snapshotMatches(BudgetMonthSnapshotDto snapshot, BigDecimal livePlanned,
+                                     BigDecimal liveSpent, BigDecimal liveFunding) {
+        BigDecimal remainder = snapshot.getRemainderTransferred() == null
+                ? BigDecimal.ZERO : snapshot.getRemainderTransferred();
+        BigDecimal expectedFunding = snapshot.getFunding() == null
+                ? null : scaled(snapshot.getFunding().subtract(remainder));
+
+        return amountsEqual(snapshot.getPlannedAmount(), livePlanned)
+                && amountsEqual(snapshot.getSpent(), liveSpent)
+                && amountsEqual(expectedFunding, liveFunding);
+    }
+
+    private static boolean amountsEqual(BigDecimal a, BigDecimal b) {
+        if (a == null && b == null) {
+            return true;
+        }
+        if (a == null || b == null) {
+            return false;
+        }
+        return a.compareTo(b) == 0;
+    }
+
+    /** Та же сверка, что и snapshotMatches, но прямо по строке {@link BudgetMonth} — для годовой сводки. */
+    private boolean yearSnapshotMatches(BudgetMonth plan, BigDecimal livePlanned,
+                                         BigDecimal liveSpent, BigDecimal liveFunding) {
+        BigDecimal remainder = plan.getRemainderTransferred() == null
+                ? BigDecimal.ZERO : plan.getRemainderTransferred();
+        BigDecimal expectedFunding = plan.getSnapshotFunding() == null
+                ? null : scaled(plan.getSnapshotFunding().subtract(remainder));
+
+        return amountsEqual(plan.getSnapshotPlanned(), livePlanned)
+                && amountsEqual(plan.getSnapshotSpent(), liveSpent)
+                && amountsEqual(expectedFunding, liveFunding);
     }
 
     /**
@@ -247,7 +311,8 @@ public class BudgetService {
             BigDecimal funding = row == null ? BigDecimal.ZERO : toAmount(row[2]);
             long count = row == null ? 0L : toLong(row[3]);
 
-            BigDecimal planned = Optional.ofNullable(plans.get(month))
+            BudgetMonth monthPlan = plans.get(month);
+            BigDecimal planned = Optional.ofNullable(monthPlan)
                     .map(BudgetMonth::getPlannedAmount).orElse(null);
 
             balance = scaled(balance.add(funding).subtract(spent));
@@ -256,6 +321,9 @@ public class BudgetService {
             if (planned != null) {
                 totalPlanned = totalPlanned.add(planned);
             }
+
+            boolean closed = monthPlan != null && monthPlan.isClosed();
+            boolean snapshotMismatch = closed && !yearSnapshotMatches(monthPlan, planned, spent, funding);
 
             months.add(BudgetYearDto.BudgetYearMonthDto.builder()
                     .month(month)
@@ -266,6 +334,8 @@ public class BudgetService {
                     .overspend(planned == null ? null : scaled(spent.subtract(planned)))
                     .closingBalance(balance)
                     .transactionCount(count)
+                    .closed(closed)
+                    .snapshotMismatch(snapshotMismatch)
                     .build());
         }
 
@@ -352,7 +422,8 @@ public class BudgetService {
 
     @Transactional
     public BudgetMonthDto setPlan(int year, int month, BudgetPlanRequest request, User user) {
-        YearMonth.of(year, month); // валидация месяца до записи в БД
+        YearMonth period = YearMonth.of(year, month); // валидация месяца до записи в БД
+        requireOpen(period, user);
 
         BudgetMonth plan = budgetMonthRepository.findByUserAndYearAndMonth(user, year, month)
                 .orElseGet(() -> BudgetMonth.builder()
@@ -380,6 +451,7 @@ public class BudgetService {
     @Transactional
     public BudgetMonthDto fund(int year, int month, BudgetFundRequest request, User user) {
         YearMonth period = YearMonth.of(year, month);
+        requireOpen(period, user);
         Bullion budget = requireBudgetBullion(user);
 
         Bullion source = request.getSourceBullionId() != null
@@ -429,35 +501,99 @@ public class BudgetService {
     }
 
     /**
-     * Увести остаток месяца на другой слиток. Не автоматизируем и не делаем
-     * обязательным: остаток можно и оставить, тогда он станет началом следующего
-     * месяца — так у бюджета появляется переходящий хвост, и это осознанный выбор.
+     * Закрывает месяц: фиксирует снимок план/факт на момент закрытия и, если
+     * есть остаток, уводит его на другой слиток. Остаток можно и оставить на
+     * бюджетном слитке — тогда он станет началом следующего месяца, это
+     * осознанный выбор, а не обязательный перенос.
+     * <p>
+     * Без остатка (0 или минус) месяц всё равно закрывается — переносить
+     * нечего, но снимок истории нужен так же.
      */
     @Transactional
     public BudgetMonthDto closeMonth(int year, int month, BudgetCloseRequest request, User user) {
         YearMonth period = YearMonth.of(year, month);
         Bullion budget = requireBudgetBullion(user);
-        Bullion target = loadBullion(request.getTargetBullionId(), user);
 
-        if (target.getId().equals(budget.getId())) {
-            throw new ApplicationException(BUDGET_SAME_BULLION.getCode(), BUDGET_SAME_BULLION.getMessage());
+        BudgetMonth plan = budgetMonthRepository.findByUserAndYearAndMonth(user, year, month)
+                .orElseGet(() -> BudgetMonth.builder().user(user).year(year).month(month).build());
+        if (plan.isClosed()) {
+            throw new ApplicationException(BUDGET_MONTH_ALREADY_CLOSED.getCode(), BUDGET_MONTH_ALREADY_CLOSED.getMessage());
         }
 
-        BigDecimal remainder = buildMonth(period, budget, user).getClosingBalance();
-        if (remainder.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new ApplicationException(BUDGET_NOTHING_TO_CLOSE.getCode(), BUDGET_NOTHING_TO_CLOSE.getMessage());
-        }
+        BudgetMonthDto snapshot = buildMonth(period, budget, user);
+        BigDecimal remainder = snapshot.getClosingBalance();
 
         LocalDateTime dateOperation = request.getDateOperation() != null
                 ? request.getDateOperation()
                 : period.atEndOfMonth().atTime(23, 59);
 
-        transactionService.transfer(budget.getId(), target.getId(), remainder, user,
-                comment(request.getComment(), "Остаток бюджета за " + period.atDay(1).format(MONTH_LABEL)),
-                dateOperation, null, false);
+        if (remainder.compareTo(BigDecimal.ZERO) > 0) {
+            if (request.getTargetBullionId() == null) {
+                throw new ApplicationException(TRANSFER_TARGET_NOT_SET.getCode(), TRANSFER_TARGET_NOT_SET.getMessage());
+            }
+            Bullion target = loadBullion(request.getTargetBullionId(), user);
+            if (target.getId().equals(budget.getId())) {
+                throw new ApplicationException(BUDGET_SAME_BULLION.getCode(), BUDGET_SAME_BULLION.getMessage());
+            }
+
+            Transaction closeTransaction = transactionService.transfer(budget.getId(), target.getId(), remainder, user,
+                    comment(request.getComment(), "Остаток бюджета за " + period.atDay(1).format(MONTH_LABEL)),
+                    dateOperation, null, false);
+
+            plan.setRemainderTransferred(remainder);
+            plan.setRemainderTargetBullionId(target.getId());
+            plan.setCloseTransactionId(closeTransaction.getId());
+        } else {
+            plan.setRemainderTransferred(BigDecimal.ZERO);
+            plan.setRemainderTargetBullionId(null);
+            plan.setCloseTransactionId(null);
+        }
+
+        plan.setClosedAt(LocalDateTime.now());
+        plan.setBudgetBullionId(budget.getId());
+        plan.setSnapshotPlanned(snapshot.getPlannedAmount());
+        plan.setSnapshotOpeningBalance(snapshot.getOpeningBalance());
+        plan.setSnapshotFunding(snapshot.getFunding());
+        plan.setSnapshotSpent(snapshot.getSpent());
+        plan.setSnapshotClosingBalance(snapshot.getClosingBalance());
+        budgetMonthRepository.save(plan);
 
         log.info("Budget month closed: userId={}, period={}-{}, remainder={}, targetBullionId={}",
-                user.getId(), year, month, remainder, target.getId());
+                user.getId(), year, month, remainder, plan.getRemainderTargetBullionId());
+
+        return getMonth(year, month, user);
+    }
+
+    /**
+     * Переоткрывает закрытый месяц: откатывает перевод остатка (если он был)
+     * и стирает снимок. План месяца не трогаем — он свойство месяца, а не
+     * закрытия. После переоткрытия месяц снова доступен бюджетным ручкам и
+     * его можно поправить и закрыть заново.
+     */
+    @Transactional
+    public BudgetMonthDto reopenMonth(int year, int month, User user) {
+        BudgetMonth plan = budgetMonthRepository.findByUserAndYearAndMonth(user, year, month)
+                .filter(BudgetMonth::isClosed)
+                .orElseThrow(() -> new ApplicationException(
+                        BUDGET_MONTH_NOT_CLOSED.getCode(), BUDGET_MONTH_NOT_CLOSED.getMessage()));
+
+        if (plan.getCloseTransactionId() != null) {
+            transactionService.rollbackTransaction(plan.getCloseTransactionId(), user);
+        }
+
+        plan.setClosedAt(null);
+        plan.setBudgetBullionId(null);
+        plan.setSnapshotPlanned(null);
+        plan.setSnapshotOpeningBalance(null);
+        plan.setSnapshotFunding(null);
+        plan.setSnapshotSpent(null);
+        plan.setSnapshotClosingBalance(null);
+        plan.setRemainderTransferred(null);
+        plan.setRemainderTargetBullionId(null);
+        plan.setCloseTransactionId(null);
+        budgetMonthRepository.save(plan);
+
+        log.info("Budget month reopened: userId={}, period={}-{}", user.getId(), year, month);
 
         return getMonth(year, month, user);
     }
@@ -475,6 +611,7 @@ public class BudgetService {
     public BudgetMonthDto rollbackOperation(Long transactionId, int year, int month, User user) {
         Transaction original = loadTransaction(transactionId, user);
         requireTouchesBudget(original, requireBudgetBullion(user));
+        requireOpen(YearMonth.from(original.getDateOperation()), user);
 
         transactionService.rollbackTransaction(transactionId, user);
         return getMonth(year, month, user);
@@ -493,6 +630,7 @@ public class BudgetService {
     public BudgetMonthDto setBucket(Long transactionId, boolean budgetOperation, User user) {
         Transaction transaction = loadTransaction(transactionId, user);
         requireTouchesBudget(transaction, requireBudgetBullion(user));
+        requireOpen(YearMonth.from(transaction.getDateOperation()), user);
 
         for (Transaction related : transactionRepository
                 .findByReversalOfIdOrIdOrderByCreatedAtAsc(transactionId, transactionId)) {
@@ -529,6 +667,19 @@ public class BudgetService {
         if (!touches) {
             throw new ApplicationException(TRANSACTION_NOT_BUDGET.getCode(), TRANSACTION_NOT_BUDGET.getMessage());
         }
+    }
+
+    /**
+     * Закрытый месяц не трогаем бюджетными ручками — план, финансирование,
+     * откат и перекладка в корзину меняют снимок задним числом, если не
+     * заблокировать их здесь.
+     */
+    private void requireOpen(YearMonth period, User user) {
+        budgetMonthRepository.findByUserAndYearAndMonth(user, period.getYear(), period.getMonthValue())
+                .filter(BudgetMonth::isClosed)
+                .ifPresent(plan -> {
+                    throw new ApplicationException(BUDGET_MONTH_CLOSED.getCode(), BUDGET_MONTH_CLOSED.getMessage());
+                });
     }
 
     private Transaction loadTransaction(Long transactionId, User user) {

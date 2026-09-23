@@ -112,16 +112,29 @@ public class BudgetController {
                 request == null ? new BudgetFundRequest() : request, user));
     }
 
+    /** Без остатка на бюджетном слитке тело можно не слать — переносить нечего, но снимок пишется всё равно. */
     @PostMapping("/{year}/{month}/close")
     public ResponseEntity<BudgetMonthDto> closeMonth(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable int year,
             @PathVariable int month,
-            @Valid @RequestBody BudgetCloseRequest request) {
+            @Valid @RequestBody(required = false) BudgetCloseRequest request) {
 
         User user = getUserFromUserDetails(userDetails);
         log.info("Close budget month {}-{} for user: {}", year, month, user.getId());
-        return ResponseEntity.ok(budgetService.closeMonth(year, month, request, user));
+        return ResponseEntity.ok(budgetService.closeMonth(year, month,
+                request == null ? new BudgetCloseRequest() : request, user));
+    }
+
+    @PostMapping("/{year}/{month}/reopen")
+    public ResponseEntity<BudgetMonthDto> reopenMonth(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable int year,
+            @PathVariable int month) {
+
+        User user = getUserFromUserDetails(userDetails);
+        log.info("Reopen budget month {}-{} for user: {}", year, month, user.getId());
+        return ResponseEntity.ok(budgetService.reopenMonth(year, month, user));
     }
 
     @PostMapping("/{year}/{month}/transactions/{id}/rollback")
