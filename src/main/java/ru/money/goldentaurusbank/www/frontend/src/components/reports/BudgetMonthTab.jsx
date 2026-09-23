@@ -15,7 +15,9 @@ import {
     AlertTriangle,
     ChevronDown,
     ChevronRight,
+    Lock,
     PiggyBank,
+    RotateCcw,
     Target,
     TrendingDown,
     Undo2,
@@ -278,17 +280,34 @@ const BudgetMonthTab = () => {
         setSaving(true)
         try {
             const { data } = await api.post(`/budget/${year}/${month}/close`, {
-                targetBullionId: Number(closeForm.targetBullionId),
+                targetBullionId: closeForm.targetBullionId ? Number(closeForm.targetBullionId) : null,
                 comment: closeForm.comment || null,
             })
             applyReport(data)
             setCloseDialog(false)
-            toast.success('Месяц закрыт, остаток уведён')
+            toast.success(hasRemainder ? 'Месяц закрыт, остаток уведён' : 'Месяц закрыт')
         } catch (err) {
             console.error('Error closing month:', err)
         } finally {
             setSaving(false)
         }
+    }
+
+    const handleReopen = () => {
+        const remainder = report?.snapshot?.remainderTransferred
+        confirm({
+            title: 'Переоткрыть месяц',
+            description:
+                remainder && Number(remainder) > 0
+                    ? `Перевод остатка ${formatCurrency(remainder)} будет отменён. Снимок сотрётся, план и операции месяца снова можно будет менять.`
+                    : 'Снимок сотрётся, план и операции месяца снова можно будет менять.',
+            confirmText: 'Переоткрыть',
+            onConfirm: async () => {
+                const { data } = await api.post(`/budget/${year}/${month}/reopen`)
+                applyReport(data)
+                toast.success('Месяц переоткрыт')
+            },
+        })
     }
 
     const openFundDialog = () => {
@@ -306,6 +325,7 @@ const BudgetMonthTab = () => {
     }
 
     const fundedToPlan = planned != null && toCents(report?.funding) >= toCents(planned)
+    const hasRemainder = toCents(report?.closingBalance) > 0
     const years = Array.from({ length: 6 }, (_, i) => today.getFullYear() - 4 + i)
 
     return (
@@ -361,8 +381,14 @@ const BudgetMonthTab = () => {
                     </div>
 
                     {budgetBullion && (
-                        <div className="ml-auto flex flex-wrap gap-2">
-                            <Button variant="outline" onClick={() => {
+                        <div className="ml-auto flex flex-wrap items-center gap-2">
+                            {report?.closed && (
+                                <Badge variant="secondary" className="gap-1">
+                                    <Lock className="size-3" />
+                                    Закрыт{report.snapshot?.closedAt ? ` ${formatDateTime(report.snapshot.closedAt)}` : ''}
+                                </Badge>
+                            )}
+                            <Button variant="outline" disabled={report?.closed} onClick={() => {
                                 setPlanForm({
                                     plannedAmount: planned != null ? String(planned) : '',
                                     comment: report?.planComment || '',
@@ -372,7 +398,7 @@ const BudgetMonthTab = () => {
                                 <Target />
                                 {planned != null ? 'План месяца' : 'Задать план'}
                             </Button>
-                            <Button onClick={openFundDialog}>
+                            <Button disabled={report?.closed} onClick={openFundDialog}>
                                 <PiggyBank />
                                 {fundedToPlan
                                     ? 'Доложить'
@@ -380,17 +406,23 @@ const BudgetMonthTab = () => {
                                         ? `Профинансировать ${formatAmount(Number(planned) - Number(report.funding))}`
                                         : 'Профинансировать'}
                             </Button>
-                            <Button
-                                variant="outline"
-                                disabled={toCents(report?.closingBalance) <= 0}
-                                onClick={() => {
-                                    setCloseForm({ targetBullionId: '', comment: '' })
-                                    setCloseDialog(true)
-                                }}
-                            >
-                                <TrendingDown />
-                                Закрыть месяц
-                            </Button>
+                            {report?.closed ? (
+                                <Button variant="outline" onClick={handleReopen}>
+                                    <RotateCcw />
+                                    Переоткрыть месяц
+                                </Button>
+                            ) : (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setCloseForm({ targetBullionId: '', comment: '' })
+                                        setCloseDialog(true)
+                                    }}
+                                >
+                                    <TrendingDown />
+                                    Закрыть месяц
+                                </Button>
+                            )}
                         </div>
                     )}
                 </div>
@@ -415,6 +447,24 @@ const BudgetMonthTab = () => {
                                         <p className="text-muted-foreground">
                                             Это ошибка подсчёта, а не ваших данных: каждая операция должна
                                             попадать ровно в одну корзину. Покажите это разработчику.
+                                        </p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {report.snapshotMismatch && (
+                            <Card className="border-warning/40 bg-warning/5">
+                                <CardContent className="flex items-start gap-3">
+                                    <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
+                                    <div className="text-sm">
+                                        <p className="font-medium text-warning">
+                                            Живые цифры разошлись со снимком закрытия
+                                        </p>
+                                        <p className="text-muted-foreground">
+                                            Обычно так бывает, если после закрытия месяца сменили бюджетный
+                                            слиток в настройках. Снимок ниже — то, что было зафиксировано при
+                                            закрытии.
                                         </p>
                                     </div>
                                 </CardContent>
@@ -459,6 +509,30 @@ const BudgetMonthTab = () => {
                                 tone={toCents(report.extraFunding) > 0 ? 'warning' : 'default'}
                             />
                         </StatGrid>
+
+                        {report.closed && report.snapshot && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">
+                                        Снимок на момент закрытия
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <dl className="flex flex-col gap-1.5 text-sm tabular-nums sm:flex-row sm:flex-wrap sm:gap-x-8 sm:gap-y-1.5">
+                                        <ReconRow label="План" value={report.snapshot.plannedAmount} />
+                                        <ReconRow label="Профинансировано" value={report.snapshot.funding} />
+                                        <ReconRow label="Потрачено" value={report.snapshot.spent} />
+                                        <ReconRow label="Остаток на конец" value={report.snapshot.closingBalance} accent />
+                                        {toCents(report.snapshot.remainderTransferred) > 0 && (
+                                            <ReconRow
+                                                label={`Уведено на «${bullionLabel(report.snapshot.remainderTargetBullion)}»`}
+                                                value={report.snapshot.remainderTransferred}
+                                            />
+                                        )}
+                                    </dl>
+                                </CardContent>
+                            </Card>
+                        )}
 
                         <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
                             <Card>
@@ -552,6 +626,7 @@ const BudgetMonthTab = () => {
                                             loading={dayLoading}
                                             transactions={dayTransactions}
                                             budgetBullionId={budgetBullion.id}
+                                            closed={report.closed}
                                             onToggle={toggleDay}
                                             onRollback={handleRollback}
                                             onBucket={handleBucket}
@@ -674,26 +749,32 @@ const BudgetMonthTab = () => {
                     open={closeDialog}
                     onOpenChange={setCloseDialog}
                     title="Закрыть месяц"
-                    description={`Остаток ${formatCurrency(report?.closingBalance)} уйдёт переводом на выбранный слиток. Если не закрывать, он станет началом следующего месяца.`}
+                    description={
+                        hasRemainder
+                            ? `Остаток ${formatCurrency(report?.closingBalance)} уйдёт переводом на выбранный слиток. Если не закрывать, он станет началом следующего месяца.`
+                            : 'Остатка нет — просто фиксируем план и факт месяца снимком.'
+                    }
                     onSubmit={submitClose}
                     saving={saving}
-                    submitDisabled={!closeForm.targetBullionId}
-                    submitText="Увести остаток"
+                    submitDisabled={hasRemainder && !closeForm.targetBullionId}
+                    submitText={hasRemainder ? 'Увести остаток' : 'Закрыть'}
                 >
-                    <div className="flex flex-col gap-2">
-                        <Label>Куда увести</Label>
-                        <Combobox
-                            options={sourceOptions}
-                            value={closeForm.targetBullionId || null}
-                            onChange={(value) =>
-                                setCloseForm({ ...closeForm, targetBullionId: value == null ? '' : String(value) })
-                            }
-                            placeholder="Выберите слиток"
-                            searchPlaceholder="Наименование или хранилище..."
-                            emptyText="Слиток не найден"
-                            renderOption={renderBullionOption}
-                        />
-                    </div>
+                    {hasRemainder && (
+                        <div className="flex flex-col gap-2">
+                            <Label>Куда увести</Label>
+                            <Combobox
+                                options={sourceOptions}
+                                value={closeForm.targetBullionId || null}
+                                onChange={(value) =>
+                                    setCloseForm({ ...closeForm, targetBullionId: value == null ? '' : String(value) })
+                                }
+                                placeholder="Выберите слиток"
+                                searchPlaceholder="Наименование или хранилище..."
+                                emptyText="Слиток не найден"
+                                renderOption={renderBullionOption}
+                            />
+                        </div>
+                    )}
                     <div className="flex flex-col gap-2">
                         <Label htmlFor="close-comment">Комментарий</Label>
                         <Input
@@ -751,7 +832,7 @@ const ChartTooltip = ({ active, payload, label }) => {
  */
 const DayRows = ({
     day, year, month, expanded, loading, transactions,
-    budgetBullionId, onToggle, onRollback, onBucket,
+    budgetBullionId, closed, onToggle, onRollback, onBucket,
 }) => {
     const empty = day.transactionCount === 0
     const date = new Date(year, month - 1, day.day)
@@ -839,11 +920,12 @@ const DayRows = ({
                                         <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                                             <Checkbox
                                                 checked={tx.budgetOperation}
+                                                disabled={closed}
                                                 onCheckedChange={(checked) => onBucket(tx, checked === true)}
                                             />
                                             трата
                                         </label>
-                                        {tx.canRollback && (
+                                        {tx.canRollback && !closed && (
                                             <Button
                                                 variant="ghost"
                                                 size="sm"

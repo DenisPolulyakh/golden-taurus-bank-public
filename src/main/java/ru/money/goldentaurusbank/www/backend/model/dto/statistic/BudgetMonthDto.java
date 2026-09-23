@@ -87,4 +87,17 @@ public class BudgetMonthDto {
 
     /** Строка на каждый календарный день месяца */
     private List<BudgetDayDto> days;
+
+    /** Месяц закрыт closeMonth */
+    private boolean closed;
+
+    /** Снимок план/факт на момент закрытия; null — месяц открыт */
+    private BudgetMonthSnapshotDto snapshot;
+
+    /**
+     * Живые план/финансирование/потрачено разошлись со снимком — обычно
+     * потому что бюджетный слиток сменили в настройках после закрытия месяца.
+     * Всегда false для открытого месяца.
+     */
+    private boolean snapshotMismatch;
 }

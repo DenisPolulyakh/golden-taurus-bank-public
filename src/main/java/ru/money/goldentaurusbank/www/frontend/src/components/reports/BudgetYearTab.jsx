@@ -9,7 +9,7 @@ import {
     XAxis,
     YAxis,
 } from 'recharts'
-import { Wallet } from 'lucide-react'
+import { AlertTriangle, Lock, Wallet } from 'lucide-react'
 import api from '@/api/axios'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,6 +22,7 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { EmptyState, PageLoading } from '@/components/ui-app/page-state'
 import { formatAmount, toCents } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -63,6 +64,7 @@ const BudgetYearTab = () => {
     }
 
     return (
+        <TooltipProvider>
         <div className="flex flex-col gap-6">
             <div className="flex items-center gap-3">
                 <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
@@ -147,7 +149,29 @@ const BudgetYearTab = () => {
                             <TableBody>
                                 {report.months.map((row) => (
                                     <TableRow key={row.month} className={cn(row.transactionCount === 0 && 'opacity-50')}>
-                                        <TableCell className="capitalize">{row.monthLabel}</TableCell>
+                                        <TableCell className="capitalize">
+                                            <span className="flex items-center gap-1.5">
+                                                {row.monthLabel}
+                                                {row.closed && (
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Lock className="size-3.5 shrink-0 text-muted-foreground" />
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>Месяц закрыт</TooltipContent>
+                                                    </Tooltip>
+                                                )}
+                                                {row.snapshotMismatch && (
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <AlertTriangle className="size-3.5 shrink-0 text-warning" />
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            Живые цифры разошлись со снимком закрытия
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                )}
+                                            </span>
+                                        </TableCell>
                                         <TableCell className="text-right tabular-nums">
                                             {row.plannedAmount == null ? '—' : formatAmount(row.plannedAmount)}
                                         </TableCell>
@@ -193,6 +217,7 @@ const BudgetYearTab = () => {
                 </>
             )}
         </div>
+        </TooltipProvider>
     )
 }
 

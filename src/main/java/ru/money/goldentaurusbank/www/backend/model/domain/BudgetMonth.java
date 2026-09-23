@@ -45,10 +45,10 @@ public class BudgetMonth {
     /**
      * Ориентир, а не лимит: потратить и профинансировать сверх него можно,
      * разница показывается в отчёте как перерасход и «доложено сверх плана».
+     * Может быть не задан — тогда отчёт считается без плана и перерасхода.
      */
-    @Column(name = "planned_amount", nullable = false, precision = 19, scale = 2)
-    @Builder.Default
-    private BigDecimal plannedAmount = BigDecimal.ZERO;
+    @Column(name = "planned_amount", precision = 19, scale = 2)
+    private BigDecimal plannedAmount;
 
     @Column(name = "comment", length = 500)
     private String comment;
@@ -61,5 +61,51 @@ public class BudgetMonth {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    // ------------------------------------------------------------------
+    // Закрытие месяца
+    // ------------------------------------------------------------------
 
+    /**
+     * NULL — месяц открыт. Момент, когда closeMonth зафиксировал снимок;
+     * reopenMonth снимает вместе со всеми полями ниже.
+     */
+    @Column(name = "closed_at")
+    private LocalDateTime closedAt;
+
+    /**
+     * Каким слитком считали снимок — на случай, если бюджетный слиток потом
+     * сменят в настройках: прошлые снимки не должны переехать на новый слиток.
+     */
+    @Column(name = "budget_bullion_id")
+    private Long budgetBullionId;
+
+    @Column(name = "snapshot_planned", precision = 19, scale = 2)
+    private BigDecimal snapshotPlanned;
+
+    @Column(name = "snapshot_opening_balance", precision = 19, scale = 2)
+    private BigDecimal snapshotOpeningBalance;
+
+    @Column(name = "snapshot_funding", precision = 19, scale = 2)
+    private BigDecimal snapshotFunding;
+
+    @Column(name = "snapshot_spent", precision = 19, scale = 2)
+    private BigDecimal snapshotSpent;
+
+    @Column(name = "snapshot_closing_balance", precision = 19, scale = 2)
+    private BigDecimal snapshotClosingBalance;
+
+    /** Сумма остатка, уведённая на другой слиток при закрытии. NULL/0, если остатка не было. */
+    @Column(name = "remainder_transferred", precision = 19, scale = 2)
+    private BigDecimal remainderTransferred;
+
+    @Column(name = "remainder_target_bullion_id")
+    private Long remainderTargetBullionId;
+
+    /** Транзакция перевода остатка — откатывается через неё при reopenMonth. */
+    @Column(name = "close_transaction_id")
+    private Long closeTransactionId;
+
+    public boolean isClosed() {
+        return closedAt != null;
+    }
 }
