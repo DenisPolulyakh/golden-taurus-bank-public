@@ -28,6 +28,8 @@ public class TransactionDto {
     private String comment;
     /** Тип дохода — заполнен только у классифицированного пополнения. */
     private IncomeType incomeType;
+    /** Можно ли назначить тип дохода: только своё пополнение, не откат и не откачено. */
+    private boolean canChangeIncomeType;
     private LocalDateTime createdAt;
     private LocalDateTime dateOperation;
     private boolean imported;
@@ -46,4 +48,6 @@ public class TransactionDto {
      * кнопка отката живёт в истории карты.
      */
     private boolean lockedByCard;
+    /** Остаток слитка сразу после этой операции. Заполнен только в истории слитка. */
+    private BigDecimal balanceAfter;
 }

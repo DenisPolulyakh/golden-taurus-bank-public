@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { Coins, CreditCard, Minus, Pencil, PiggyBank, Plus, Repeat, Trash2, TrendingUp, Wallet } from 'lucide-react'
+import { Coins, CreditCard, History, Minus, Pencil, PiggyBank, Plus, Repeat, Trash2, TrendingUp, Wallet } from 'lucide-react'
 import api from '@/api/axios'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,7 @@ import BullionTypeStamp from './BullionTypeStamp'
 import { useBudgetBullionId } from '@/components/hooks/useBudgetBullion'
 import { useIncomeTypes } from '@/components/hooks/useIncomeTypes'
 import BullionTransactionModal from './BullionTransactionModal'
+import BullionHistoryModal from './BullionHistoryModal'
 import CreditCardOperationModal from '../credit-cards/CreditCardOperationModal'
 import { isEmptyBullionAmount, notifyAmountChange } from './bullionAmount'
 
@@ -63,6 +64,7 @@ function VaultBullionsPage() {
 
     // Погашение долга карты из накопителя: одна кнопка — две операции
     const [repayModal, setRepayModal] = useState({ isOpen: false, bullion: null, card: null });
+    const [historyBullion, setHistoryBullion] = useState(null);
 
     const fetchVault = useCallback(async () => {
         try {
@@ -639,6 +641,7 @@ function VaultBullionsPage() {
                             onWithdraw={() => handleOpenWithdraw(bullion)}
                             onTransfer={() => handleOpenTransfer(bullion)}
                             onRepayCard={() => handleOpenRepayCard(bullion)}
+                            onHistory={() => setHistoryBullion(bullion)}
                             disabled={actionLoading}
                             vaultFlags={{
                                 allowedIncome,
@@ -744,11 +747,21 @@ function VaultBullionsPage() {
                     initialDateOperation={transferModal.dateOperation}
                 />
             )}
+
+            {historyBullion && (
+                <BullionHistoryModal
+                    isOpen={!!historyBullion}
+                    bullion={historyBullion}
+                    incomeTypes={incomeTypes}
+                    onClose={() => setHistoryBullion(null)}
+                    onRolledBack={refreshData}
+                />
+            )}
         </PageContainer>
     )
 }
 
-const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransfer, onRepayCard, disabled, vaultFlags }) => {
+const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransfer, onRepayCard, onHistory, disabled, vaultFlags }) => {
     const {
         allowedIncome = true,
         allowedExpense = true,
@@ -874,6 +887,10 @@ const BullionCard = ({ bullion, onEdit, onDelete, onRefill, onWithdraw, onTransf
                             Погашение
                         </Button>
                     )}
+                    <Button variant="outline" size="sm" onClick={onHistory}>
+                        <History />
+                        История
+                    </Button>
                     <Button
                         variant="outline"
                         size="sm"

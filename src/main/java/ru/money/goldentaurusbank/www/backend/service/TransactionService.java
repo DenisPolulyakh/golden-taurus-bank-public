@@ -14,6 +14,7 @@ import ru.money.goldentaurusbank.www.backend.model.dto.request.RefillBullionRequ
 import ru.money.goldentaurusbank.www.backend.model.dto.request.UpdateIncomeTypeRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.TransferRequest;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.WithdrawBullionRequest;
+import ru.money.goldentaurusbank.www.backend.model.dto.response.PageResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.statistic.*;
 import ru.money.goldentaurusbank.www.backend.repository.BullionRepository;
 import ru.money.goldentaurusbank.www.backend.repository.CreditCardHistoryRepository;
@@ -224,7 +225,7 @@ public class TransactionService {
         if (!transaction.getUserId().equals(user.getId())) {
             throw new ApplicationException(ACCESS_DENIED.getCode(), ACCESS_DENIED.getMessage());
         }
-        if (transaction.getKind() != TransactionKind.DEPOSIT) {
+        if (transaction.getKind() != TransactionKind.DEPOSIT || transaction.getReversalOfId() != null) {
             throw new ApplicationException(INCOME_TYPE_UPDATE_NOT_ALLOWED.getCode(), INCOME_TYPE_UPDATE_NOT_ALLOWED.getMessage());
         }
         if (transactionRepository.existsByReversalOfId(transactionId)) {
@@ -697,9 +698,41 @@ public class TransactionService {
         return toDtos(transactionRepository.findByReversalOfIdOrIdOrderByCreatedAtAsc(transactionId, transactionId));
     }
 
+    /**
+     * Страница истории слитка с поиском по комментарию и «Остатком после» у
+     * каждой операции. Проверяет владение слитком.
+     */
     @Transactional(readOnly = true)
-    public List<TransactionDto> getBullionHistory(Long bullionId) {
-        return toDtos(transactionRepository.findBullionHistory(bullionId));
+    public PageResponse<TransactionDto> getBullionHistory(User user, Long bullionId, String search, int page, int size) {
+        Bullion bullion = loadBullion(bullionId, user);
+        int pageNumber = Math.max(page - 1, 0);
+        int pageSize = size > 0 ? Math.min(size, 100) : 10;
+        String searchFilter = StringUtils.isBlank(search) ? null : search.trim();
+
+        List<TransactionDto> content = toDtos(transactionRepository.findBullionHistory(
+                user.getId(), bullionId, searchFilter, pageNumber * pageSize, pageSize));
+        long total = transactionRepository.countBullionHistory(user.getId(), bullionId, searchFilter);
+
+        if (!content.isEmpty()) {
+            Set<Long> ids = content.stream().map(TransactionDto::getId).collect(Collectors.toSet());
+            Map<Long, BigDecimal> newerDeltas = new HashMap<>();
+            for (Object[] row : transactionRepository.findBullionNewerDeltas(user.getId(), bullionId, ids)) {
+                newerDeltas.put(toLong(row[0]), toBigDecimal(row[1]));
+            }
+            content.forEach(dto -> dto.setBalanceAfter(
+                    bullion.getAmount().subtract(newerDeltas.getOrDefault(dto.getId(), BigDecimal.ZERO))));
+        }
+
+        int totalPages = (int) Math.ceil((double) total / pageSize);
+        return PageResponse.<TransactionDto>builder()
+                .content(content)
+                .pageNumber(pageNumber + 1)
+                .pageSize(pageSize)
+                .totalElements(total)
+                .totalPages(totalPages)
+                .first(pageNumber == 0)
+                .last(pageNumber + 1 >= totalPages)
+                .build();
     }
 
     // ------------------------------------------------------------------
@@ -737,6 +770,9 @@ public class TransactionService {
                 .descriptionSegments(buildDescriptionSegments(transaction))
                 .comment(transaction.getComment())
                 .incomeType(transaction.getIncomeType())
+                .canChangeIncomeType(transaction.getKind() == TransactionKind.DEPOSIT
+                        && transaction.getReversalOfId() == null
+                        && reversedById == null)
                 .createdAt(transaction.getCreatedAt())
                 .dateOperation(transaction.getDateOperation())
                 .imported(transaction.isImported())

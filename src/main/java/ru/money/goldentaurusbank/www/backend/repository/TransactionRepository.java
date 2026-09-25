@@ -33,12 +33,66 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     @Query("SELECT t.reversalOfId, t.id FROM Transaction t WHERE t.reversalOfId IN :ids")
     List<Object[]> findReversalsOf(@Param("ids") Collection<Long> ids);
 
+    /**
+     * Страница истории конкретного слитка с поиском по комментарию (без учёта
+     * регистра, подстрока). {@code search} = null — без фильтра.
+     */
     @Query(value = """
         SELECT * FROM taurus.transactions
-        WHERE source_bullion_id = :bullionId OR target_bullion_id = :bullionId
+        WHERE user_id = :userId
+            AND (source_bullion_id = :bullionId OR target_bullion_id = :bullionId)
+            AND (CAST(:search AS VARCHAR) IS NULL
+                 OR comment ILIKE '%' || CAST(:search AS VARCHAR) || '%')
         ORDER BY date_operation DESC, id DESC
+        OFFSET :offset LIMIT :limit
         """, nativeQuery = true)
-    List<Transaction> findBullionHistory(@Param("bullionId") Long bullionId);
+    List<Transaction> findBullionHistory(
+            @Param("userId") Long userId,
+            @Param("bullionId") Long bullionId,
+            @Param("search") String search,
+            @Param("offset") int offset,
+            @Param("limit") int limit
+    );
+
+    /** Счётчик для {@link #findBullionHistory} — тот же фильтр, без сортировки и страницы. */
+    @Query(value = """
+        SELECT COUNT(*) FROM taurus.transactions
+        WHERE user_id = :userId
+            AND (source_bullion_id = :bullionId OR target_bullion_id = :bullionId)
+            AND (CAST(:search AS VARCHAR) IS NULL
+                 OR comment ILIKE '%' || CAST(:search AS VARCHAR) || '%')
+        """, nativeQuery = true)
+    long countBullionHistory(
+            @Param("userId") Long userId,
+            @Param("bullionId") Long bullionId,
+            @Param("search") String search
+    );
+
+    /**
+     * Сколько слиток получил минус сколько отдал по операциям НОВЕЕ каждой из
+     * {@code ids} (окно идёт по всей истории слитка, а не только по найденным
+     * строкам — чтобы «Остаток после» был верен и при поиске). Вычитая это из
+     * текущей суммы слитка, получаем остаток сразу после операции — тем же
+     * приёмом, что и накопления в {@code balanceAt}.
+     */
+    @Query(value = """
+        SELECT w.id, w.newer_delta
+        FROM (
+            SELECT t.id,
+                   COALESCE(SUM(CASE WHEN t.target_bullion_id = :bullionId THEN t.amount ELSE -t.amount END)
+                            OVER (ORDER BY t.date_operation DESC, t.id DESC
+                                  ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS newer_delta
+            FROM taurus.transactions t
+            WHERE t.user_id = :userId
+                AND (t.source_bullion_id = :bullionId OR t.target_bullion_id = :bullionId)
+        ) w
+        WHERE w.id IN (:ids)
+        """, nativeQuery = true)
+    List<Object[]> findBullionNewerDeltas(
+            @Param("userId") Long userId,
+            @Param("bullionId") Long bullionId,
+            @Param("ids") Collection<Long> ids
+    );
 
     @Query(value = """
         SELECT * FROM taurus.transactions
