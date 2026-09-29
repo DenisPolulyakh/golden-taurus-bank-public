@@ -72,7 +72,7 @@ function BankDetailPage() {
     }
 
     const handleVaultClick = (vaultId) => {
-        navigate(`/vaults/${vaultId}`, { state: { from: 'banks' } })
+        navigate(`/vaults/${vaultId}`, { state: { from: 'banks', bankId } })
     }
 
     const handleSort = (field) => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Coins, CreditCard, Minus, Plus, Repeat, Trash2, TrendingUp, Wallet } from 'lucide-react'
 import api from '@/api/axios'
@@ -16,9 +16,22 @@ import BullionModal from './BullionModal'
 import BullionTypeStamp from './BullionTypeStamp'
 import { useBudgetBullionId } from '@/components/hooks/useBudgetBullion'
 import { useIncomeTypes } from '@/components/hooks/useIncomeTypes'
+import { useArrivalHighlight } from '@/components/hooks/useArrivalHighlight'
+import { useListControls } from '@/components/hooks/useListControls'
 import BullionTransactionModal from './BullionTransactionModal'
 import CreditCardOperationModal from '../credit-cards/CreditCardOperationModal'
 import { isEmptyBullionAmount, notifyAmountChange } from './bullionAmount'
+
+const matchesBullionName = (bullionName, query) =>
+    bullionName.bullionNameTitle?.toLowerCase().includes(query) ||
+    bullionName.vaults?.some((vault) => vault.name?.toLowerCase().includes(query))
+
+const BULLION_NAME_SORT_VALUES = {
+    bullionNameAmount: (bullionName) => bullionName.bullionNameAmount || 0,
+    bullionNameTitle: (bullionName) => bullionName.bullionNameTitle || '',
+}
+
+const BULLION_NAME_FIRST_ORDER = { bullionNameAmount: 'desc', bullionNameTitle: 'asc' }
 
 function BullionsPage() {
     // Галочку «Трата бюджета» показываем только у бюджетного слитка
@@ -27,13 +40,10 @@ function BullionsPage() {
     const [groupedData, setGroupedData] = useState(null);
     const [bullionNameBullions, setBullionNameBullions] = useState([]);
     const [allVaults, setAllVaults] = useState([]);
-    const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
     const [editingBullion, setEditingBullion] = useState(null);
-    const [sortField, setSortField] = useState('bullionNameAmount');
-    const [sortOrder, setSortOrder] = useState('desc');
 
     // Погашение карты из накопителя. У наименования накопителей может быть
     // несколько (разные хранилища, а то и разные карты), поэтому слиток
@@ -84,38 +94,21 @@ function BullionsPage() {
         }
     };
 
-    const getFilteredAndSorted = useMemo(() => {
-        let filtered = [...bullionNameBullions];
+    const {
+        searchTerm,
+        setSearchTerm,
+        sortField,
+        sortOrder,
+        toggleSort,
+        visibleItems: getFilteredAndSorted,
+    } = useListControls(bullionNameBullions, {
+        matches: matchesBullionName,
+        sortValues: BULLION_NAME_SORT_VALUES,
+        initialSort: { field: 'bullionNameAmount', order: 'desc' },
+        firstOrder: BULLION_NAME_FIRST_ORDER,
+    });
 
-        if (searchTerm && searchTerm.trim()) {
-            const searchLower = searchTerm.toLowerCase().trim();
-            filtered = filtered.filter(bullionName => {
-                const bullionNameMatch = bullionName.bullionNameTitle?.toLowerCase().includes(searchLower);
-                const vaultMatch = bullionName.vaults?.some(vault =>
-                    vault.name && vault.name.toLowerCase().includes(searchLower)
-                );
-                return bullionNameMatch || vaultMatch;
-            });
-        }
-
-        filtered.sort((a, b) => {
-            let aVal = sortField === 'bullionNameAmount' ? (a.bullionNameAmount || 0) : (a.bullionNameTitle || '');
-            let bVal = sortField === 'bullionNameAmount' ? (b.bullionNameAmount || 0) : (b.bullionNameTitle || '');
-
-            if (typeof aVal === 'string') {
-                aVal = aVal.toLowerCase();
-                bVal = bVal.toLowerCase();
-            }
-
-            if (sortOrder === 'asc') {
-                return aVal > bVal ? 1 : -1;
-            } else {
-                return aVal < bVal ? 1 : -1;
-            }
-        });
-
-        return filtered;
-    }, [bullionNameBullions, searchTerm, sortField, sortOrder]);
+    const highlightedBullionNameId = useArrivalHighlight('bullionNameId', !loading, 'bullion-name');
 
     const handleAddBullion = () => {
         setEditingBullion(null);
@@ -320,15 +313,6 @@ function BullionsPage() {
         } catch (err) {
             console.error('Ошибка сохранения слитка:', err);
             throw err;
-        }
-    };
-
-    const toggleSort = (field) => {
-        if (sortField === field) {
-            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortField(field);
-            setSortOrder('desc');
         }
     };
 
@@ -613,7 +597,10 @@ function BullionsPage() {
                     {getFilteredAndSorted.map((bullionName) => (
                         <Card
                             key={bullionName.bullionNameId}
-                            className="gap-4 overflow-hidden pt-0 transition-shadow hover:shadow-md"
+                            id={`bullion-name-${bullionName.bullionNameId}`}
+                            className={`gap-4 overflow-hidden pt-0 transition-shadow hover:shadow-md ${
+                                bullionName.bullionNameId === highlightedBullionNameId ? 'ring-2 ring-primary' : ''
+                            }`}
                         >
                             {/* Цвет наименования уже хранится в справочнике —
                                 здесь он и опознаёт карточку */}
@@ -652,7 +639,11 @@ function BullionsPage() {
                                             <Badge key={vault.id} variant="outline" asChild>
                                                 <Link
                                                     to={`/vaults/${vault.id}`}
-                                                    state={{ from: 'bullions' }}
+                                                    state={{
+                                                        from: 'bullions',
+                                                        bullionId: vault.bullionId,
+                                                        bullionNameId: bullionName.bullionNameId,
+                                                    }}
                                                 >
                                                     {vault.name} ({formatAmount(vault.amount)} ₽)
                                                 </Link>
