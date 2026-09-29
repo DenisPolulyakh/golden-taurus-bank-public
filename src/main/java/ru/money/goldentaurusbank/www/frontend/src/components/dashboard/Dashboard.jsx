@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Coins, CreditCard, FolderTree, History, Landmark, TrendingUp, Vault, Wallet } from 'lucide-react'
+import { Coins, CreditCard, FolderTree, History, Landmark, Vault } from 'lucide-react'
 import api, { clearAccessToken } from '@/api/axios'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AppHeader } from '@/components/ui-app/app-header'
 import { PageContainer } from '@/components/ui-app/page-header'
 import { PageLoading } from '@/components/ui-app/page-state'
-import { StatCard, StatGrid } from '@/components/ui-app/stat-card'
+import { SavingsStats } from '@/components/ui-app/savings-stats'
 import { formatAmount } from '@/lib/format'
 import SavingsChart from './SavingsChart.jsx'
 import PieChartComponent from './PieChartComponent.jsx'
@@ -20,42 +20,6 @@ const QUICK_ACTIONS = [
     { to: '/credit-cards', label: 'Кредитные карты', icon: CreditCard },
     { to: '/transactions', label: 'История операций', icon: History },
 ]
-
-const formatDateTime = (date) => {
-    const dateStr = date.toLocaleDateString('ru-RU', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-    })
-    const timeStr = date.toLocaleTimeString('ru-RU', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-    })
-    return `${dateStr}, ${timeStr}`
-}
-
-/**
- * Часы живут отдельным компонентом. Пока они сидели в состоянии дашборда, тик
- * раз в секунду перерисовывал заодно и графики, а recharts на каждой перерисовке
- * заново запускает вступительную анимацию — её id завязан на объект пропсов.
- * Анимация не доигрывала до конца, и подписи на диаграмме не появлялись вовсе.
- */
-function CurrentDateTime() {
-    const [now, setNow] = useState(new Date())
-
-    useEffect(() => {
-        const timerId = setInterval(() => setNow(new Date()), 1000)
-        return () => clearInterval(timerId)
-    }, [])
-
-    return (
-        <p className="text-sm text-muted-foreground first-letter:uppercase">
-            {formatDateTime(now)}
-        </p>
-    )
-}
 
 function Dashboard({ user, onLogout }) {
     const [userData, setUserData] = useState(user)
@@ -143,35 +107,14 @@ function Dashboard({ user, onLogout }) {
                             Добро пожаловать, {userData?.fullName}!
                         </h1>
                         <p className="text-sm text-muted-foreground">{userData?.email}</p>
-                        <CurrentDateTime />
                     </div>
 
-                    <StatGrid>
-                        <StatCard
-                            icon={Wallet}
-                            label="Общая сумма всех слитков"
-                            value={`${formatAmount(totalAmount)} ₽`}
-                            tone="brand"
-                        />
-                        <StatCard
-                            icon={Coins}
-                            label="Количество слитков"
-                            value={countBullions}
-                            tone="info"
-                        />
-                        <StatCard
-                            icon={Vault}
-                            label="Количество хранилищ"
-                            value={countVaults}
-                            tone="primary"
-                        />
-                        <StatCard
-                            icon={TrendingUp}
-                            label="Средняя ставка"
-                            value={`${averageRate.toFixed(2)}%`}
-                            tone="success"
-                        />
-                    </StatGrid>
+                    <SavingsStats
+                        totalAmount={totalAmount}
+                        countBullions={countBullions}
+                        countVaults={countVaults}
+                        averageRate={averageRate}
+                    />
 
                     <Card>
                         <CardContent>

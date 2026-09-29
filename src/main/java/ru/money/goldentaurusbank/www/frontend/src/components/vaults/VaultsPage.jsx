@@ -25,6 +25,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { PageContainer, PageHeader } from '@/components/ui-app/page-header'
 import { SearchInput } from '@/components/ui-app/search-input'
+import { SavingsStats } from '@/components/ui-app/savings-stats'
 import { SortableHead, TablePager } from '@/components/ui-app/data-table'
 import { EmptyState, ErrorMessage, PageLoading } from '@/components/ui-app/page-state'
 import { useConfirm } from '@/components/ui-app/confirm-dialog'
@@ -41,6 +42,7 @@ function VaultsPage() {
     const [error, setError] = useState('')
     const [modalOpen, setModalOpen] = useState(false)
     const [editingVault, setEditingVault] = useState(null)
+    const [stats, setStats] = useState(null)
 
     const [currentPage, setCurrentPage] = useState(1)
     const [pageSize, setPageSize] = useState(10)
@@ -85,6 +87,15 @@ function VaultsPage() {
         }
     }, [])
 
+    const fetchStats = useCallback(async () => {
+        try {
+            const response = await api.get('/bullions/grouped')
+            setStats(response.data.data)
+        } catch (err) {
+            console.error('Ошибка загрузки сводки хранилищ:', err)
+        }
+    }, [])
+
     const debouncedFetch = useCallback((search, sortBy, sortOrderParam, page, size) => {
         if (timeoutRef.current) {
             clearTimeout(timeoutRef.current)
@@ -109,6 +120,10 @@ function VaultsPage() {
             }
         }
     }, [searchTerm, sortField, sortOrder, currentPage, pageSize, debouncedFetch, fetchVaults])
+
+    useEffect(() => {
+        fetchStats()
+    }, [fetchStats])
 
     const handleAddVault = () => {
         setEditingVault(null)
@@ -149,6 +164,7 @@ function VaultsPage() {
                 }
             }
 
+            fetchStats()
             setModalOpen(false)
             setEditingVault(null)
         } catch (err) {
@@ -172,6 +188,7 @@ function VaultsPage() {
                 try {
                     setError('')
                     await api.delete(`/vaults/${id}`)
+                    fetchStats()
                     if (vaults.length === 1 && currentPage > 1) {
                         setCurrentPage(currentPage - 1)
                     }
@@ -247,6 +264,13 @@ function VaultsPage() {
                         Добавить хранилище
                     </Button>
                 </PageHeader>
+
+                <SavingsStats
+                    totalAmount={stats?.totalAmount}
+                    countBullions={stats?.countBullions}
+                    countVaults={stats?.countVaults}
+                    averageRate={stats?.averageRate}
+                />
 
                 <SearchInput
                     value={searchTerm}
