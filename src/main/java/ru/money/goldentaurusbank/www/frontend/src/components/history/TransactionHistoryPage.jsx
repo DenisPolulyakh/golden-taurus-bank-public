@@ -31,34 +31,12 @@ import { useConfirm } from '@/components/ui-app/confirm-dialog'
 import { useIncomeTypes } from '@/components/hooks/useIncomeTypes'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { DescriptionSegments } from './DescriptionSegments'
+import { IncomeTypeSelect } from './IncomeTypeSelect'
+import { KIND_LABELS, KIND_AMOUNT_CLASS, KIND_BADGE_VARIANT, getKindLabel } from './transactionKinds'
 
 // Radix Select не умеет пустую строку значением пункта — «все типы» ездит сторожевым
 const ALL_KINDS = 'all'
-// Тот же сторожевой приём для «без классификации» в выборе типа дохода
-const NO_INCOME_TYPE = 'NONE'
-
-// Вид операции выводится бэкендом из того, какие ноги заполнены.
-const KIND_LABELS = {
-    DEPOSIT: 'Пополнение',
-    WITHDRAWAL: 'Списание',
-    TRANSFER: 'Перевод',
-    OPENING_BALANCE: 'Начальный остаток',
-}
-
-// Перевод и начальный остаток накопления не двигают — красим их нейтрально.
-const KIND_AMOUNT_CLASS = {
-    DEPOSIT: 'text-success',
-    WITHDRAWAL: 'text-destructive',
-    TRANSFER: 'text-primary',
-    OPENING_BALANCE: 'text-muted-foreground',
-}
-
-const KIND_BADGE_VARIANT = {
-    DEPOSIT: 'success',
-    WITHDRAWAL: 'danger',
-    TRANSFER: 'info',
-    OPENING_BALANCE: 'outline',
-}
 
 const TransactionHistoryPage = () => {
     const [transactions, setTransactions] = useState([]);
@@ -119,43 +97,6 @@ const TransactionHistoryPage = () => {
                 }
             },
         });
-    };
-
-    const getKindLabel = (kind) => KIND_LABELS[kind] || kind || '—';
-
-    const getIncomeTypeLabel = (code) =>
-        incomeTypes.find((option) => option.code === code)?.displayName || code;
-
-    const handleIncomeTypeChange = async (tx, value) => {
-        const incomeType = value === NO_INCOME_TYPE ? null : value;
-        try {
-            await api.patch(`/transactions/${tx.id}/income-type`, { incomeType });
-            setTransactions((prev) =>
-                prev.map((t) => (t.id === tx.id ? { ...t, incomeType } : t))
-            );
-            toast.success('Тип дохода обновлён');
-        } catch (err) {
-            console.error('Ошибка обновления типа дохода:', err);
-            toast.error(err.response?.data?.message || 'Не удалось обновить тип дохода');
-        }
-    };
-
-    const renderDescription = (tx) => {
-        const segments = tx.descriptionSegments;
-        if (Array.isArray(segments) && segments.length > 0) {
-            // seg.archived — хранилища больше нет: цвет остаётся своим, но гаснет
-            return segments.map((seg, i) => (
-                <span
-                    key={i}
-                    className={seg.archived ? 'opacity-50 line-through' : undefined}
-                    title={seg.archived ? 'Хранилище удалено' : undefined}
-                    style={seg.color ? { color: seg.color, fontWeight: 600 } : undefined}
-                >
-                    {seg.text}
-                </span>
-            ));
-        }
-        return tx.description || tx.comment || '-';
     };
 
     if (loading && page === 0) {
@@ -274,37 +215,13 @@ const TransactionHistoryPage = () => {
                                                         откат
                                                     </Badge>
                                                 )}
-                                                {/* Тип дохода — только у пополнения; у откаченного своё
-                                                    менять нельзя (бэк отклонит), просто показываем бейджем */}
-                                                {tx.kind === 'DEPOSIT' && (
-                                                    tx.reversedById ? (
-                                                        tx.incomeType && (
-                                                            <Badge variant="outline">
-                                                                {getIncomeTypeLabel(tx.incomeType)}
-                                                            </Badge>
-                                                        )
-                                                    ) : (
-                                                        <Select
-                                                            value={tx.incomeType || NO_INCOME_TYPE}
-                                                            onValueChange={(value) => handleIncomeTypeChange(tx, value)}
-                                                        >
-                                                            <SelectTrigger
-                                                                size="sm"
-                                                                className="h-6 w-auto gap-1 border-dashed px-2 text-xs"
-                                                            >
-                                                                <SelectValue placeholder="Тип дохода" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value={NO_INCOME_TYPE}>Без классификации</SelectItem>
-                                                                {incomeTypes.map((option) => (
-                                                                    <SelectItem key={option.code} value={option.code}>
-                                                                        {option.displayName}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    )
-                                                )}
+                                                <IncomeTypeSelect
+                                                    transaction={tx}
+                                                    incomeTypes={incomeTypes}
+                                                    onChanged={(incomeType) =>
+                                                        setTransactions((prev) => prev.map((t) => (t.id === tx.id ? { ...t, incomeType } : t)))
+                                                    }
+                                                />
                                             </span>
                                         </TableCell>
                                         <TableCell
@@ -319,7 +236,7 @@ const TransactionHistoryPage = () => {
                                             описание раздвигало таблицу и наезжало на «Действия» */}
                                         <TableCell className="w-full whitespace-normal">
                                             <div className="max-w-[34rem] break-words">
-                                                {renderDescription(tx)}
+                                                <DescriptionSegments transaction={tx} />
                                             </div>
                                         </TableCell>
                                         <TableCell className="w-0 text-right">

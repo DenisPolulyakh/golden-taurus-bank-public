@@ -187,6 +187,36 @@ class IncomeTypeUpdateIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.code").value(INCOME_TYPE_UPDATE_NOT_ALLOWED));
     }
 
+    @Test
+    @DisplayName("Тип дохода нельзя проставить на записи отката")
+    void cannotSetIncomeTypeOnRollbackRecord() throws Exception {
+        mockMvc.perform(post("/api/transactions/{id}/rollback", withdrawalId)
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk());
+        Long rollbackId = lastHistoryEntryId();
+
+        assertThat(fetchHistoryEntry(rollbackId).get("canChangeIncomeType").asBoolean()).isFalse();
+
+        updateIncomeType(rollbackId, "SALARY", accessToken)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(INCOME_TYPE_UPDATE_NOT_ALLOWED));
+    }
+
+    @Test
+    @DisplayName("Флаг canChangeIncomeType в истории")
+    void canChangeIncomeTypeFlagInHistory() throws Exception {
+        assertThat(fetchHistoryEntry(unclassifiedDepositId).get("canChangeIncomeType").asBoolean()).isTrue();
+        assertThat(fetchHistoryEntry(withdrawalId).get("canChangeIncomeType").asBoolean()).isFalse();
+        assertThat(fetchHistoryEntry(transferId).get("canChangeIncomeType").asBoolean()).isFalse();
+        assertThat(fetchHistoryEntry(openingBalanceId).get("canChangeIncomeType").asBoolean()).isFalse();
+
+        mockMvc.perform(post("/api/transactions/{id}/rollback", classifiedDepositId)
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk());
+
+        assertThat(fetchHistoryEntry(classifiedDepositId).get("canChangeIncomeType").asBoolean()).isFalse();
+    }
+
     // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
 
     private org.springframework.test.web.servlet.ResultActions updateIncomeType(Long transactionId, String incomeType,

@@ -12,10 +12,13 @@ import ru.money.goldentaurusbank.www.backend.model.domain.User;
 import ru.money.goldentaurusbank.www.backend.model.dto.request.*;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.BullionResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.GroupedBullionResponse;
+import ru.money.goldentaurusbank.www.backend.model.dto.response.PageResponse;
 import ru.money.goldentaurusbank.www.backend.model.dto.response.SuccessResponse;
+import ru.money.goldentaurusbank.www.backend.model.dto.statistic.TransactionDto;
 import ru.money.goldentaurusbank.www.backend.repository.BullionNameRepository;
 import ru.money.goldentaurusbank.www.backend.repository.UserRepository;
 import ru.money.goldentaurusbank.www.backend.service.BullionService;
+import ru.money.goldentaurusbank.www.backend.service.TransactionService;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -28,6 +31,7 @@ import static ru.money.goldentaurusbank.www.backend.model.dto.enums.ResponseCode
 public class BullionController {
 
     private final BullionService bullionService;
+    private final TransactionService transactionService;
     private final UserRepository userRepository;
     private final BullionNameRepository bullionNameRepository;
 
@@ -198,6 +202,20 @@ public class BullionController {
         GroupedBullionResponse grouped = bullionService.getGroupedBullions(user);
 
         return ResponseEntity.ok(new SuccessResponse<>(grouped));
+    }
+
+
+    @GetMapping("/{bullionId}/history")
+    public ResponseEntity<SuccessResponse<PageResponse<TransactionDto>>> getBullionHistory(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long bullionId,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        User user = getUserFromUserDetails(userDetails);
+        return ResponseEntity.ok(new SuccessResponse<>(
+                transactionService.getBullionHistory(user, bullionId, search, page, size)));
     }
 
 
