@@ -1,5 +1,6 @@
 import { Coins, TrendingUp, Vault, Wallet } from 'lucide-react'
 import { StatCard, StatGrid } from '@/components/ui-app/stat-card'
+import { TodayCard } from '@/components/ui-app/today-card'
 import { formatAmount } from '@/lib/format'
 
 const EMPTY_VALUE = '—'
@@ -7,6 +8,7 @@ const EMPTY_VALUE = '—'
 export function SavingsStats({ totalAmount, countBullions, countVaults, averageRate }) {
     return (
         <StatGrid>
+            <TodayCard className="col-span-full" />
             <StatCard
                 icon={Wallet}
                 label="Общая сумма"

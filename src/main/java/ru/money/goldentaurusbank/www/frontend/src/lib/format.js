@@ -65,3 +65,14 @@ export function formatDateTime(value) {
         minute: '2-digit',
     })
 }
+
+/** 1 день / 2 дня / 5 дней — иначе счётчик читается как машинный. */
+export function pluralDays(days) {
+    const abs = Math.abs(days)
+    const lastTwo = abs % 100
+    const last = abs % 10
+    if (lastTwo >= 11 && lastTwo <= 14) return `${abs} дней`
+    if (last === 1) return `${abs} день`
+    if (last >= 2 && last <= 4) return `${abs} дня`
+    return `${abs} дней`
+}
