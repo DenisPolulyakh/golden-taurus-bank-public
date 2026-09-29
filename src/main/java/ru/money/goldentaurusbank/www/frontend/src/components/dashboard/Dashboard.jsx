@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Coins, CreditCard, FolderTree, History, Landmark, TrendingUp, Vault, Wallet } from 'lucide-react'
+import { Coins, CreditCard, FolderTree, History, Landmark, Vault } from 'lucide-react'
 import api, { clearAccessToken } from '@/api/axios'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AppHeader } from '@/components/ui-app/app-header'
 import { PageContainer } from '@/components/ui-app/page-header'
 import { PageLoading } from '@/components/ui-app/page-state'
-import { StatCard, StatGrid } from '@/components/ui-app/stat-card'
+import { SavingsStats } from '@/components/ui-app/savings-stats'
 import { formatAmount } from '@/lib/format'
 import SavingsChart from './SavingsChart.jsx'
 import PieChartComponent from './PieChartComponent.jsx'
@@ -146,32 +146,12 @@ function Dashboard({ user, onLogout }) {
                         <CurrentDateTime />
                     </div>
 
-                    <StatGrid>
-                        <StatCard
-                            icon={Wallet}
-                            label="Общая сумма всех слитков"
-                            value={`${formatAmount(totalAmount)} ₽`}
-                            tone="brand"
-                        />
-                        <StatCard
-                            icon={Coins}
-                            label="Количество слитков"
-                            value={countBullions}
-                            tone="info"
-                        />
-                        <StatCard
-                            icon={Vault}
-                            label="Количество хранилищ"
-                            value={countVaults}
-                            tone="primary"
-                        />
-                        <StatCard
-                            icon={TrendingUp}
-                            label="Средняя ставка"
-                            value={`${averageRate.toFixed(2)}%`}
-                            tone="success"
-                        />
-                    </StatGrid>
+                    <SavingsStats
+                        totalAmount={totalAmount}
+                        countBullions={countBullions}
+                        countVaults={countVaults}
+                        averageRate={averageRate}
+                    />
 
                     <Card>
                         <CardContent>
