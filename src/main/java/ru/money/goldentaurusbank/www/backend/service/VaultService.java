@@ -25,8 +25,8 @@ import ru.money.goldentaurusbank.www.backend.repository.BankRepository;
 import ru.money.goldentaurusbank.www.backend.repository.VaultRepository;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -218,6 +218,9 @@ public class VaultService {
             direction = Sort.Direction.DESC;
         }
 
+        if ("totalAmount".equals(sortBy)) {
+            return getVaultsSortedByTotalAmount(user, search, direction, pageNumber, pageSize);
+        }
 
         String sortField = "name";
         if (sortBy != null) {
@@ -228,18 +231,13 @@ public class VaultService {
                 case "bankName":
                     sortField = "bank.name";
                     break;
-                case "totalAmount":
-                    sortField = null;
-                    break;
                 default:
                     sortField = "name";
                     break;
             }
         }
 
-        Pageable pageable = sortField != null
-                ? PageRequest.of(pageNumber, pageSize, Sort.by(direction, sortField))
-                : PageRequest.of(pageNumber, pageSize);
+        Pageable pageable = PageRequest.of(pageNumber, pageSize, Sort.by(direction, sortField));
 
         Page<Vault> vaultPage;
 
@@ -255,17 +253,6 @@ public class VaultService {
                 .collect(Collectors.toList());
 
 
-        Sort.Direction dir = direction;
-        if ("totalAmount".equals(sortBy)) {
-            content.sort((a, b) -> {
-                BigDecimal aTotal = a.getTotalAmount() != null ? a.getTotalAmount() : BigDecimal.ZERO;
-                BigDecimal bTotal = b.getTotalAmount() != null ? b.getTotalAmount() : BigDecimal.ZERO;
-                return dir == Sort.Direction.ASC
-                        ? aTotal.compareTo(bTotal)
-                        : bTotal.compareTo(aTotal);
-            });
-        }
-
         return PageResponse.<VaultResponse>builder()
                 .content(content)
                 .pageNumber(vaultPage.getNumber() + 1)
@@ -274,6 +261,44 @@ public class VaultService {
                 .totalPages(vaultPage.getTotalPages())
                 .first(vaultPage.isFirst())
                 .last(vaultPage.isLast())
+                .build();
+    }
+
+    private PageResponse<VaultResponse> getVaultsSortedByTotalAmount(
+            User user, String search, Sort.Direction direction, int pageNumber, int pageSize) {
+
+        List<Vault> vaults = vaultRepository.findByUserAndArchivedFalse(user);
+
+        if (search != null && !search.trim().isEmpty()) {
+            String query = search.trim().toLowerCase();
+            vaults = vaults.stream()
+                    .filter(v -> v.getName().toLowerCase().contains(query))
+                    .collect(Collectors.toList());
+        }
+
+        Comparator<Vault> byAmount = Comparator.comparing(Vault::getTotalAmount);
+        if (direction == Sort.Direction.DESC) {
+            byAmount = byAmount.reversed();
+        }
+        vaults.sort(byAmount.thenComparing(Vault::getName, String.CASE_INSENSITIVE_ORDER));
+
+        int totalElements = vaults.size();
+        int totalPages = (totalElements + pageSize - 1) / pageSize;
+        int start = (int) Math.min((long) pageNumber * pageSize, totalElements);
+        int end = Math.min(start + pageSize, totalElements);
+
+        List<VaultResponse> content = vaults.subList(start, end).stream()
+                .map(vaultMapper::toResponse)
+                .collect(Collectors.toList());
+
+        return PageResponse.<VaultResponse>builder()
+                .content(content)
+                .pageNumber(pageNumber + 1)
+                .pageSize(pageSize)
+                .totalElements(totalElements)
+                .totalPages(totalPages)
+                .first(pageNumber == 0)
+                .last(pageNumber + 1 >= totalPages)
                 .build();
     }
 

@@ -659,7 +659,164 @@ class VaultIntegrationTest extends IntegrationTestBase {
         assertThat(getVaults()).hasSize(2);
     }
 
+    @Test
+    @DisplayName("Сортировка хранилищ по сумме по убыванию работает через все страницы")
+    void sortByTotalAmountDescAcrossPages() throws Exception {
+        Long bullionNameId = createBullionName("Рубли");
+        createVaultWithAmount("Альфа", bullionNameId, "100");
+        createVaultWithAmount("Бета", bullionNameId, "300");
+        createVaultWithAmount("Гамма", bullionNameId, "200");
+        entityManager.flush();
+        entityManager.clear();
+
+        JsonNode firstPage = getVaultPage("totalAmount", "desc", 1, 2, null);
+        JsonNode secondPage = getVaultPage("totalAmount", "desc", 2, 2, null);
+
+        assertThat(vaultNames(firstPage)).containsExactly("Бета", "Гамма");
+        assertThat(vaultNames(secondPage)).containsExactly("Альфа");
+        assertThat(firstPage.get("totalElements").asLong()).isEqualTo(3);
+        assertThat(firstPage.get("totalPages").asInt()).isEqualTo(2);
+        assertThat(firstPage.get("first").asBoolean()).isTrue();
+        assertThat(secondPage.get("last").asBoolean()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Сортировка хранилищ по сумме по возрастанию работает через все страницы")
+    void sortByTotalAmountAscAcrossPages() throws Exception {
+        Long bullionNameId = createBullionName("Рубли");
+        createVaultWithAmount("Альфа", bullionNameId, "100");
+        createVaultWithAmount("Бета", bullionNameId, "300");
+        createVaultWithAmount("Гамма", bullionNameId, "200");
+        entityManager.flush();
+        entityManager.clear();
+
+        JsonNode firstPage = getVaultPage("totalAmount", "asc", 1, 2, null);
+        JsonNode secondPage = getVaultPage("totalAmount", "asc", 2, 2, null);
+
+        assertThat(vaultNames(firstPage)).containsExactly("Альфа", "Гамма");
+        assertThat(vaultNames(secondPage)).containsExactly("Бета");
+    }
+
+    @Test
+    @DisplayName("Сортировка хранилищ по сумме учитывает поиск")
+    void sortByTotalAmountWithSearch() throws Exception {
+        Long bullionNameId = createBullionName("Рубли");
+        createVaultWithAmount("Вклад-1", bullionNameId, "100");
+        createVaultWithAmount("Вклад-2", bullionNameId, "300");
+        createVaultWithAmount("Карта", bullionNameId, "200");
+        entityManager.flush();
+        entityManager.clear();
+
+        JsonNode firstPage = getVaultPage("totalAmount", "desc", 1, 1, "вклад");
+
+        assertThat(vaultNames(firstPage)).containsExactly("Вклад-2");
+        assertThat(firstPage.get("totalElements").asLong()).isEqualTo(2);
+        assertThat(firstPage.get("totalPages").asInt()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Архивный слиток не входит в сумму при сортировке хранилищ")
+    void sortByTotalAmountIgnoresArchivedBullions() throws Exception {
+        Long rubles = createBullionName("Рубли");
+        Long dollars = createBullionName("Доллары");
+        Long richVault = createVaultWithAmount("Богатое", rubles, "500");
+        createBullionInVault(richVault, dollars, "50");
+        createVaultWithAmount("Среднее", rubles, "100");
+        entityManager.flush();
+        entityManager.createNativeQuery("UPDATE taurus.bullions SET archived = true WHERE vault_id = ?1 AND bullion_name_id = ?2")
+                .setParameter(1, richVault)
+                .setParameter(2, rubles)
+                .executeUpdate();
+        entityManager.clear();
+
+        JsonNode page = getVaultPage("totalAmount", "desc", 1, 10, null);
+
+        assertThat(vaultNames(page)).containsExactly("Среднее", "Богатое");
+    }
+
     // Вспомогательные методы
+    private Long createBullionName(String title) throws Exception {
+        String request = """
+                {
+                    "title": "%s"
+                }
+                """.formatted(title);
+
+        MvcResult result = mockMvc.perform(post("/api/bullion-names")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        return objectMapper.readTree(result.getResponse().getContentAsString())
+                .get("data").get("id").asLong();
+    }
+
+    private Long createVaultWithAmount(String name, Long bullionNameId, String amount) throws Exception {
+        String request = """
+                {
+                    "name": "%s"
+                }
+                """.formatted(name);
+
+        MvcResult result = mockMvc.perform(post("/api/vaults")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Long vaultId = objectMapper.readTree(result.getResponse().getContentAsString())
+                .get("data").get("id").asLong();
+        createBullionInVault(vaultId, bullionNameId, amount);
+        return vaultId;
+    }
+
+    private Long createBullionInVault(Long vaultId, Long bullionNameId, String amount) throws Exception {
+        String request = """
+                {
+                    "bullionNameId": %d,
+                    "vaultId": %d,
+                    "amount": %s
+                }
+                """.formatted(bullionNameId, vaultId, amount);
+
+        MvcResult result = mockMvc.perform(post("/api/bullions")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        return objectMapper.readTree(result.getResponse().getContentAsString())
+                .get("data").get("id").asLong();
+    }
+
+    private JsonNode getVaultPage(String sortBy, String sortOrder, int page, int size, String search) throws Exception {
+        var request = get("/api/vaults")
+                .header("Authorization", "Bearer " + accessToken)
+                .param("sortBy", sortBy)
+                .param("sortOrder", sortOrder)
+                .param("page", String.valueOf(page))
+                .param("size", String.valueOf(size));
+        if (search != null) {
+            request = request.param("search", search);
+        }
+
+        MvcResult result = mockMvc.perform(request)
+                .andExpect(status().isOk())
+                .andReturn();
+
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("data");
+    }
+
+    private List<String> vaultNames(JsonNode page) {
+        List<String> names = new java.util.ArrayList<>();
+        page.get("content").forEach(vault -> names.add(vault.get("name").asText()));
+        return names;
+    }
+
     private Long createBank(String name) throws Exception {
         String request = """
                 {
