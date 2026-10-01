@@ -18,7 +18,9 @@ import { useBudgetBullionId } from '@/components/hooks/useBudgetBullion'
 import { useIncomeTypes } from '@/components/hooks/useIncomeTypes'
 import { useArrivalHighlight } from '@/components/hooks/useArrivalHighlight'
 import { useListControls } from '@/components/hooks/useListControls'
+import { useBullionSelection } from '@/components/hooks/useBullionSelection'
 import BullionTransactionModal from './BullionTransactionModal'
+import BullionSelectionPanel from './BullionSelectionPanel'
 import CreditCardOperationModal from '../credit-cards/CreditCardOperationModal'
 import { isEmptyBullionAmount, notifyAmountChange } from './bullionAmount'
 
@@ -32,6 +34,8 @@ const BULLION_NAME_SORT_VALUES = {
 }
 
 const BULLION_NAME_FIRST_ORDER = { bullionNameAmount: 'desc', bullionNameTitle: 'asc' }
+
+const getBullionNameId = (bullionName) => bullionName.bullionNameId
 
 function BullionsPage() {
     // Галочку «Трата бюджета» показываем только у бюджетного слитка
@@ -109,6 +113,14 @@ function BullionsPage() {
     });
 
     const highlightedBullionNameId = useArrivalHighlight('bullionNameId', !loading, 'bullion-name');
+
+    const {
+        selectedItems,
+        isSelected,
+        onCardClick,
+        remove: removeSelected,
+        clear: clearSelection,
+    } = useBullionSelection(bullionNameBullions, getBullionNameId);
 
     const handleAddBullion = () => {
         setEditingBullion(null);
@@ -598,8 +610,11 @@ function BullionsPage() {
                         <Card
                             key={bullionName.bullionNameId}
                             id={`bullion-name-${bullionName.bullionNameId}`}
+                            onClick={(event) => onCardClick(event, bullionName.bullionNameId)}
                             className={`gap-4 overflow-hidden pt-0 transition-shadow hover:shadow-md ${
                                 bullionName.bullionNameId === highlightedBullionNameId ? 'ring-2 ring-primary' : ''
+                            } ${
+                                isSelected(bullionName.bullionNameId) ? 'border-primary bg-primary/10' : ''
                             }`}
                         >
                             {/* Цвет наименования уже хранится в справочнике —
@@ -776,6 +791,16 @@ function BullionsPage() {
                     ))}
                 </div>
             )}
+
+            <BullionSelectionPanel
+                items={selectedItems.map((bullionName) => ({
+                    id: bullionName.bullionNameId,
+                    title: bullionName.bullionNameTitle,
+                    amount: bullionName.bullionNameAmount,
+                }))}
+                onRemove={removeSelected}
+                onClear={clearSelection}
+            />
 
             <BullionModal
                 isOpen={modalOpen}

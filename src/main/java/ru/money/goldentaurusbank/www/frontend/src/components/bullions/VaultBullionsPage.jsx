@@ -17,8 +17,10 @@ import BullionTypeStamp from './BullionTypeStamp'
 import { useBudgetBullionId } from '@/components/hooks/useBudgetBullion'
 import { useIncomeTypes } from '@/components/hooks/useIncomeTypes'
 import { useListControls } from '@/components/hooks/useListControls'
+import { useBullionSelection } from '@/components/hooks/useBullionSelection'
 import { useArrivalHighlight } from '@/components/hooks/useArrivalHighlight'
 import BullionTransactionModal from './BullionTransactionModal'
+import BullionSelectionPanel from './BullionSelectionPanel'
 import BullionHistoryModal from './BullionHistoryModal'
 import CreditCardOperationModal from '../credit-cards/CreditCardOperationModal'
 import { isEmptyBullionAmount, notifyAmountChange } from './bullionAmount'
@@ -33,6 +35,8 @@ const BULLION_SORT_VALUES = {
 const BULLION_FIRST_ORDER = { amount: 'desc', bullionNameTitle: 'asc' }
 
 const EMPTY_BULLIONS = []
+
+const getBullionId = (bullion) => bullion.id
 
 function VaultBullionsPage() {
     // Галочку «Трата бюджета» показываем только у бюджетного слитка
@@ -170,6 +174,14 @@ function VaultBullionsPage() {
     });
 
     const highlightedBullionId = useArrivalHighlight('bullionId', !loading && !!vaultSummary, 'bullion');
+
+    const {
+        selectedItems,
+        isSelected,
+        onCardClick,
+        remove: removeSelected,
+        clear: clearSelection,
+    } = useBullionSelection(vaultSummary?.bullions ?? EMPTY_BULLIONS, getBullionId);
 
     useEffect(() => {
         fetchVault();
@@ -628,6 +640,8 @@ function VaultBullionsPage() {
                             key={bullion.id}
                             bullion={bullion}
                             highlighted={bullion.id === highlightedBullionId}
+                            selected={isSelected(bullion.id)}
+                            onSelect={(event) => onCardClick(event, bullion.id)}
                             onEdit={() => handleEditBullion(bullion)}
                             onDelete={() => handleOpenDelete(bullion)}
                             onRefill={() => handleOpenRefill(bullion)}
@@ -645,6 +659,16 @@ function VaultBullionsPage() {
                     ))}
                 </div>
             )}
+
+            <BullionSelectionPanel
+                items={selectedItems.map((bullion) => ({
+                    id: bullion.id,
+                    title: bullion.bullionNameTitle,
+                    amount: bullion.amount,
+                }))}
+                onRemove={removeSelected}
+                onClear={clearSelection}
+            />
 
             <BullionModal
                 isOpen={modalOpen}
@@ -754,7 +778,7 @@ function VaultBullionsPage() {
     )
 }
 
-const BullionCard = ({ bullion, highlighted, onEdit, onDelete, onRefill, onWithdraw, onTransfer, onRepayCard, onHistory, disabled, vaultFlags }) => {
+const BullionCard = ({ bullion, highlighted, selected, onSelect, onEdit, onDelete, onRefill, onWithdraw, onTransfer, onRepayCard, onHistory, disabled, vaultFlags }) => {
     const {
         allowedIncome = true,
         allowedExpense = true,
@@ -768,7 +792,8 @@ const BullionCard = ({ bullion, highlighted, onEdit, onDelete, onRefill, onWithd
     return (
         <Card
             id={`bullion-${bullion.id}`}
-            className={`gap-4 transition-shadow hover:shadow-md ${highlighted ? 'ring-2 ring-primary' : ''}`}
+            onClick={onSelect}
+            className={`gap-4 transition-shadow hover:shadow-md ${highlighted ? 'ring-2 ring-primary' : ''} ${selected ? 'border-primary bg-primary/10' : ''}`}
         >
             <CardHeader>
                 <CardTitle className="text-base">{bullion.bullionNameTitle}</CardTitle>
