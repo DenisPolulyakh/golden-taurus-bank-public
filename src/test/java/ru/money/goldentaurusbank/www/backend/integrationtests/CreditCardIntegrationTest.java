@@ -350,11 +350,11 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
     void paymentAmountIsEditable() throws Exception {
         Long cardId = createCardWithPayment("Платинум", "4321", "300000", "20000");
 
-        paymentRequest(put("/api/credit-cards/{cardId}", cardId), "Платинум", null, "300000", "0", "35000")
+        paymentRequest(put("/api/credit-cards/{cardId}", cardId), "Платинум", null, "300000", "1000", "35000")
                 .andExpect(status().isOk());
         assertThat(getCard(cardId).get("paymentAmount").decimalValue()).isEqualByComparingTo("35000");
 
-        paymentRequest(put("/api/credit-cards/{cardId}", cardId), "Платинум", null, "300000", "0", null)
+        paymentRequest(put("/api/credit-cards/{cardId}", cardId), "Платинум", null, "300000", "1000", null)
                 .andExpect(status().isOk());
         assertThat(getCard(cardId).get("paymentAmount").isNull()).isTrue();
     }
@@ -372,7 +372,7 @@ class CreditCardIntegrationTest extends CreditCardTestBase {
 
     private Long createCardWithPayment(String name, String last4, String limit, String paymentAmount)
             throws Exception {
-        return createCardWithPayment(name, last4, limit, "0", paymentAmount);
+        return createCardWithPayment(name, last4, limit, "1000", paymentAmount);
     }
 
     private Long createCardWithPayment(String name, String last4, String limit, String debt, String paymentAmount)

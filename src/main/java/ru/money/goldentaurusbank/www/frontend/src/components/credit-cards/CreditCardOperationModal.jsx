@@ -21,7 +21,7 @@ import { formatAmount } from '@/lib/format'
  * слитках» их у наименования может быть несколько — тогда сверху появляется
  * выпадающий список {@code bullionOptions}, и выбор решает, какую карту гасим.
  */
-function CreditCardOperationModal({ isOpen, card, type, bullion, bullionOptions, onSelectBullion, onClose, onSave }) {
+function CreditCardOperationModal({ isOpen, card, type, bullion, bullionOptions, onSelectBullion, onClose, onSave, initialAmount = '' }) {
     const [amount, setAmount] = useState('')
     const [comment, setComment] = useState('')
     const [dateOperation, setDateOperation] = useState('')
@@ -29,18 +29,18 @@ function CreditCardOperationModal({ isOpen, card, type, bullion, bullionOptions,
 
     useEffect(() => {
         if (!isOpen) return
-        setAmount('')
+        setAmount(initialAmount)
         setComment('')
         const now = new Date()
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
         setDateOperation(now.toISOString().slice(0, 16))
-    }, [isOpen])
+    }, [isOpen, initialAmount])
 
     // Смена накопителя меняет и карту, и потолок суммы — введённое до этого
     // число к новому слитку отношения не имеет
     useEffect(() => {
-        setAmount('')
-    }, [bullion?.id])
+        setAmount(initialAmount)
+    }, [bullion?.id, initialAmount])
 
     if (!isOpen || !card) return null
 

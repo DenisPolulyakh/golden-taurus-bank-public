@@ -161,6 +161,9 @@ public class CreditCardService {
             creditCardTransactionService.openingDebt(card, debt, user, OPENING_DEBT_COMMENT, LocalDateTime.now());
         }
 
+        card.clearPaymentIfPaidOff();
+        creditCardRepository.save(card);
+
         applyAccumulators(user, card, request.getBullionIds());
 
         log.info("[CreditCardService.createCard] card id = {}, last4 = {}", card.getId(), card.getLast4());
@@ -207,6 +210,9 @@ public class CreditCardService {
             card.setCardLimit(targetLimit);
             creditCardRepository.save(card);
         }
+
+        card.clearPaymentIfPaidOff();
+        creditCardRepository.save(card);
 
         applyAccumulators(user, card, request.getBullionIds());
 

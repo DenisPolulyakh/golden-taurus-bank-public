@@ -27,6 +27,10 @@ export function useBullionSelection(items, getId) {
 
     const clear = useCallback(() => setSelectedIds([]), [])
 
+    const selectMany = useCallback((ids) => {
+        setSelectedIds((prev) => [...prev, ...ids.filter((id) => !prev.includes(id))])
+    }, [])
+
     const onCardClick = useCallback((event, id) => {
         if (isSelectionClick(event)) toggle(id)
     }, [toggle])
@@ -52,5 +56,5 @@ export function useBullionSelection(items, getId) {
         return () => document.removeEventListener('keydown', onKeyDown)
     }, [hasSelection, clear])
 
-    return { selectedItems, isSelected, onCardClick, remove, clear }
+    return { selectedItems, isSelected, onCardClick, remove, clear, selectMany }
 }

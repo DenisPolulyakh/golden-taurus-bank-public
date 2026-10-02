@@ -55,3 +55,10 @@ export function graceText(daysLeft) {
     if (daysLeft === 0) return 'Сегодня последний день'
     return pluralDays(daysLeft)
 }
+
+export function graceShortText(daysLeft) {
+    if (daysLeft === null || daysLeft === undefined) return ''
+    if (daysLeft < 0) return 'просрочено'
+    if (daysLeft === 0) return 'сегодня'
+    return pluralDays(daysLeft)
+}
