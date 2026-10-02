@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import { CreditCard as CreditCardIcon, Download, History, KeyRound, Lock, Minus, Pencil, Plus, Printer, ScrollText, Settings, Trash2, Wallet } from 'lucide-react'
+import { CheckCheck, CreditCard as CreditCardIcon, Download, History, KeyRound, Lock, Minus, Pencil, Plus, Printer, ScrollText, Settings, Trash2, Wallet } from 'lucide-react'
 import api from '@/api/axios'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import { SortButton } from '@/components/ui-app/data-table'
 import { EmptyState, ErrorMessage, PageLoading } from '@/components/ui-app/page-state'
 import { StatCard, StatGrid } from '@/components/ui-app/stat-card'
 import { useConfirm } from '@/components/ui-app/confirm-dialog'
+import { useBullionSelection } from '@/components/hooks/useBullionSelection'
 import { cn } from '@/lib/utils'
 import { buildSheetHtml } from '@/lib/vaultSheet'
 import CreditCardModal from './CreditCardModal'
@@ -22,6 +23,7 @@ import VaultSettingsDialog from './VaultSettingsDialog'
 import { CardVaultProvider, useCardVault } from './CardVaultProvider'
 import CreditCardOperationModal from './CreditCardOperationModal'
 import CreditCardHistoryModal from './CreditCardHistoryModal'
+import CreditCardSelectionPanel from './CreditCardSelectionPanel'
 import {
     formatAmount,
     formatSigned,
@@ -33,8 +35,11 @@ import {
     usageText,
 } from './creditCardFormat'
 
+const getCardId = (card) => card.id
+
 function CreditCardsPage() {
     const [cards, setCards] = useState([]);
+    const [knownCards, setKnownCards] = useState(() => new Map());
     const [totalDebt, setTotalDebt] = useState(0);
     const [totalLimit, setTotalLimit] = useState(0);
     const [count, setCount] = useState(0);
@@ -52,6 +57,15 @@ function CreditCardsPage() {
     const [requisitesCard, setRequisitesCard] = useState(null);
     const [vaultSettingsOpen, setVaultSettingsOpen] = useState(false);
     const vault = useCardVault();
+    const knownCardList = useMemo(() => [...knownCards.values()], [knownCards]);
+    const {
+        selectedItems: selectedCards,
+        isSelected,
+        onCardClick,
+        remove: removeSelected,
+        clear: clearSelection,
+        selectMany,
+    } = useBullionSelection(knownCardList, getCardId);
 
     const navigate = useNavigate();
     const { confirm, confirmDialog } = useConfirm();
@@ -68,6 +82,11 @@ function CreditCardsPage() {
             const response = await api.get(`/credit-cards?${params.toString()}`);
             const data = response.data.data;
             setCards(data.cards || []);
+            setKnownCards((prev) => {
+                const next = search ? new Map(prev) : new Map();
+                for (const card of data.cards || []) next.set(card.id, card);
+                return next;
+            });
             setTotalDebt(data.totalDebt || 0);
             setTotalLimit(data.totalLimit || 0);
             setCount(data.count || 0);
@@ -186,6 +205,12 @@ function CreditCardsPage() {
                 setActionLoading(true);
                 try {
                     await api.delete(`/credit-cards/${card.id}`);
+                    removeSelected(card.id);
+                    setKnownCards((prev) => {
+                        const next = new Map(prev);
+                        next.delete(card.id);
+                        return next;
+                    });
                     if (vault.isOpen && vault.cardById(card.id)) {
                         await vault.dropCard(card.id);
                     }
@@ -211,6 +236,15 @@ function CreditCardsPage() {
         await reload();
     };
 
+    const handleLocateCard = (id) => {
+        const element = document.getElementById(`credit-card-${id}`);
+        if (!element) {
+            toast.info('Карта скрыта поиском');
+            return;
+        }
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
     if (loading) {
         return (
             <PageContainer>
@@ -220,6 +254,7 @@ function CreditCardsPage() {
     }
 
     const usage = limitUsage(totalDebt, totalLimit)
+    const cardsWithDebt = cards.filter((card) => Number(card.debt) > 0)
 
     return (
         <PageContainer>
@@ -304,6 +339,15 @@ function CreditCardsPage() {
                     placeholder="Поиск по названию или последним 4 цифрам..."
                 />
                 <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => selectMany(cardsWithDebt.map(getCardId))}
+                        disabled={cardsWithDebt.length === 0}
+                    >
+                        <CheckCheck />
+                        Все с долгом
+                    </Button>
                     <SortButton
                         label="По остатку дней"
                         field="grace"
@@ -350,6 +394,8 @@ function CreditCardsPage() {
                             key={card.id}
                             card={card}
                             disabled={actionLoading}
+                            selected={isSelected(card.id)}
+                            onSelect={(event) => onCardClick(event, card.id)}
                             onSpend={() => setOperation({ type: 'spend', card })}
                             onRepay={() => setOperation({ type: 'repay', card })}
                             onHistory={() => setHistoryCard(card)}
@@ -367,6 +413,14 @@ function CreditCardsPage() {
                     ))}
                 </div>
             )}
+
+            <CreditCardSelectionPanel
+                cards={selectedCards}
+                onRemove={removeSelected}
+                onClear={clearSelection}
+                onRepay={(card, amount) => setOperation({ type: 'repay', card, amount })}
+                onLocate={handleLocateCard}
+            />
 
             {modalOpen && (
                 <CreditCardModal
@@ -387,6 +441,7 @@ function CreditCardsPage() {
                     type={operation.type}
                     onClose={() => setOperation(null)}
                     onSave={handleOperation}
+                    initialAmount={operation.amount}
                 />
             )}
 
@@ -410,11 +465,15 @@ function CreditCardsPage() {
     )
 }
 
-const CreditCard = ({ card, disabled, onSpend, onRepay, onHistory, onEdit, onDelete, hasRequisites, vaultLocked, onRequisites }) => {
+const CreditCard = ({ card, selected, onSelect, disabled, onSpend, onRepay, onHistory, onEdit, onDelete, hasRequisites, vaultLocked, onRequisites }) => {
     const accumulators = card.accumulators || []
 
     return (
-        <Card className="gap-4 transition-shadow hover:shadow-md">
+        <Card
+            id={`credit-card-${card.id}`}
+            onClick={onSelect}
+            className={cn('gap-4 transition-shadow hover:shadow-md', selected && 'border-primary bg-primary/10')}
+        >
             <CardHeader>
                 <CardTitle className="text-base">{card.name}</CardTitle>
             </CardHeader>

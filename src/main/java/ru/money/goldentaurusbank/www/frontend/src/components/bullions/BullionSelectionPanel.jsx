@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
 import { GripVertical, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useFloatingPanel, useStoredOption } from '@/components/hooks/useFloatingPanel'
 import { formatAmount, toCents } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -15,39 +15,11 @@ const ROUNDING_OPTIONS = [
     { value: '1000000', label: 'до 1 млн ₽' },
 ]
 
+const ROUNDING_VALUES = ROUNDING_OPTIONS.map((option) => option.value)
+
 const DEFAULT_ROUNDING = '1000'
 const ROUNDING_KEY = 'bullion-selection:rounding'
 const POSITION_KEY = 'bullion-selection:position'
-const DESKTOP_QUERY = '(min-width: 640px)'
-const EDGE_GAP = 8
-
-function readRounding() {
-    try {
-        const value = localStorage.getItem(ROUNDING_KEY)
-        return ROUNDING_OPTIONS.some((option) => option.value === value) ? value : DEFAULT_ROUNDING
-    } catch {
-        return DEFAULT_ROUNDING
-    }
-}
-
-function readPosition() {
-    try {
-        const parsed = JSON.parse(localStorage.getItem(POSITION_KEY))
-        return Number.isFinite(parsed?.x) && Number.isFinite(parsed?.y)
-            ? { x: parsed.x, y: parsed.y }
-            : null
-    } catch {
-        return null
-    }
-}
-
-function save(key, value) {
-    try {
-        localStorage.setItem(key, value)
-    } catch (error) {
-        console.error('Не удалось сохранить настройку окна выделения:', error)
-    }
-}
 
 function roundingShortfall(totalCents, rubles) {
     const stepCents = Number(rubles) * 100
@@ -55,114 +27,26 @@ function roundingShortfall(totalCents, rubles) {
     return { targetCents, shortfallCents: targetCents - totalCents }
 }
 
-function clampToViewport(position, element) {
-    const maxX = Math.max(window.innerWidth - element.offsetWidth - EDGE_GAP, EDGE_GAP)
-    const maxY = Math.max(window.innerHeight - element.offsetHeight - EDGE_GAP, EDGE_GAP)
-    return {
-        x: Math.min(Math.max(position.x, EDGE_GAP), maxX),
-        y: Math.min(Math.max(position.y, EDGE_GAP), maxY),
-    }
-}
-
-function useIsDesktop() {
-    const [isDesktop, setIsDesktop] = useState(() => window.matchMedia(DESKTOP_QUERY).matches)
-
-    useEffect(() => {
-        const media = window.matchMedia(DESKTOP_QUERY)
-        const onChange = (event) => setIsDesktop(event.matches)
-        media.addEventListener('change', onChange)
-        return () => media.removeEventListener('change', onChange)
-    }, [])
-
-    return isDesktop
-}
-
 function BullionSelectionPanel({ items, onRemove, onClear }) {
-    const panelRef = useRef(null)
-    const dragRef = useRef(null)
-    const isDesktop = useIsDesktop()
-    const [rounding, setRounding] = useState(readRounding)
-    const [position, setPosition] = useState(readPosition)
-
     const hasItems = items.length > 0
-
-    const keepInViewport = useCallback(() => {
-        const panel = panelRef.current
-        if (!panel) return
-        setPosition((prev) => {
-            if (!prev) return prev
-            const next = clampToViewport(prev, panel)
-            return next.x === prev.x && next.y === prev.y ? prev : next
-        })
-    }, [])
-
-    useEffect(() => {
-        if (!isDesktop || !hasItems) return
-        const observer = new ResizeObserver(keepInViewport)
-        observer.observe(panelRef.current)
-        window.addEventListener('resize', keepInViewport)
-        return () => {
-            observer.disconnect()
-            window.removeEventListener('resize', keepInViewport)
-        }
-    }, [isDesktop, hasItems, keepInViewport])
-
-    const handleRoundingChange = (value) => {
-        setRounding(value)
-        save(ROUNDING_KEY, value)
-    }
-
-    const pointerPosition = (event) => clampToViewport({
-        x: event.clientX - dragRef.current.offsetX,
-        y: event.clientY - dragRef.current.offsetY,
-    }, panelRef.current)
-
-    const handlePointerDown = (event) => {
-        if (!isDesktop || event.button !== 0 || event.target.closest('button')) return
-        const rect = panelRef.current.getBoundingClientRect()
-        dragRef.current = { offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top }
-        event.currentTarget.setPointerCapture(event.pointerId)
-        event.preventDefault()
-    }
-
-    const handlePointerMove = (event) => {
-        if (!dragRef.current) return
-        setPosition(pointerPosition(event))
-    }
-
-    const handlePointerUp = (event) => {
-        if (!dragRef.current) return
-        const next = pointerPosition(event)
-        dragRef.current = null
-        setPosition(next)
-        save(POSITION_KEY, JSON.stringify(next))
-    }
-
-    const handlePointerCancel = () => {
-        dragRef.current = null
-    }
+    const [rounding, setRounding] = useStoredOption(ROUNDING_KEY, ROUNDING_VALUES, DEFAULT_ROUNDING)
+    const { panelRef, style, dragHandleProps } = useFloatingPanel(POSITION_KEY, hasItems)
 
     if (!hasItems) return null
 
     const totalCents = items.reduce((sum, item) => sum + toCents(item.amount), 0)
     const { targetCents, shortfallCents } = roundingShortfall(totalCents, rounding)
-    const desktopStyle = isDesktop && position
-        ? { left: position.x, top: position.y, right: 'auto', bottom: 'auto' }
-        : undefined
 
     return (
         <aside
             ref={panelRef}
-            style={desktopStyle}
+            style={style}
             aria-label="Выделенные слитки"
             className="sticky bottom-2 z-40 flex max-h-[50vh] flex-col rounded-xl border bg-card text-card-foreground shadow-lg sm:fixed sm:right-6 sm:bottom-6 sm:max-h-[80vh] sm:w-80"
         >
             <div
                 className="flex items-center gap-2 border-b px-4 py-2 select-none sm:cursor-grab sm:touch-none sm:active:cursor-grabbing"
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerCancel}
+                {...dragHandleProps}
             >
                 <GripVertical className="hidden size-4 text-muted-foreground sm:block" />
                 <span className="flex-1 text-sm font-medium">Выделено: {items.length}</span>
@@ -180,7 +64,7 @@ function BullionSelectionPanel({ items, onRemove, onClear }) {
             <div className="flex flex-col gap-3 px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                     <span className="text-sm text-muted-foreground">Округлять</span>
-                    <Select value={rounding} onValueChange={handleRoundingChange}>
+                    <Select value={rounding} onValueChange={setRounding}>
                         <SelectTrigger size="sm" className="w-36">
                             <SelectValue />
                         </SelectTrigger>
