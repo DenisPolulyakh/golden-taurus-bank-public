@@ -11,6 +11,9 @@ const ROUNDING_OPTIONS = [
     { value: '1', label: 'до 1 ₽' },
     { value: '10', label: 'до 10 ₽' },
     { value: '100', label: 'до 100 ₽' },
+    { value: '1000', label: 'до 1 000 ₽' },
+    { value: '10000', label: 'до 10 000 ₽' },
+    { value: '100000', label: 'до 100 000 ₽' },
 ]
 
 const ROUNDING_VALUES = ROUNDING_OPTIONS.map((option) => option.value)
@@ -76,7 +79,7 @@ function CreditCardSelectionPanel({ cards, onRemove, onClear, onRepay, onLocate 
                 <div className="flex items-center justify-between gap-3">
                     <span className="text-sm text-muted-foreground">Округлять долг</span>
                     <Select value={rounding} onValueChange={setRounding}>
-                        <SelectTrigger size="sm" className="w-32">
+                        <SelectTrigger size="sm" className="w-36">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
