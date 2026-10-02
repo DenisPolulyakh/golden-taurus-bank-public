@@ -141,6 +141,7 @@ public class CreditCardTransactionService {
         }
 
         card.setDebt(debt);
+        card.clearPaymentIfPaidOff();
         creditCardRepository.save(card);
 
         CreditCardHistory history = creditCardHistoryRepository.save(CreditCardHistory.builder()

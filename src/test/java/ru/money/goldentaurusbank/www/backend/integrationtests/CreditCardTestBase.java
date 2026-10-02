@@ -177,7 +177,7 @@ abstract class CreditCardTestBase extends IntegrationTestBase {
 
     protected Long createCardWithGrace(String name, String last4, String limit, LocalDate gracePeriodDate)
             throws Exception {
-        MvcResult result = cardRequest(post("/api/credit-cards"), name, last4, limit, "0", gracePeriodDate, null)
+        MvcResult result = cardRequest(post("/api/credit-cards"), name, last4, limit, "1000", gracePeriodDate, null)
                 .andExpect(status().isOk())
                 .andReturn();
 

@@ -87,6 +87,13 @@ public class CreditCard {
         return cardLimit.subtract(debt);
     }
 
+    public void clearPaymentIfPaidOff() {
+        if (debt.signum() == 0) {
+            gracePeriodDate = null;
+            paymentAmount = null;
+        }
+    }
+
     /** Сколько уже накоплено на погашение. */
     @Transient
     public BigDecimal getAccumulatedAmount() {

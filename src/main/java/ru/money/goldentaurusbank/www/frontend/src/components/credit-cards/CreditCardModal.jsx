@@ -81,6 +81,8 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
         )
     }
 
+    const noDebt = debt === '' || Number(debt) === 0
+
     const handleSubmit = async (e) => {
         e.preventDefault()
         setSaving(true)
@@ -88,8 +90,8 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
             await onSave({
                 name,
                 last4,
-                gracePeriodDate,
-                paymentAmount,
+                gracePeriodDate: noDebt ? '' : gracePeriodDate,
+                paymentAmount: noDebt ? '' : paymentAmount,
                 limit,
                 debt,
                 bullionIds,
@@ -146,32 +148,6 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
             </Field>
 
             <Field>
-                <FieldLabel htmlFor="card-grace-date">Ближайший платёж</FieldLabel>
-                <DatePicker
-                    id="card-grace-date"
-                    value={gracePeriodDate}
-                    onChange={setGracePeriodDate}
-                    clearable
-                />
-            </Field>
-
-            <Field>
-                <FieldLabel htmlFor="card-payment-amount">К внесению</FieldLabel>
-                <Input
-                    id="card-payment-amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    placeholder="—"
-                />
-                <FieldDescription>
-                    Сколько внести к дате платежа. Необязательно: пусто — значит платёж не задан
-                </FieldDescription>
-            </Field>
-
-            <Field>
                 <FieldLabel htmlFor="card-limit">Лимит</FieldLabel>
                 <Input
                     id="card-limit"
@@ -197,6 +173,35 @@ function CreditCardModal({ isOpen, card, onClose, onSave }) {
                 />
                 <FieldDescription>
                     Изменение задолженности записывается операцией и попадает в историю карты
+                </FieldDescription>
+            </Field>
+
+            <Field>
+                <FieldLabel htmlFor="card-grace-date">Ближайший платёж</FieldLabel>
+                <DatePicker
+                    id="card-grace-date"
+                    value={gracePeriodDate}
+                    onChange={setGracePeriodDate}
+                    clearable
+                    disabled={noDebt}
+                />
+                {noDebt && <FieldDescription>Долга нет — платёж не нужен</FieldDescription>}
+            </Field>
+
+            <Field>
+                <FieldLabel htmlFor="card-payment-amount">К внесению</FieldLabel>
+                <Input
+                    id="card-payment-amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    placeholder="—"
+                    disabled={noDebt}
+                />
+                <FieldDescription>
+                    Сколько внести к дате платежа. Необязательно: пусто — значит платёж не задан
                 </FieldDescription>
             </Field>
 
