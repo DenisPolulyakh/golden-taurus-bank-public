@@ -715,6 +715,13 @@ function VaultBullionsPage() {
                     onDateChange: bullionMove.setDateOperation,
                     onAmountChange: bullionMove.setAmount,
                     onAmountBlur: bullionMove.normalizeAmount,
+                    vaultTotal: totalAmount,
+                    target: bullionMove.target,
+                    targetCents: bullionMove.targetCents,
+                    onTargetChange: bullionMove.setTarget,
+                    onTargetBlur: bullionMove.normalizeTarget,
+                    onFit: bullionMove.fitTo,
+                    onResetAmounts: bullionMove.resetAmounts,
                     onSubmit: handleMoveSelected,
                     loading: bullionMove.loading,
                     disabledReason: vault?.allowedTransferOut === false
