@@ -84,6 +84,49 @@ public class BullionService {
     }
 
     @Transactional
+    public void moveBullionsToVault(User user, MoveBullionsRequest request) {
+        Vault toVault = vaultRepository.findByIdAndUserAndArchivedFalse(request.getToVaultId(), user)
+                .orElseThrow(() -> new ApplicationException(
+                        VAULT_NOT_FOUND.getCode(),
+                        VAULT_NOT_FOUND.getMessage()
+                ));
+        Long batchId = transactionService.createBatchId();
+        String comment = "Перенос в хранилище " + toVault.getName();
+
+        for (MoveBullionsRequest.Item item : request.getItems()) {
+            Bullion source = bullionRepository.findByIdAndUser(item.getBullionId(), user)
+                    .filter(bullion -> !bullion.isArchived())
+                    .orElseThrow(() -> new ApplicationException(
+                            BULLION_NOT_FOUND.getCode(),
+                            BULLION_NOT_FOUND.getMessage()
+                    ));
+            if (source.getVault() != null && source.getVault().getId().equals(toVault.getId())) {
+                throw new ApplicationException(
+                        CANNOT_TRANSFER_TO_SAME_VAULT.getCode(),
+                        CANNOT_TRANSFER_TO_SAME_VAULT.getMessage()
+                );
+            }
+
+            TransferRequest transfer = new TransferRequest();
+            transfer.setFromBullionId(source.getId());
+            transfer.setToVaultId(toVault.getId());
+            transfer.setAmount(item.getAmount());
+            transfer.setDateOperation(request.getDateOperation());
+            transfer.setComment(comment);
+            transfer.setBudgetOperation(false);
+
+            resolveTransferTarget(user, transfer);
+            transactionService.transferAmount(transfer, user, batchId);
+
+            if (canArchiveAfterMove(source)) {
+                transactionService.archive(source);
+            }
+        }
+        log.info("Слитки перенесены в хранилище {}: {} шт., batchId = {}",
+                toVault.getId(), request.getItems().size(), batchId);
+    }
+
+    @Transactional
     public BullionResponse createBullion(User user, BullionRequest request) {
         BullionName bullionName = bullionNameRepository.findByIdAndUser(request.getBullionNameId(), user)
                 .orElseThrow(() -> new ApplicationException(
@@ -448,6 +491,13 @@ public class BullionService {
 
     private static LocalDateTime atStartOfDay(LocalDate date) {
         return date == null ? null : date.atStartOfDay();
+    }
+
+    private static boolean canArchiveAfterMove(Bullion bullion) {
+        return bullion.getAmount().signum() == 0
+                && !bullion.isBudget()
+                && !bullion.isBudgetSource()
+                && bullion.getCreditCard() == null;
     }
 
     private static boolean isPositive(BigDecimal amount) {

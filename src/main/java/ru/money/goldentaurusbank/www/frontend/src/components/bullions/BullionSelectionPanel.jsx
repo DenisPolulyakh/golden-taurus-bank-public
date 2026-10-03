@@ -1,5 +1,6 @@
 import { GripVertical, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useFloatingPanel, useStoredOption } from '@/components/hooks/useFloatingPanel'
 import { formatAmount, toCents } from '@/lib/format'
@@ -27,7 +28,17 @@ function roundingShortfall(totalCents, rubles) {
     return { targetCents, shortfallCents: targetCents - totalCents }
 }
 
-function BullionSelectionPanel({ items, onRemove, onClear }) {
+function roundingExcess(totalCents, rubles) {
+    const stepCents = Number(rubles) * 100
+    const floorCents = Math.floor(totalCents / stepCents) * stepCents
+    return { floorCents, excessCents: totalCents - floorCents }
+}
+
+function nowLocalInput() {
+    return new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+}
+
+function BullionSelectionPanel({ items, onRemove, onClear, move }) {
     const hasItems = items.length > 0
     const [rounding, setRounding] = useStoredOption(ROUNDING_KEY, ROUNDING_VALUES, DEFAULT_ROUNDING)
     const { panelRef, style, dragHandleProps } = useFloatingPanel(POSITION_KEY, hasItems)
@@ -36,13 +47,23 @@ function BullionSelectionPanel({ items, onRemove, onClear }) {
 
     const totalCents = items.reduce((sum, item) => sum + toCents(item.amount), 0)
     const { targetCents, shortfallCents } = roundingShortfall(totalCents, rounding)
+    const { floorCents, excessCents } = roundingExcess(totalCents, rounding)
+    const showExcess = Boolean(move) && floorCents > 0 && excessCents > 0
+    const canMove = Boolean(move) &&
+        !move.loading &&
+        !move.disabledReason &&
+        move.targetVaultId !== '' &&
+        items.some((item) => toCents(item.amount) > 0)
 
     return (
         <aside
             ref={panelRef}
             style={style}
             aria-label="Выделенные слитки"
-            className="sticky bottom-2 z-40 flex max-h-[50vh] flex-col rounded-xl border bg-card text-card-foreground shadow-lg sm:fixed sm:right-6 sm:bottom-6 sm:max-h-[80vh] sm:w-80"
+            className={cn(
+                'sticky bottom-2 z-40 flex max-h-[50vh] flex-col rounded-xl border bg-card text-card-foreground shadow-lg sm:fixed sm:right-6 sm:bottom-6 sm:max-h-[80vh] sm:w-80',
+                move && 'sm:w-96',
+            )}
         >
             <div
                 className="flex items-center gap-2 border-b px-4 py-2 select-none sm:cursor-grab sm:touch-none sm:active:cursor-grabbing"
@@ -87,6 +108,17 @@ function BullionSelectionPanel({ items, onRemove, onClear }) {
                     </span>
                 </div>
 
+                {showExcess && (
+                    <div className="flex flex-col gap-0.5">
+                        <span className="text-sm text-muted-foreground">
+                            Лишнее сверх {formatAmount(floorCents / 100)} ₽
+                        </span>
+                        <span className="text-lg font-semibold tabular-nums">
+                            {formatAmount(excessCents / 100)} ₽
+                        </span>
+                    </div>
+                )}
+
                 <div className="flex flex-col gap-0.5">
                     <span className="text-sm text-muted-foreground">Сумма выделенных</span>
                     <span className="brand-text text-3xl leading-tight font-semibold tabular-nums">
@@ -101,7 +133,24 @@ function BullionSelectionPanel({ items, onRemove, onClear }) {
                         <span className="min-w-0 flex-1 truncate" title={item.title}>
                             {item.title}
                         </span>
-                        <span className="shrink-0 tabular-nums">{formatAmount(item.amount)} ₽</span>
+                        {move ? (
+                            <div className="flex shrink-0 flex-col items-end">
+                                <Input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={item.inputValue}
+                                    onChange={(event) => move.onAmountChange(item.id, event.target.value)}
+                                    onBlur={() => move.onAmountBlur(item.id)}
+                                    aria-label={`Сумма переноса «${item.title}»`}
+                                    className="h-7 w-28 text-right tabular-nums"
+                                />
+                                <span className="text-xs text-muted-foreground tabular-nums">
+                                    из {formatAmount(item.maxAmount)} ₽
+                                </span>
+                            </div>
+                        ) : (
+                            <span className="shrink-0 tabular-nums">{formatAmount(item.amount)} ₽</span>
+                        )}
                         <Button
                             variant="ghost"
                             size="icon-xs"
@@ -113,6 +162,43 @@ function BullionSelectionPanel({ items, onRemove, onClear }) {
                     </li>
                 ))}
             </ul>
+
+            {move && (
+                <div className="flex shrink-0 flex-col gap-3 border-t px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-muted-foreground">Куда</span>
+                        <Select value={move.targetVaultId} onValueChange={move.onTargetChange}>
+                            <SelectTrigger size="sm" className="w-52">
+                                <SelectValue placeholder="Выберите хранилище" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {move.vaults.map((vault) => (
+                                    <SelectItem key={vault.id} value={String(vault.id)}>
+                                        {vault.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-muted-foreground">Дата</span>
+                        <Input
+                            type="datetime-local"
+                            value={move.dateOperation}
+                            onChange={(event) => move.onDateChange(event.target.value)}
+                            max={nowLocalInput()}
+                            className="h-8 w-52 text-sm"
+                        />
+                    </div>
+                    <Button
+                        onClick={move.onSubmit}
+                        disabled={!canMove}
+                        title={move.disabledReason ?? ''}
+                    >
+                        Перенести
+                    </Button>
+                </div>
+            )}
         </aside>
     )
 }

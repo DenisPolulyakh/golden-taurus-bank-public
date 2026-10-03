@@ -255,10 +255,15 @@ public class TransactionService {
      */
     @Transactional
     public Bullion transferAmount(TransferRequest request, User user) {
+        return transferAmount(request, user, null);
+    }
+
+    @Transactional
+    public Bullion transferAmount(TransferRequest request, User user, Long batchId) {
         requireTransferAllowed(loadBullion(request.getFromBullionId(), user),
                 loadBullion(request.getToBullionId(), user));
         Transaction transaction = transfer(request.getFromBullionId(), request.getToBullionId(),
-                request.getAmount(), user, request.getComment(), request.getDateOperation(), null,
+                request.getAmount(), user, request.getComment(), request.getDateOperation(), batchId,
                 budgetOperationOrDefault(request.getBudgetOperation(), false));
         return loadBullion(transaction.getSourceBullionId(), user);
     }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { Coins, CreditCard, History, Minus, Pencil, PiggyBank, Plus, Repeat, Trash2, TrendingUp, Wallet } from 'lucide-react'
+import { toast } from 'sonner'
 import api from '@/api/axios'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,6 +19,7 @@ import { useBudgetBullionId } from '@/components/hooks/useBudgetBullion'
 import { useIncomeTypes } from '@/components/hooks/useIncomeTypes'
 import { useListControls } from '@/components/hooks/useListControls'
 import { useBullionSelection } from '@/components/hooks/useBullionSelection'
+import { useBullionMove } from '@/components/hooks/useBullionMove'
 import { useArrivalHighlight } from '@/components/hooks/useArrivalHighlight'
 import BullionTransactionModal from './BullionTransactionModal'
 import BullionSelectionPanel from './BullionSelectionPanel'
@@ -182,6 +184,7 @@ function VaultBullionsPage() {
         remove: removeSelected,
         clear: clearSelection,
     } = useBullionSelection(vaultSummary?.bullions ?? EMPTY_BULLIONS, getBullionId);
+    const bullionMove = useBullionMove(selectedItems);
 
     useEffect(() => {
         fetchVault();
@@ -477,6 +480,40 @@ function VaultBullionsPage() {
         return allVaults.filter(vault => vault.id !== parseInt(vaultId) && vault.allowedIncome !== false);
     }, [allVaults, vaultId]);
 
+    const moveVaults = allVaults
+        .filter(candidate => candidate.id !== parseInt(vaultId) && candidate.allowedTransferIn !== false)
+        .map(candidate => ({ id: candidate.id, label: candidate.displayName || candidate.name }));
+
+    const handleMoveSelected = async () => {
+        const moveItems = selectedItems
+            .map((bullion) => ({ bullionId: bullion.id, cents: bullionMove.centsFor(bullion) }))
+            .filter((moveItem) => moveItem.cents > 0);
+        if (moveItems.length === 0 || !bullionMove.targetVaultId) return;
+
+        const targetVault = moveVaults.find(candidate => String(candidate.id) === bullionMove.targetVaultId);
+        const totalCents = moveItems.reduce((sum, moveItem) => sum + moveItem.cents, 0);
+
+        bullionMove.setLoading(true);
+        try {
+            await api.post('/bullions/move-to-vault', {
+                toVaultId: Number(bullionMove.targetVaultId),
+                dateOperation: bullionMove.dateOperation || null,
+                items: moveItems.map((moveItem) => ({
+                    bullionId: moveItem.bullionId,
+                    amount: (moveItem.cents / 100).toFixed(2)
+                }))
+            });
+            toast.success(`Перенесено слитков: ${moveItems.length} на ${formatAmount(totalCents / 100)} ₽ в «${targetVault?.label ?? ''}»`);
+            clearSelection();
+            bullionMove.reset();
+            await refreshData();
+        } catch (err) {
+            console.error('Ошибка переноса слитков:', err);
+        } finally {
+            bullionMove.setLoading(false);
+        }
+    };
+
     if (loading) {
         return (
             <PageContainer>
@@ -664,10 +701,26 @@ function VaultBullionsPage() {
                 items={selectedItems.map((bullion) => ({
                     id: bullion.id,
                     title: bullion.bullionNameTitle,
-                    amount: bullion.amount,
+                    amount: bullionMove.centsFor(bullion) / 100,
+                    maxAmount: bullion.amount,
+                    inputValue: bullionMove.amountFor(bullion),
                 }))}
                 onRemove={removeSelected}
                 onClear={clearSelection}
+                move={{
+                    vaults: moveVaults,
+                    targetVaultId: bullionMove.targetVaultId,
+                    onTargetChange: bullionMove.setTargetVaultId,
+                    dateOperation: bullionMove.dateOperation,
+                    onDateChange: bullionMove.setDateOperation,
+                    onAmountChange: bullionMove.setAmount,
+                    onAmountBlur: bullionMove.normalizeAmount,
+                    onSubmit: handleMoveSelected,
+                    loading: bullionMove.loading,
+                    disabledReason: vault?.allowedTransferOut === false
+                        ? 'Из этого хранилища переводить нельзя'
+                        : null,
+                }}
             />
 
             <BullionModal

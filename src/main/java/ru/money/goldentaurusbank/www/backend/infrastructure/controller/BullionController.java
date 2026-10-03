@@ -100,6 +100,22 @@ public class BullionController {
     }
 
 
+    @PostMapping("/move-to-vault")
+    public ResponseEntity<SuccessResponse<Void>> moveBullionsToVault(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody MoveBullionsRequest request) {
+
+        User user = getUserFromUserDetails(userDetails);
+        bullionService.moveBullionsToVault(user, request);
+
+        return ResponseEntity.ok(new SuccessResponse<>(
+                SUCCESS.getCode(),
+                "Слитки перенесены",
+                null
+        ));
+    }
+
+
     @GetMapping
     public ResponseEntity<SuccessResponse<List<BullionResponse>>> getAllBullions(
             @AuthenticationPrincipal UserDetails userDetails) {
