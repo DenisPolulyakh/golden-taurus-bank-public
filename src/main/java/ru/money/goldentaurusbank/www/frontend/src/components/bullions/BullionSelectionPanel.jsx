@@ -1,4 +1,4 @@
-import { GripVertical, X } from 'lucide-react'
+import { GripVertical, Scissors, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -48,17 +48,12 @@ function BullionSelectionPanel({ items, onRemove, onClear, move }) {
     const totalCents = items.reduce((sum, item) => sum + toCents(item.amount), 0)
     const { targetCents, shortfallCents } = roundingShortfall(totalCents, rounding)
     const { floorCents, excessCents } = roundingExcess(totalCents, rounding)
-    const targetActive = Boolean(move) && move.targetCents > 0
-    const targetDiffCents = targetActive ? move.targetCents - totalCents : 0
-    const fullCents = items.reduce((sum, item) => sum + toCents(item.maxAmount ?? item.amount), 0)
+    const goalActive = Boolean(move) && move.goalCents > 0
+    const goalDiffCents = goalActive ? move.goalCents - totalCents : 0
+    const goalExcessCents = goalDiffCents < 0 ? -goalDiffCents : 0
     const hasEdits = Boolean(move) && items.some((item) => toCents(item.amount) < toCents(item.maxAmount))
-    const fitDisabledReason = !move ? null
-        : move.targetCents <= 0 ? 'Введите сумму'
-        : fullCents < move.targetCents ? `Выделенных слитков не хватает до ${formatAmount(move.targetCents / 100)} ₽`
-        : null
-    const canFit = Boolean(move) && !move.loading && !fitDisabledReason
     const vaultRestCents = move ? toCents(move.vaultTotal) - totalCents : 0
-    const showExcess = Boolean(move) && !targetActive && floorCents > 0 && excessCents > 0
+    const showExcess = Boolean(move) && !goalActive && floorCents > 0 && excessCents > 0
     const canMove = Boolean(move) &&
         !move.loading &&
         !move.disabledReason &&
@@ -113,26 +108,15 @@ function BullionSelectionPanel({ items, onRemove, onClear, move }) {
                     <div className="flex flex-col gap-1">
                         <div className="flex items-center justify-between gap-3">
                             <span className="text-sm text-muted-foreground">Перевести ровно</span>
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    type="text"
-                                    inputMode="decimal"
-                                    value={move.target}
-                                    onChange={(event) => move.onTargetChange(event.target.value)}
-                                    onBlur={move.onTargetBlur}
-                                    aria-label="Перевести ровно"
-                                    className="h-8 w-28 text-right tabular-nums"
-                                />
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={move.onFit}
-                                    disabled={!canFit}
-                                    title={fitDisabledReason ?? ''}
-                                >
-                                    Подогнать
-                                </Button>
-                            </div>
+                            <Input
+                                type="text"
+                                inputMode="decimal"
+                                value={move.goalAmount}
+                                onChange={(event) => move.onGoalChange(event.target.value)}
+                                onBlur={move.onGoalBlur}
+                                aria-label="Перевести ровно"
+                                className="h-8 w-36 text-right tabular-nums"
+                            />
                         </div>
                         {hasEdits && (
                             <Button
@@ -147,13 +131,13 @@ function BullionSelectionPanel({ items, onRemove, onClear, move }) {
                     </div>
                 )}
 
-                {targetActive ? (
+                {goalActive ? (
                     <div className="flex flex-col gap-0.5">
                         <span className="text-sm text-muted-foreground">
-                            {targetDiffCents < 0 ? 'Лишнее сверх' : 'Не хватает до'} {formatAmount(move.targetCents / 100)} ₽
+                            {goalDiffCents < 0 ? 'Оставить в слитках, чтобы перевести' : 'Не хватает до'} {formatAmount(move.goalCents / 100)} ₽
                         </span>
-                        <span className={cn('text-lg font-semibold tabular-nums', targetDiffCents === 0 && 'text-success')}>
-                            {formatAmount(Math.abs(targetDiffCents) / 100)} ₽
+                        <span className={cn('text-lg font-semibold tabular-nums', goalDiffCents === 0 && 'text-success')}>
+                            {formatAmount(Math.abs(goalDiffCents) / 100)} ₽
                         </span>
                     </div>
                 ) : (
@@ -214,6 +198,17 @@ function BullionSelectionPanel({ items, onRemove, onClear, move }) {
                             </div>
                         ) : (
                             <span className="shrink-0 tabular-nums">{formatAmount(item.amount)} ₽</span>
+                        )}
+                        {goalExcessCents > 0 && toCents(item.amount) > 0 && (
+                            <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => move.onKeepHere(item.id, goalExcessCents)}
+                                aria-label={`Оставить лишнее в «${item.title}»`}
+                                title={`Оставить здесь ${formatAmount(Math.min(goalExcessCents, toCents(item.amount)) / 100)} ₽`}
+                            >
+                                <Scissors />
+                            </Button>
                         )}
                         <Button
                             variant="ghost"
