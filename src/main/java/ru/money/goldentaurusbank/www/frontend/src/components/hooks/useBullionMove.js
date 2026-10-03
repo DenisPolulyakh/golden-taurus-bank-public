@@ -10,6 +10,7 @@ export function useBullionMove(selectedItems) {
     const [amounts, setAmounts] = useState({})
     const [targetVaultId, setTargetVaultId] = useState('')
     const [dateOperation, setDateOperation] = useState('')
+    const [target, setTarget] = useState('')
     const [loading, setLoading] = useState(false)
     const [seenItems, setSeenItems] = useState(selectedItems)
 
@@ -43,8 +44,29 @@ export function useBullionMove(selectedItems) {
         setAmounts((prev) => ({ ...prev, [id]: (cents / 100).toFixed(2) }))
     }, [selectedItems, centsFor])
 
+    const targetCents = parseCents(target)
+
+    const normalizeTarget = useCallback(() => {
+        setTarget(targetCents > 0 ? (targetCents / 100).toFixed(2) : '')
+    }, [targetCents])
+
+    const fitTo = useCallback(() => {
+        const sorted = [...selectedItems].sort((a, b) => toCents(b.amount) - toCents(a.amount))
+        let rest = targetCents
+        const next = {}
+        for (const item of sorted) {
+            const take = Math.min(toCents(item.amount), rest)
+            next[item.id] = (take / 100).toFixed(2)
+            rest -= take
+        }
+        setAmounts(next)
+    }, [selectedItems, targetCents])
+
+    const resetAmounts = useCallback(() => setAmounts({}), [])
+
     const reset = useCallback(() => {
         setAmounts({})
+        setTarget('')
         setTargetVaultId('')
         setDateOperation('')
     }, [])
@@ -58,6 +80,12 @@ export function useBullionMove(selectedItems) {
         setTargetVaultId,
         dateOperation,
         setDateOperation,
+        target,
+        setTarget,
+        targetCents,
+        normalizeTarget,
+        fitTo,
+        resetAmounts,
         loading,
         setLoading,
         reset,

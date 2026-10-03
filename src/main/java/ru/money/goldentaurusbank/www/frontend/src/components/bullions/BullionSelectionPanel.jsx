@@ -48,7 +48,17 @@ function BullionSelectionPanel({ items, onRemove, onClear, move }) {
     const totalCents = items.reduce((sum, item) => sum + toCents(item.amount), 0)
     const { targetCents, shortfallCents } = roundingShortfall(totalCents, rounding)
     const { floorCents, excessCents } = roundingExcess(totalCents, rounding)
-    const showExcess = Boolean(move) && floorCents > 0 && excessCents > 0
+    const targetActive = Boolean(move) && move.targetCents > 0
+    const targetDiffCents = targetActive ? move.targetCents - totalCents : 0
+    const fullCents = items.reduce((sum, item) => sum + toCents(item.maxAmount ?? item.amount), 0)
+    const hasEdits = Boolean(move) && items.some((item) => toCents(item.amount) < toCents(item.maxAmount))
+    const fitDisabledReason = !move ? null
+        : move.targetCents <= 0 ? 'Введите сумму'
+        : fullCents < move.targetCents ? `Выделенных слитков не хватает до ${formatAmount(move.targetCents / 100)} ₽`
+        : null
+    const canFit = Boolean(move) && !move.loading && !fitDisabledReason
+    const vaultRestCents = move ? toCents(move.vaultTotal) - totalCents : 0
+    const showExcess = Boolean(move) && !targetActive && floorCents > 0 && excessCents > 0
     const canMove = Boolean(move) &&
         !move.loading &&
         !move.disabledReason &&
@@ -99,14 +109,63 @@ function BullionSelectionPanel({ items, onRemove, onClear, move }) {
                     </Select>
                 </div>
 
-                <div className="flex flex-col gap-0.5">
-                    <span className="text-sm text-muted-foreground">
-                        Не хватает до {formatAmount(targetCents / 100)} ₽
-                    </span>
-                    <span className={cn('text-lg font-semibold tabular-nums', shortfallCents === 0 && 'text-success')}>
-                        {formatAmount(shortfallCents / 100)} ₽
-                    </span>
-                </div>
+                {move && (
+                    <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-3">
+                            <span className="text-sm text-muted-foreground">Перевести ровно</span>
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={move.target}
+                                    onChange={(event) => move.onTargetChange(event.target.value)}
+                                    onBlur={move.onTargetBlur}
+                                    aria-label="Перевести ровно"
+                                    className="h-8 w-28 text-right tabular-nums"
+                                />
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={move.onFit}
+                                    disabled={!canFit}
+                                    title={fitDisabledReason ?? ''}
+                                >
+                                    Подогнать
+                                </Button>
+                            </div>
+                        </div>
+                        {hasEdits && (
+                            <Button
+                                variant="ghost"
+                                size="xs"
+                                className="self-end"
+                                onClick={move.onResetAmounts}
+                            >
+                                Вернуть полные суммы
+                            </Button>
+                        )}
+                    </div>
+                )}
+
+                {targetActive ? (
+                    <div className="flex flex-col gap-0.5">
+                        <span className="text-sm text-muted-foreground">
+                            {targetDiffCents < 0 ? 'Лишнее сверх' : 'Не хватает до'} {formatAmount(move.targetCents / 100)} ₽
+                        </span>
+                        <span className={cn('text-lg font-semibold tabular-nums', targetDiffCents === 0 && 'text-success')}>
+                            {formatAmount(Math.abs(targetDiffCents) / 100)} ₽
+                        </span>
+                    </div>
+                ) : (
+                    <div className="flex flex-col gap-0.5">
+                        <span className="text-sm text-muted-foreground">
+                            Не хватает до {formatAmount(targetCents / 100)} ₽
+                        </span>
+                        <span className={cn('text-lg font-semibold tabular-nums', shortfallCents === 0 && 'text-success')}>
+                            {formatAmount(shortfallCents / 100)} ₽
+                        </span>
+                    </div>
+                )}
 
                 {showExcess && (
                     <div className="flex flex-col gap-0.5">
@@ -147,6 +206,11 @@ function BullionSelectionPanel({ items, onRemove, onClear, move }) {
                                 <span className="text-xs text-muted-foreground tabular-nums">
                                     из {formatAmount(item.maxAmount)} ₽
                                 </span>
+                                {toCents(item.amount) > 0 && toCents(item.amount) < toCents(item.maxAmount) && (
+                                    <span className="text-xs text-muted-foreground tabular-nums">
+                                        останется {formatAmount((toCents(item.maxAmount) - toCents(item.amount)) / 100)} ₽
+                                    </span>
+                                )}
                             </div>
                         ) : (
                             <span className="shrink-0 tabular-nums">{formatAmount(item.amount)} ₽</span>
@@ -165,6 +229,10 @@ function BullionSelectionPanel({ items, onRemove, onClear, move }) {
 
             {move && (
                 <div className="flex shrink-0 flex-col gap-3 border-t px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-muted-foreground">Останется в хранилище</span>
+                        <span className="text-sm font-medium tabular-nums">{formatAmount(vaultRestCents / 100)} ₽</span>
+                    </div>
                     <div className="flex items-center justify-between gap-3">
                         <span className="text-sm text-muted-foreground">Куда</span>
                         <Select value={move.targetVaultId} onValueChange={move.onTargetChange}>
