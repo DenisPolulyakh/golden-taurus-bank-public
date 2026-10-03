@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Eraser, Pencil, Plus, Trash2, Vault } from 'lucide-react'
+import { CheckCheck, Eraser, Pencil, Plus, Trash2, Vault } from 'lucide-react'
+import { toast } from 'sonner'
 import api from '@/api/axios'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -29,10 +30,14 @@ import { SavingsStats } from '@/components/ui-app/savings-stats'
 import { SortableHead, TablePager } from '@/components/ui-app/data-table'
 import { EmptyState, ErrorMessage, PageLoading } from '@/components/ui-app/page-state'
 import { useConfirm } from '@/components/ui-app/confirm-dialog'
+import { useBullionSelection } from '@/components/hooks/useBullionSelection'
 import { formatAmount, formatShortDate } from '@/lib/format'
 import VaultModal from './VaultModal'
+import VaultSelectionPanel from './VaultSelectionPanel'
 
 const PAGE_SIZES = [5, 10, 20, 50]
+
+const getVaultId = (vault) => vault.id
 
 function VaultsPage() {
     const [vaults, setVaults] = useState([])
@@ -52,10 +57,30 @@ function VaultsPage() {
     const [sortField, setSortField] = useState('name')
     const [sortOrder, setSortOrder] = useState('asc')
 
+    const [bulkLoading, setBulkLoading] = useState(false)
+    const [knownVaults, setKnownVaults] = useState(() => new Map())
+    const knownVaultList = useMemo(() => [...knownVaults.values()], [knownVaults])
+    const {
+        selectedItems: selectedVaults,
+        isSelected,
+        onCardClick: onRowClick,
+        remove: removeSelected,
+        clear: clearSelection,
+        selectMany,
+    } = useBullionSelection(knownVaultList, getVaultId)
+
     const navigate = useNavigate()
     const timeoutRef = useRef(null)
     const isInitialMount = useRef(true)
     const { confirm, confirmDialog } = useConfirm()
+
+    const rememberVaults = useCallback((list) => {
+        setKnownVaults((prev) => {
+            const next = new Map(prev)
+            for (const vault of list) next.set(vault.id, vault)
+            return next
+        })
+    }, [])
 
     const fetchVaults = useCallback(async (search, sortBy, sortOrderParam, page, size, showTableLoader = true) => {
         if (showTableLoader) {
@@ -75,6 +100,7 @@ function VaultsPage() {
             const response = await api.get(`/vaults?${params.toString()}`)
             const pageData = response.data.data
             setVaults(pageData.content || [])
+            rememberVaults(pageData.content || [])
             setCurrentPage(pageData.pageNumber)
             setTotalPages(pageData.totalPages)
             setTotalElements(pageData.totalElements)
@@ -85,7 +111,7 @@ function VaultsPage() {
             setLoading(false)
             setTableLoading(false)
         }
-    }, [])
+    }, [rememberVaults])
 
     const fetchStats = useCallback(async () => {
         try {
@@ -164,6 +190,7 @@ function VaultsPage() {
                 }
             }
 
+            rememberVaults([savedVault])
             fetchStats()
             setModalOpen(false)
             setEditingVault(null)
@@ -188,6 +215,12 @@ function VaultsPage() {
                 try {
                     setError('')
                     await api.delete(`/vaults/${id}`)
+                    removeSelected(id)
+                    setKnownVaults((prev) => {
+                        const next = new Map(prev)
+                        next.delete(id)
+                        return next
+                    })
                     fetchStats()
                     if (vaults.length === 1 && currentPage > 1) {
                         setCurrentPage(currentPage - 1)
@@ -224,6 +257,48 @@ function VaultsPage() {
 
     const handleVaultClick = (vaultId) => {
         navigate(`/vaults/${vaultId}`, { state: { from: 'vaults' } })
+    }
+
+    const handleSelectByType = async (accountType) => {
+        setBulkLoading(true)
+        try {
+            setError('')
+            const params = new URLSearchParams()
+            if (searchTerm) params.append('search', searchTerm)
+            params.append('sortBy', 'name')
+            params.append('sortOrder', 'asc')
+            params.append('page', 1)
+            params.append('size', 100)
+
+            const response = await api.get(`/vaults?${params.toString()}`)
+            const pageData = response.data.data
+            const list = pageData.content || []
+            rememberVaults(list)
+
+            const matching = list.filter((vault) => vault.accountType === accountType)
+            if (matching.length === 0) {
+                toast.info(accountType === 'SAVINGS' ? 'Накопительных хранилищ нет' : 'Срочных хранилищ нет')
+                return
+            }
+            selectMany(matching.map(getVaultId))
+            if (pageData.totalElements > list.length) {
+                toast.info('Выделены только первые 100 хранилищ')
+            }
+        } catch (err) {
+            console.error('Ошибка массового выделения хранилищ:', err)
+            setError('Не удалось выделить хранилища')
+        } finally {
+            setBulkLoading(false)
+        }
+    }
+
+    const handleLocateVault = (id) => {
+        const element = document.getElementById(`vault-row-${id}`)
+        if (!element) {
+            toast.info('Хранилище на другой странице или скрыто поиском')
+            return
+        }
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
 
     const toggleSort = (field) => {
@@ -272,11 +347,33 @@ function VaultsPage() {
                     averageRate={stats?.averageRate}
                 />
 
-                <SearchInput
-                    value={searchTerm}
-                    onChange={setSearchTerm}
-                    placeholder="Поиск хранилищ..."
-                />
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <SearchInput
+                        value={searchTerm}
+                        onChange={setSearchTerm}
+                        placeholder="Поиск хранилищ..."
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSelectByType('SAVINGS')}
+                            disabled={bulkLoading}
+                        >
+                            <CheckCheck />
+                            Все накопительные
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSelectByType('TERM')}
+                            disabled={bulkLoading}
+                        >
+                            <CheckCheck />
+                            Все срочные
+                        </Button>
+                    </div>
+                </div>
 
                 <ErrorMessage>{error}</ErrorMessage>
 
@@ -353,7 +450,12 @@ function VaultsPage() {
                                     const deletable = canDelete(vault)
 
                                     return (
-                                        <TableRow key={vault.id}>
+                                        <TableRow
+                                            key={vault.id}
+                                            id={`vault-row-${vault.id}`}
+                                            onClick={(event) => onRowClick(event, vault.id)}
+                                            className={isSelected(vault.id) ? 'bg-primary/10' : ''}
+                                        >
                                             <TableCell>
                                                 {vault.bankName ? (
                                                     <Link
@@ -519,6 +621,14 @@ function VaultsPage() {
                     initialAllowedExpense={editingVault?.settings?.allowedExpense !== false}
                     initialAllowedTransfer={editingVault?.settings?.allowedTransfer !== false}
                     isEditing={!!editingVault}
+                />
+
+                <VaultSelectionPanel
+                    vaults={selectedVaults}
+                    grandTotal={stats?.totalAmount}
+                    onRemove={removeSelected}
+                    onClear={clearSelection}
+                    onLocate={handleLocateVault}
                 />
 
                 {confirmDialog}
