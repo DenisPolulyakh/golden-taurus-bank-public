@@ -14,6 +14,7 @@ import { EmptyState, ErrorMessage, PageLoading } from '@/components/ui-app/page-
 import { StatCard, StatGrid } from '@/components/ui-app/stat-card'
 import { useConfirm } from '@/components/ui-app/confirm-dialog'
 import { useBullionSelection } from '@/components/hooks/useBullionSelection'
+import { useArrivalHighlight } from '@/components/hooks/useArrivalHighlight'
 import { cn } from '@/lib/utils'
 import { buildSheetHtml } from '@/lib/vaultSheet'
 import CreditCardModal from './CreditCardModal'
@@ -68,6 +69,7 @@ function CreditCardsPage() {
     } = useBullionSelection(knownCardList, getCardId);
 
     const navigate = useNavigate();
+    const highlightedCardId = useArrivalHighlight('creditCardId', !loading, 'credit-card');
     const { confirm, confirmDialog } = useConfirm();
     const timeoutRef = useRef(null);
     const isInitialMount = useRef(true);
@@ -395,6 +397,7 @@ function CreditCardsPage() {
                             card={card}
                             disabled={actionLoading}
                             selected={isSelected(card.id)}
+                            highlighted={card.id === highlightedCardId}
                             onSelect={(event) => onCardClick(event, card.id)}
                             onSpend={() => setOperation({ type: 'spend', card })}
                             onRepay={() => setOperation({ type: 'repay', card })}
@@ -465,14 +468,14 @@ function CreditCardsPage() {
     )
 }
 
-const CreditCard = ({ card, selected, onSelect, disabled, onSpend, onRepay, onHistory, onEdit, onDelete, hasRequisites, vaultLocked, onRequisites }) => {
+const CreditCard = ({ card, highlighted, selected, onSelect, disabled, onSpend, onRepay, onHistory, onEdit, onDelete, hasRequisites, vaultLocked, onRequisites }) => {
     const accumulators = card.accumulators || []
 
     return (
         <Card
             id={`credit-card-${card.id}`}
             onClick={onSelect}
-            className={cn('gap-4 transition-shadow hover:shadow-md', selected && 'border-primary bg-primary/10')}
+            className={cn('gap-4 transition-shadow hover:shadow-md', highlighted && 'ring-2 ring-primary', selected && 'border-primary bg-primary/10')}
         >
             <CardHeader>
                 <CardTitle className="text-base">{card.name}</CardTitle>
@@ -517,7 +520,10 @@ const CreditCard = ({ card, selected, onSelect, disabled, onSpend, onRepay, onHi
                         <div className="flex flex-wrap gap-1.5">
                             {accumulators.map((item) => (
                                 <Badge key={item.bullionId} variant="outline" asChild>
-                                    <Link to={`/vaults/${item.vaultId}`}>
+                                    <Link
+                                        to={`/vaults/${item.vaultId}`}
+                                        state={{ from: 'credit-cards', bullionId: item.bullionId, creditCardId: card.id }}
+                                    >
                                         <span
                                             style={
                                                 item.bullionNameColor

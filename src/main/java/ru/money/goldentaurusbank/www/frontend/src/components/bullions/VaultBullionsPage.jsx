@@ -205,6 +205,8 @@ function VaultBullionsPage() {
             navigate('/vaults');
         } else if (from === 'banks' && location.state?.bankId) {
             navigate(`/banks/${location.state.bankId}`);
+        } else if (from === 'credit-cards') {
+            navigate('/credit-cards', { state: { creditCardId: location.state?.creditCardId } });
         } else {
             navigate('/bullions', { state: { bullionNameId: location.state?.bullionNameId } });
         }
