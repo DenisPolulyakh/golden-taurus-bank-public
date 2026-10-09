@@ -2,6 +2,57 @@
 
 Домашняя бухгалтерия: Spring Boot 3.5 (Java 21) + React 19 (Vite) + PostgreSQL.
 
+*English: a full-stack personal finance app. Java 21 / Spring Boot 3.5 backend, React 19 frontend, PostgreSQL with Liquibase migrations, JWT auth, Telegram reminders. About 350 tests, mostly integration tests on a real PostgreSQL via Testcontainers, run in GitHub Actions. Details below are in Russian.*
+
+## Что умеет
+
+- Банки, хранилища и слитки-накопители: учёт остатков, операции, архивация вместо удаления, история сохраняется.
+- Кредитные карты: лимит, погашение, погашение из накопителя, откат операций.
+- Месячный бюджет и статистика доходов.
+- Сундук с реквизитами карт: шифрование AES-256-GCM на клиенте, сервер хранит непрозрачную строку и следит только за версией.
+- Телеграм-бот: привязка чата по одноразовому коду и напоминания о платежах.
+- Регистрация с подтверждением почты, JWT (access в памяти, refresh в httpOnly-cookie).
+
+## Технологии
+
+| Слой | Что используется |
+|------|------------------|
+| Бэкенд | Java 21, Spring Boot 3.5, Spring Security, Spring Data JPA, Bean Validation, Actuator |
+| База данных | PostgreSQL, миграции Liquibase |
+| Фронтенд | React 19, Vite, shadcn/ui |
+| Тесты | JUnit 5, Spring Boot Test, Testcontainers (PostgreSQL) |
+| Инфраструктура | Docker (multi-stage сборка), Docker Compose, Caddy с автоматическим Let's Encrypt, GitHub Actions |
+
+## Как устроено
+
+```
+src/main/java/.../backend
+  config/          конфигурация Spring и безопасности
+  security/        JWT, фильтры, refresh-cookie
+  model/           сущности, DTO, коды ответов
+  repository/      Spring Data репозитории
+  service/         бизнес-логика (банки, хранилища, слитки, кредитные карты, бюджет)
+  service/telegram телеграм-бот и напоминания
+  infrastructure/  REST-контроллеры и обработка ошибок
+src/main/java/.../frontend   React-приложение
+src/main/resources/db        миграции Liquibase
+```
+
+## Тесты и CI
+
+В проекте около 350 тестов, большая часть из них интеграционные: они поднимают реальный
+PostgreSQL в Testcontainers и проходят весь путь от HTTP-запроса до базы. Один контейнер и один
+контекст Spring используются на весь прогон, поэтому тесты не растягиваются на минуты.
+
+Локальный запуск (нужен Docker):
+
+```bash
+./mvnw verify
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) на каждый push в `main` и каждый pull request
+выполняет `mvn verify` и собирает фронтенд.
+
 ## Деплой на VPS в Docker
 
 Всё приложение поднимается тремя контейнерами в одной сети:

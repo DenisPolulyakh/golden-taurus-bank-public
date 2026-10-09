@@ -13,7 +13,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 
 /**
  * Общая обвязка интеграционных тестов: один PostgreSQL и один контекст Spring на
- * весь прогон вместо шести (см. plans/planCICD.md, п. 10).
+ * весь прогон вместо шести.
  */
 abstract class IntegrationTestBase {
 

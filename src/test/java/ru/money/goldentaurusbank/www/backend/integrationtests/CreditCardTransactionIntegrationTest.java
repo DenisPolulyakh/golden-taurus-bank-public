@@ -15,7 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Операции по кредитной карте: списание лимита, погашение, погашение из
- * накопителя и откат (см. plans/PLAN_CREDIT_CARD.md).
+ * накопителя и откат.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc

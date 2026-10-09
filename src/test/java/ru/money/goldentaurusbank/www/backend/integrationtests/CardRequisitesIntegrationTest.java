@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Сундук с реквизитами карт: сервер хранит непрозрачную строку и следит только
- * за версией (см. plans/PLAN_CARD_VAULT.md).
+ * за версией.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc

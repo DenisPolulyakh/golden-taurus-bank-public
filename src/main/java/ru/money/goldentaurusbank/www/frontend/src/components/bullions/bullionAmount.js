@@ -4,7 +4,7 @@ import { formatAmount, toCents } from '@/lib/format'
 /**
  * Тост о корректирующей операции после правки суммы слитка. Дельту считаем на клиенте:
  * старую сумму страница знает до отправки формы, а ответ PUT о проведённой операции молчит.
- * Полей о проведённой операции в ответе не планируется — см. PLAN_BULLION_AMOUNT_EDIT.md, п. 3.4.
+ * Полей о проведённой операции в ответе не планируется.
  */
 export const notifyAmountChange = (previousAmount, newAmount) => {
     const deltaCents = toCents(newAmount) - toCents(previousAmount)

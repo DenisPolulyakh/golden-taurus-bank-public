@@ -21,8 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Напоминания о платежах: кому, когда и по каким картам
- * (см. plans/PLAN_TELEGRAM_BOT.md).
+ * Напоминания о платежах: кому, когда и по каким картам.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc

@@ -1,7 +1,7 @@
 name: CI
 
 # Тесты и сборка идут на раннерах GitHub, не на VPS: на 2 vCPU и 3.7 ГБ
-# компиляция рядом с боевой БД упирается в память (см. plans/planCICD.md, п. 12).
+# компиляция рядом с боевой БД упирается в память.
 on:
   push:
     branches: [main]      # прямые пуши в main + слияния PR
@@ -59,10 +59,6 @@ jobs:
         working-directory: ${{ env.FRONTEND_DIR }}
         run: npm run lint
 
-      # Артефакт CI больше не выкладывает: его никто не забирал. Выкладка собирает
-      # себе jar и dist сама и в том же прогоне их и распаковывает (deploy.yml,
-      # job `build` → `deploy-<sha>`). Лишняя копия только ела 500 МБ квоты на Free
-      # и в итоге роняла зелёный прогон на `Artifact storage quota has been hit`.
       - name: Фронт — сборка
         working-directory: ${{ env.FRONTEND_DIR }}
         run: npm run build

@@ -25,8 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Привязка телеграм-чатов к аккаунтам по одноразовому коду
- * (см. plans/PLAN_TELEGRAM_BOT.md).
+ * Привязка телеграм-чатов к аккаунтам по одноразовому коду.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc

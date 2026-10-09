@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Кредитные карты: заведение, последние 4 цифры, поиск, сортировки, накопитель
- * и архивация (см. plans/PLAN_CREDIT_CARD.md).
+ * и архивация.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc

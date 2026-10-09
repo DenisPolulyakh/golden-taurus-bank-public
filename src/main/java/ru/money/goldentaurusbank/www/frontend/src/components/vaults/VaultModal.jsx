@@ -47,7 +47,7 @@ function VaultModal({
     const [accountType, setAccountType] = useState('SAVINGS')
     const [closeDate, setCloseDate] = useState('')
     // Галочки разрешённых операций: бэк хранит их в vaults.allowed_*,
-    // и только они решают, доступна ли операция (см. plans/PLAN_VAULT_ALLOW.md).
+    // и только они решают, доступна ли операция.
     const [allowedIncome, setAllowedIncome] = useState(true)
     const [allowedExpense, setAllowedExpense] = useState(true)
     const [allowedTransfer, setAllowedTransfer] = useState(true)

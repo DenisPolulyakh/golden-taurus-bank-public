@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Галочки операций у хранилища (plans/PLAN_VAULT_ALLOW.md).
+ * Галочки операций у хранилища.
  *
  * <p>Правило одно: разрешённость операции задаёт только галочка. Дата закрытия
  * срочного вклада справочная и ни на что не влияет — условия у вкладов разные,

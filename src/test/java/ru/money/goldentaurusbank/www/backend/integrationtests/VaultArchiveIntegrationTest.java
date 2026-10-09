@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Удалённое хранилище архивируется, а не исчезает: история операций должна
- * по-прежнему показывать банк и хранилище (см. plans/PLAN_VAULT_ARCHIVE.md).
+ * по-прежнему показывать банк и хранилище.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc

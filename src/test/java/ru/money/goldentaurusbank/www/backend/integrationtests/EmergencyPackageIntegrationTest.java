@@ -16,8 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Аварийный пакет: долги открытым текстом плюс запертый сундук
- * (см. plans/PLAN_CARD_VAULT.md).
+ * Аварийный пакет: долги открытым текстом плюс запертый сундук.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
